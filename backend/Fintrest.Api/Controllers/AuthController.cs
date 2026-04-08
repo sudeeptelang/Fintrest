@@ -1,7 +1,6 @@
 using Fintrest.Api.Data;
 using Fintrest.Api.DTOs.Auth;
 using Fintrest.Api.Models;
-using Fintrest.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,53 +8,114 @@ using System.Security.Claims;
 
 namespace Fintrest.Api.Controllers;
 
+/// <summary>
+/// Auth is handled by Supabase. This controller syncs Supabase users
+/// to our local users table and returns profile info.
+/// </summary>
 [ApiController]
 [Route("api/v1/auth")]
-public class AuthController(AppDbContext db, JwtService jwt) : ControllerBase
+public class AuthController(AppDbContext db) : ControllerBase
 {
-    [HttpPost("signup")]
-    public async Task<ActionResult<TokenResponse>> Signup(SignupRequest request)
-    {
-        if (await db.Users.AnyAsync(u => u.Email == request.Email))
-            return Conflict(new { message = "Email already registered" });
-
-        var user = new User
-        {
-            Email = request.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            FullName = request.FullName,
-        };
-
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
-
-        var token = jwt.GenerateToken(user.Id, user.Email, user.IsAdmin);
-        return Created("", new TokenResponse(token));
-    }
-
-    [HttpPost("login")]
-    public async Task<ActionResult<TokenResponse>> Login(LoginRequest request)
-    {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
-
-        if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            return Unauthorized(new { message = "Invalid email or password" });
-
-        if (!user.IsActive)
-            return StatusCode(403, new { message = "Account is deactivated" });
-
-        var token = jwt.GenerateToken(user.Id, user.Email, user.IsAdmin);
-        return Ok(new TokenResponse(token));
-    }
-
+    /// <summary>
+    /// Get or create the local user record from Supabase JWT claims.
+    /// Called after the frontend authenticates via Supabase.
+    /// </summary>
     [Authorize]
     [HttpGet("me")]
     public async Task<ActionResult<UserResponse>> GetMe()
     {
-        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var user = await db.Users.FindAsync(userId);
-        if (user is null) return NotFound();
+        var supabaseId = GetSupabaseUserId();
+        if (supabaseId is null) return Unauthorized();
 
-        return Ok(new UserResponse(user.Id, user.Email, user.FullName, user.Plan.ToString(), user.IsActive));
+        var email = User.FindFirstValue(ClaimTypes.Email)
+                    ?? User.FindFirstValue("email")
+                    ?? "";
+
+        // Find or create local user
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == supabaseId.Value);
+
+        if (user is null)
+        {
+            // First time this Supabase user hits our API — create local record
+            user = new User
+            {
+                Id = supabaseId.Value,
+                Email = email,
+                PasswordHash = "supabase_auth", // Not used — Supabase handles passwords
+                FullName = User.FindFirstValue("user_metadata.full_name"),
+            };
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
+        }
+        else if (user.Email != email && !string.IsNullOrEmpty(email))
+        {
+            // Sync email if changed in Supabase
+            user.Email = email;
+            user.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        return Ok(new UserResponse(
+            user.Id,
+            user.Email,
+            user.FullName,
+            user.Plan.ToString(),
+            user.IsActive
+        ));
+    }
+
+    /// <summary>
+    /// Sync user profile data from Supabase after signup.
+    /// Frontend calls this after supabase.auth.signUp() succeeds.
+    /// </summary>
+    [Authorize]
+    [HttpPost("sync")]
+    public async Task<ActionResult<UserResponse>> SyncProfile([FromBody] SyncProfileRequest request)
+    {
+        var supabaseId = GetSupabaseUserId();
+        if (supabaseId is null) return Unauthorized();
+
+        var email = User.FindFirstValue(ClaimTypes.Email)
+                    ?? User.FindFirstValue("email")
+                    ?? "";
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == supabaseId.Value);
+
+        if (user is null)
+        {
+            user = new User
+            {
+                Id = supabaseId.Value,
+                Email = email,
+                PasswordHash = "supabase_auth",
+                FullName = request.FullName,
+            };
+            db.Users.Add(user);
+        }
+        else
+        {
+            if (request.FullName is not null) user.FullName = request.FullName;
+            user.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync();
+
+        return Ok(new UserResponse(
+            user.Id,
+            user.Email,
+            user.FullName,
+            user.Plan.ToString(),
+            user.IsActive
+        ));
+    }
+
+    private Guid? GetSupabaseUserId()
+    {
+        // Supabase puts user ID in the "sub" claim
+        var sub = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? User.FindFirstValue("sub");
+        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }
+
+public record SyncProfileRequest(string? FullName);

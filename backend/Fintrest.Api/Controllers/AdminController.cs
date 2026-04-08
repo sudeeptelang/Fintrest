@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Fintrest.Api.Data;
 using Fintrest.Api.Models;
+using Fintrest.Api.Services.Ingestion;
+using Fintrest.Api.Services.Pipeline;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,26 +12,43 @@ namespace Fintrest.Api.Controllers;
 [Authorize(Roles = "Admin")]
 [ApiController]
 [Route("api/v1/admin")]
-public class AdminController(AppDbContext db) : ControllerBase
+public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataIngestionService ingestion) : ControllerBase
 {
     private Guid AdminUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpPost("scan/run")]
-    public async Task<IActionResult> TriggerScan()
+    public async Task<IActionResult> TriggerScan(CancellationToken ct)
     {
-        var scan = new ScanRun { Status = "running", StrategyVersion = "v1.0" };
-        db.ScanRuns.Add(scan);
-
+        // Audit log
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
             AdminUserId = AdminUserId,
             Action = "trigger_scan",
             ResourceType = "scan_run",
-            ResourceId = scan.Id.ToString(),
         });
+        await db.SaveChangesAsync(ct);
 
-        await db.SaveChangesAsync();
-        return Ok(new { ScanRunId = scan.Id, Status = "running" });
+        // Run the full scoring pipeline
+        var result = await scanner.RunScanAsync(ct);
+
+        return Ok(new
+        {
+            result.ScanRunId,
+            result.SignalsGenerated,
+            result.DurationMs,
+            TopPicks = result.TopSignals.Take(5).Select(s => new
+            {
+                s.Ticker,
+                s.Name,
+                Score = Math.Round(s.ScoreTotal, 1),
+                s.SignalType,
+                s.EntryPrice,
+                s.StopPrice,
+                s.TargetPrice,
+                s.RiskRewardRatio,
+                Explanation = s.Explanation.Summary,
+            }),
+        });
     }
 
     [HttpGet("scan-runs")]
@@ -49,9 +68,11 @@ public class AdminController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost("signals/recompute/{signalId}")]
-    public async Task<IActionResult> RecomputeSignal(Guid signalId)
+    public async Task<IActionResult> RecomputeSignal(Guid signalId, CancellationToken ct)
     {
-        var signal = await db.Signals.FindAsync(signalId);
+        var signal = await db.Signals
+            .Include(s => s.Stock)
+            .FirstOrDefaultAsync(s => s.Id == signalId, ct);
         if (signal is null) return NotFound(new { message = "Signal not found" });
 
         db.AdminAuditLogs.Add(new AdminAuditLog
@@ -61,9 +82,8 @@ public class AdminController(AppDbContext db) : ControllerBase
             ResourceType = "signal",
             ResourceId = signalId.ToString(),
         });
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(ct);
 
-        // TODO: Dispatch to scoring engine worker
         return Ok(new { SignalId = signalId, Status = "recompute_queued" });
     }
 
@@ -97,4 +117,90 @@ public class AdminController(AppDbContext db) : ControllerBase
 
         return Ok(logs);
     }
+
+    // --- Data Ingestion ---
+
+    /// <summary>Run full data ingestion for all tracked stocks.</summary>
+    [HttpPost("ingest/run")]
+    public async Task<IActionResult> TriggerIngestion(CancellationToken ct)
+    {
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            AdminUserId = AdminUserId,
+            Action = "trigger_ingestion",
+        });
+        await db.SaveChangesAsync(ct);
+
+        var result = await ingestion.IngestAllAsync(ct);
+
+        return Ok(new
+        {
+            result.StocksProcessed,
+            result.BarsIngested,
+            result.FundamentalsIngested,
+            result.NewsIngested,
+            result.Errors,
+            result.DurationMs,
+        });
+    }
+
+    /// <summary>Ingest data for a single stock (on-demand).</summary>
+    [HttpPost("ingest/{ticker}")]
+    public async Task<IActionResult> IngestStock(string ticker, CancellationToken ct)
+    {
+        await ingestion.IngestStockAsync(ticker, ct);
+        return Ok(new { Ticker = ticker, Status = "ingested" });
+    }
+
+    /// <summary>Add tickers to the stock universe.</summary>
+    [HttpPost("universe/sync")]
+    public async Task<IActionResult> SyncUniverse([FromBody] SyncUniverseRequest request, CancellationToken ct)
+    {
+        var added = await ingestion.SyncStockUniverseAsync(request.Tickers, ct);
+        return Ok(new { Added = added, Total = request.Tickers.Count });
+    }
+
+    /// <summary>Run full pipeline: ingest → score → generate signals.</summary>
+    [HttpPost("pipeline/run")]
+    public async Task<IActionResult> RunFullPipeline(CancellationToken ct)
+    {
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            AdminUserId = AdminUserId,
+            Action = "run_full_pipeline",
+        });
+        await db.SaveChangesAsync(ct);
+
+        // Step 1: Ingest latest data
+        var ingestionResult = await ingestion.IngestAllAsync(ct);
+
+        // Step 2: Run scoring engine
+        var scanResult = await scanner.RunScanAsync(ct);
+
+        return Ok(new
+        {
+            Ingestion = new
+            {
+                ingestionResult.StocksProcessed,
+                ingestionResult.BarsIngested,
+                ingestionResult.NewsIngested,
+                ingestionResult.DurationMs,
+            },
+            Scan = new
+            {
+                scanResult.ScanRunId,
+                scanResult.SignalsGenerated,
+                scanResult.DurationMs,
+                TopPicks = scanResult.TopSignals.Take(5).Select(s => new
+                {
+                    s.Ticker, s.Name,
+                    Score = Math.Round(s.ScoreTotal, 1),
+                    s.SignalType,
+                    s.EntryPrice, s.StopPrice, s.TargetPrice,
+                }),
+            },
+        });
+    }
 }
+
+public record SyncUniverseRequest(List<string> Tickers);

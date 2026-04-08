@@ -1,18 +1,17 @@
 using System.Text;
 using Fintrest.Api.Data;
-using Fintrest.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Database
+// Database — Supabase PostgreSQL
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// JWT Auth
-var jwtSecret = builder.Configuration["Jwt:Secret"]!;
+// Auth — Validate Supabase JWT tokens
+var supabaseJwtSecret = builder.Configuration["Supabase:JwtSecret"]!;
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -22,15 +21,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ValidIssuer = $"{builder.Configuration["Supabase:Url"]}/auth/v1",
+            ValidAudience = "authenticated",
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(supabaseJwtSecret)),
+            NameClaimType = "sub",  // Supabase user ID is in "sub" claim
         };
     });
 builder.Services.AddAuthorization();
 
+// Data Providers
+builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.IMarketDataProvider,
+    Fintrest.Api.Services.Providers.Polygon.PolygonProvider>();
+builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.IFundamentalsProvider,
+    Fintrest.Api.Services.Providers.FMP.FmpProvider>();
+builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.INewsProvider,
+    Fintrest.Api.Services.Providers.Finnhub.FinnhubProvider>();
+
 // Services
-builder.Services.AddSingleton<JwtService>();
+builder.Services.AddScoped<Fintrest.Api.Services.Ingestion.DataIngestionService>();
+builder.Services.AddScoped<Fintrest.Api.Services.Pipeline.ScanOrchestrator>();
 
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
