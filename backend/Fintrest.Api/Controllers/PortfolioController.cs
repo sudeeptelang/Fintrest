@@ -15,7 +15,9 @@ public class PortfolioController(
     AppDbContext db,
     PortfolioService portfolioService,
     PortfolioAiAdvisor advisor,
-    RiskAnalytics riskAnalytics) : ControllerBase
+    RiskAnalytics riskAnalytics,
+    PortfolioImporter importer,
+    ClaudeFinancialAdvisor claudeAdvisor) : ControllerBase
 {
     private long UserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -256,4 +258,101 @@ public class PortfolioController(
 
         return Ok(new { recommendation.Id, recommendation.Status });
     }
+
+    // --- Portfolio Import ---
+
+    /// <summary>
+    /// Upload a CSV file to create a portfolio.
+    /// Supports Robinhood, Schwab, Fidelity, and generic CSV formats.
+    /// Columns auto-detected: ticker/symbol, quantity/shares, cost/avg cost
+    /// </summary>
+    [HttpPost("import/csv")]
+    [RequestSizeLimit(10_000_000)] // 10MB max
+    public async Task<IActionResult> ImportCsv(
+        IFormFile file,
+        [FromQuery] string name = "Imported Portfolio",
+        [FromQuery] double? cash = null,
+        CancellationToken ct = default)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "No file uploaded" });
+
+        if (!file.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) &&
+            !file.FileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Only CSV and TXT files are supported" });
+
+        using var stream = file.OpenReadStream();
+        var result = await importer.ImportFromCsvAsync(UserId, name, stream, cash, ct);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Import portfolio from text — paste holdings directly.
+    /// Format: one per line, "AAPL 100 150.00" or "AAPL,100,150.00"
+    /// </summary>
+    [HttpPost("import/text")]
+    public async Task<IActionResult> ImportText(
+        [FromBody] ImportTextRequest request,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Holdings))
+            return BadRequest(new { message = "No holdings provided" });
+
+        var result = await importer.ImportFromTextAsync(
+            UserId, request.Name ?? "Imported Portfolio", request.Holdings, request.Cash, ct);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Import and immediately analyze — upload + AI advisor in one call.
+    /// </summary>
+    [HttpPost("import/analyze")]
+    [RequestSizeLimit(10_000_000)]
+    public async Task<IActionResult> ImportAndAnalyze(
+        IFormFile file,
+        [FromQuery] string name = "Imported Portfolio",
+        [FromQuery] double? cash = null,
+        CancellationToken ct = default)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "No file uploaded" });
+
+        // Step 1: Import
+        using var stream = file.OpenReadStream();
+        var importResult = await importer.ImportFromCsvAsync(UserId, name, stream, cash, ct);
+
+        // Step 2: Run AI analysis
+        AdvisorResponse? analysis = null;
+        try
+        {
+            analysis = await advisor.AnalyzePortfolio(importResult.PortfolioId);
+        }
+        catch (Exception ex)
+        {
+            // Analysis is best-effort
+            return Ok(new { Import = importResult, Analysis = (object?)null, AnalysisError = ex.Message });
+        }
+
+        return Ok(new { Import = importResult, Analysis = analysis });
+    }
+
+    /// <summary>
+    /// Deep AI analysis powered by Claude.
+    /// Analyzes portfolio composition, signal alignment, risk, and generates
+    /// natural language recommendations.
+    /// </summary>
+    [HttpGet("{id}/ai-analysis")]
+    public async Task<IActionResult> GetAiAnalysis(long id, CancellationToken ct)
+    {
+        var portfolio = await db.Portfolios
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId, ct);
+        if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
+
+        var analysis = await claudeAdvisor.AnalyzePortfolioAsync(id, ct);
+        return Ok(analysis);
+    }
 }
+
+public record ImportTextRequest(string Holdings, string? Name = null, double? Cash = null);
