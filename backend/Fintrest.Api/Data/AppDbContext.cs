@@ -25,6 +25,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ProviderHealth> ProviderHealth => Set<ProviderHealth>();
     public DbSet<LlmTraceLog> LlmTraceLogs => Set<LlmTraceLog>();
 
+    // Portfolio
+    public DbSet<Portfolio> Portfolios => Set<Portfolio>();
+    public DbSet<PortfolioHolding> PortfolioHoldings => Set<PortfolioHolding>();
+    public DbSet<PortfolioTransaction> PortfolioTransactions => Set<PortfolioTransaction>();
+    public DbSet<PortfolioSnapshot> PortfolioSnapshots => Set<PortfolioSnapshot>();
+    public DbSet<PortfolioAiRecommendation> PortfolioAiRecommendations => Set<PortfolioAiRecommendation>();
+    public DbSet<PortfolioRiskMetric> PortfolioRiskMetrics => Set<PortfolioRiskMetric>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -85,6 +93,42 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<PerformanceTracking>(e =>
         {
             e.HasIndex(p => p.SignalId).IsUnique();
+        });
+
+        // Portfolio
+        modelBuilder.Entity<Portfolio>(e =>
+        {
+            e.HasIndex(p => p.UserId);
+        });
+
+        // PortfolioHolding — unique stock per portfolio
+        modelBuilder.Entity<PortfolioHolding>(e =>
+        {
+            e.HasIndex(h => new { h.PortfolioId, h.StockId }).IsUnique();
+        });
+
+        // PortfolioTransaction
+        modelBuilder.Entity<PortfolioTransaction>(e =>
+        {
+            e.HasIndex(t => new { t.PortfolioId, t.ExecutedAt }).IsDescending(false, true);
+        });
+
+        // PortfolioSnapshot — one snapshot per portfolio per day
+        modelBuilder.Entity<PortfolioSnapshot>(e =>
+        {
+            e.HasIndex(s => new { s.PortfolioId, s.Date }).IsUnique();
+        });
+
+        // PortfolioAiRecommendation
+        modelBuilder.Entity<PortfolioAiRecommendation>(e =>
+        {
+            e.HasIndex(r => new { r.PortfolioId, r.CreatedAt }).IsDescending(false, true);
+        });
+
+        // PortfolioRiskMetric — one per portfolio per day
+        modelBuilder.Entity<PortfolioRiskMetric>(e =>
+        {
+            e.HasIndex(r => new { r.PortfolioId, r.Date }).IsUnique();
         });
     }
 }

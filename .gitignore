@@ -39,3 +39,4 @@ desktop.ini
 # Secrets
 *.env
 appsettings.Development.json
+backend/Fintrest.Api/appsettings.Development.json

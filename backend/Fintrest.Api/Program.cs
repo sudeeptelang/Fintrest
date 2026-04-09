@@ -42,6 +42,12 @@ builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.INewsPr
 // Services
 builder.Services.AddScoped<Fintrest.Api.Services.Ingestion.DataIngestionService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Pipeline.ScanOrchestrator>();
+builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.PortfolioService>();
+builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.PortfolioAiAdvisor>();
+builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.RiskAnalytics>();
+
+// Background Jobs
+builder.Services.AddHostedService<Fintrest.Api.Services.Pipeline.DailyCronJob>();
 
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
