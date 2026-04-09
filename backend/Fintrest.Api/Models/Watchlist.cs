@@ -7,9 +7,10 @@ namespace Fintrest.Api.Models;
 public class Watchlist
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid UserId { get; set; }
+    public long UserId { get; set; }
 
     [MaxLength(100)]
     public string Name { get; set; } = "My Watchlist";
@@ -26,11 +27,12 @@ public class Watchlist
 public class WatchlistItem
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid WatchlistId { get; set; }
-    public Guid StockId { get; set; }
-    public DateTime AddedAt { get; set; } = DateTime.UtcNow;
+    public long WatchlistId { get; set; }
+    public long StockId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [ForeignKey(nameof(WatchlistId))]
     public Watchlist Watchlist { get; set; } = null!;

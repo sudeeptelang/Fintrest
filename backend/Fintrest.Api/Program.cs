@@ -8,7 +8,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Database — Supabase PostgreSQL
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+           .UseSnakeCaseNamingConvention());
 
 // Auth — Validate Supabase JWT tokens
 var supabaseJwtSecret = builder.Configuration["Supabase:JwtSecret"]!;

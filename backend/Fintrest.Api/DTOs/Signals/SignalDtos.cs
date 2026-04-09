@@ -1,27 +1,32 @@
 namespace Fintrest.Api.DTOs.Signals;
 
 public record SignalResponse(
-    Guid Id,
+    long Id,
     string Ticker,
     string StockName,
     string SignalType,
     double ScoreTotal,
-    double? EntryPrice,
-    double? StopPrice,
-    double? TargetPrice,
+    double? EntryLow,
+    double? EntryHigh,
+    double? StopLoss,
+    double? TargetLow,
+    double? TargetHigh,
+    string? RiskLevel,
+    int? HorizonDays,
     SignalBreakdownDto? Breakdown,
     DateTime CreatedAt
 );
 
 public record SignalBreakdownDto(
     double MomentumScore,
-    double VolumeScore,
-    double CatalystScore,
-    double FundamentalScore,
+    double RelVolumeScore,
+    double NewsScore,
+    double FundamentalsScore,
     double SentimentScore,
     double TrendScore,
     double RiskScore,
-    string? ExplanationJson
+    string? ExplanationJson,
+    string? WhyNowSummary
 );
 
 public record SignalListResponse(List<SignalResponse> Signals, int Count);

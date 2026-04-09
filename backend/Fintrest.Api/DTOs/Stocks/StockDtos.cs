@@ -1,13 +1,15 @@
 namespace Fintrest.Api.DTOs.Stocks;
 
 public record StockResponse(
-    Guid Id,
+    long Id,
     string Ticker,
     string Name,
     string? Exchange,
     string? Sector,
     string? Industry,
-    double? MarketCap
+    double? MarketCap,
+    double? FloatShares,
+    string? Country
 );
 
 public record MarketDataResponse(
@@ -20,11 +22,12 @@ public record MarketDataResponse(
     double? Ma20,
     double? Ma50,
     double? Ma200,
-    double? Rsi14
+    double? Rsi
 );
 
 public record NewsResponse(
     string Headline,
+    string? Summary,
     string? Source,
     string? Url,
     double? SentimentScore,

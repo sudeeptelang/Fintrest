@@ -16,9 +16,8 @@ public record LoginRequest(
 public record TokenResponse(string AccessToken, string TokenType = "bearer");
 
 public record UserResponse(
-    Guid Id,
+    long Id,
     string Email,
     string? FullName,
-    string Plan,
-    bool IsActive
+    string Plan
 );

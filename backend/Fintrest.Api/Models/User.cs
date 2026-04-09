@@ -10,7 +10,8 @@ public enum SubscriptionStatus { Active, Canceled, PastDue, Trialing, Inactive }
 public class User
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
     [Required, MaxLength(255)]
     public string Email { get; set; } = string.Empty;
@@ -18,12 +19,11 @@ public class User
     [Required, MaxLength(255)]
     public string PasswordHash { get; set; } = string.Empty;
 
+    public PlanType Plan { get; set; } = PlanType.Free;
+
     [MaxLength(255)]
     public string? FullName { get; set; }
 
-    public PlanType Plan { get; set; } = PlanType.Free;
-    public bool IsActive { get; set; } = true;
-    public bool IsAdmin { get; set; } = false;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
@@ -37,9 +37,10 @@ public class User
 public class Subscription
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid UserId { get; set; }
+    public long UserId { get; set; }
 
     [MaxLength(255)]
     public string? StripeCustomerId { get; set; }
@@ -47,10 +48,12 @@ public class Subscription
     [MaxLength(255)]
     public string? StripeSubscriptionId { get; set; }
 
+    public PlanType Plan { get; set; } = PlanType.Free;
     public SubscriptionStatus Status { get; set; } = SubscriptionStatus.Inactive;
-    public DateTime? CurrentPeriodStart { get; set; }
+    public DateTime? TrialEndsAt { get; set; }
     public DateTime? CurrentPeriodEnd { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation
     [ForeignKey(nameof(UserId))]

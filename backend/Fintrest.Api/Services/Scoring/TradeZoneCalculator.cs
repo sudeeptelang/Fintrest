@@ -4,13 +4,16 @@ namespace Fintrest.Api.Services.Scoring;
 
 /// <summary>
 /// Calculates entry, stop-loss, and target prices using ATR-based methods.
+/// Returns range-based zones (low/high) for entry and target.
 /// </summary>
 public static class TradeZoneCalculator
 {
     public record TradeZone(
-        double Entry,
+        double EntryLow,
+        double EntryHigh,
         double StopLoss,
-        double Target,
+        double TargetLow,
+        double TargetHigh,
         double RiskRewardRatio
     );
 
@@ -27,22 +30,23 @@ public static class TradeZoneCalculator
 
         var price = snap.Price;
 
-        // Entry: current price (market order at open)
-        var entry = Math.Round(price, 2);
+        // Entry zone: current price +/- 0.25x ATR
+        var entryLow = Math.Round(price - atr.Value * 0.25, 2);
+        var entryHigh = Math.Round(price + atr.Value * 0.25, 2);
+        var entryMid = price;
 
-        // Stop-loss: 1.5x ATR below entry (swing-trade standard)
+        // Stop-loss: 1.5x ATR below entry mid
         var stopDistance = atr.Value * 1.5;
-        var stopLoss = Math.Round(entry - stopDistance, 2);
+        var stopLoss = Math.Round(entryMid - stopDistance, 2);
 
-        // Target: 2x the risk (minimum 2:1 R:R)
-        var targetDistance = stopDistance * 2.0;
-        var target = Math.Round(entry + targetDistance, 2);
+        // Target zone: 2x the risk (minimum 2:1 R:R), +/- 0.5x ATR
+        var targetMid = entryMid + stopDistance * 2.0;
+        var targetLow = Math.Round(targetMid - atr.Value * 0.5, 2);
+        var targetHigh = Math.Round(targetMid + atr.Value * 0.5, 2);
 
-        // Adjust target up if strong momentum (score > 85)
-        // This is a signal-aware adjustment — stronger signals get wider targets
-        var riskReward = stopDistance > 0 ? targetDistance / stopDistance : 0;
+        var riskReward = stopDistance > 0 ? (targetMid - entryMid) / stopDistance : 0;
 
-        return new TradeZone(entry, stopLoss, target, Math.Round(riskReward, 1));
+        return new TradeZone(entryLow, entryHigh, stopLoss, targetLow, targetHigh, Math.Round(riskReward, 1));
     }
 
     /// <summary>
@@ -62,10 +66,16 @@ public static class TradeZoneCalculator
             _ => 2.0
         };
 
-        var risk = zone.Entry - zone.StopLoss;
-        var newTarget = Math.Round(zone.Entry + risk * multiplier, 2);
-        var newRR = risk > 0 ? Math.Round((newTarget - zone.Entry) / risk, 1) : 0;
+        var entryMid = (zone.EntryLow + zone.EntryHigh) / 2.0;
+        var risk = entryMid - zone.StopLoss;
+        var newTargetMid = entryMid + risk * multiplier;
 
-        return zone with { Target = newTarget, RiskRewardRatio = newRR };
+        // Keep same spread around the new target mid
+        var halfSpread = (zone.TargetHigh - zone.TargetLow) / 2.0;
+        var newTargetLow = Math.Round(newTargetMid - halfSpread, 2);
+        var newTargetHigh = Math.Round(newTargetMid + halfSpread, 2);
+        var newRR = risk > 0 ? Math.Round((newTargetMid - entryMid) / risk, 1) : 0;
+
+        return zone with { TargetLow = newTargetLow, TargetHigh = newTargetHigh, RiskRewardRatio = newRR };
     }
 }

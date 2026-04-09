@@ -22,6 +22,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PerformanceTracking> PerformanceTracking => Set<PerformanceTracking>();
     public DbSet<SeoArticle> SeoArticles => Set<SeoArticle>();
     public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
+    public DbSet<ProviderHealth> ProviderHealth => Set<ProviderHealth>();
+    public DbSet<LlmTraceLog> LlmTraceLogs => Set<LlmTraceLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,6 +41,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.HasIndex(s => s.UserId).IsUnique();
             e.Property(s => s.Status).HasConversion<string>();
+            e.Property(s => s.Plan).HasConversion<string>();
         });
 
         // Stock

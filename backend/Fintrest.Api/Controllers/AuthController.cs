@@ -39,7 +39,6 @@ public class AuthController(AppDbContext db) : ControllerBase
             // First time this Supabase user hits our API — create local record
             user = new User
             {
-                Id = supabaseId.Value,
                 Email = email,
                 PasswordHash = "supabase_auth", // Not used — Supabase handles passwords
                 FullName = User.FindFirstValue("user_metadata.full_name"),
@@ -59,8 +58,7 @@ public class AuthController(AppDbContext db) : ControllerBase
             user.Id,
             user.Email,
             user.FullName,
-            user.Plan.ToString(),
-            user.IsActive
+            user.Plan.ToString()
         ));
     }
 
@@ -85,7 +83,6 @@ public class AuthController(AppDbContext db) : ControllerBase
         {
             user = new User
             {
-                Id = supabaseId.Value,
                 Email = email,
                 PasswordHash = "supabase_auth",
                 FullName = request.FullName,
@@ -104,17 +101,16 @@ public class AuthController(AppDbContext db) : ControllerBase
             user.Id,
             user.Email,
             user.FullName,
-            user.Plan.ToString(),
-            user.IsActive
+            user.Plan.ToString()
         ));
     }
 
-    private Guid? GetSupabaseUserId()
+    private long? GetSupabaseUserId()
     {
         // Supabase puts user ID in the "sub" claim
         var sub = User.FindFirstValue(ClaimTypes.NameIdentifier)
                   ?? User.FindFirstValue("sub");
-        return Guid.TryParse(sub, out var id) ? id : null;
+        return long.TryParse(sub, out var id) ? id : null;
     }
 }
 

@@ -7,7 +7,7 @@ namespace Fintrest.Api.Services.Scoring;
 public record StockSnapshot
 {
     // Identity
-    public required Guid StockId { get; init; }
+    public required long StockId { get; init; }
     public required string Ticker { get; init; }
     public required string Name { get; init; }
     public string? Sector { get; init; }
@@ -22,9 +22,9 @@ public record StockSnapshot
 
     // Fundamentals (latest quarter)
     public double? RevenueGrowth { get; init; }
-    public double? EpsSurprise { get; init; }
+    public double? EpsGrowth { get; init; }
     public double? GrossMargin { get; init; }
-    public double? OperatingMargin { get; init; }
+    public double? NetMargin { get; init; }
     public double? PeRatio { get; init; }
 
     // News / Catalyst

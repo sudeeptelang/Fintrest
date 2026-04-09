@@ -7,16 +7,24 @@ namespace Fintrest.Api.Models;
 public class PerformanceTracking
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid SignalId { get; set; }
+    public long SignalId { get; set; }
+
+    [MaxLength(20)]
+    public string? EvaluationMode { get; set; }
+
     public double EntryPrice { get; set; }
     public double? ExitPrice { get; set; }
+    public double? MaxDrawdownPct { get; set; }
+    public double? MaxRunupPct { get; set; }
     public double? ReturnPct { get; set; }
-    public double? MaxDrawdown { get; set; }
-    public double? MaxGain { get; set; }
-    public int? DaysHeld { get; set; }
-    public bool IsClosed { get; set; }
+    public int? DurationDays { get; set; }
+
+    [MaxLength(20)]
+    public string? Outcome { get; set; }
+
     public DateTime? ClosedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

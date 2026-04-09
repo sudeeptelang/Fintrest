@@ -15,7 +15,7 @@ public class MarketController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> MarketSummary()
     {
         var latestScan = await db.ScanRuns
-            .Where(s => s.Status == "success")
+            .Where(s => s.Status == "COMPLETED")
             .OrderByDescending(s => s.CompletedAt)
             .FirstOrDefaultAsync();
 
@@ -35,7 +35,7 @@ public class MarketController(AppDbContext db) : ControllerBase
     public async Task<ActionResult<SignalListResponse>> TopPicksToday([FromQuery] int limit = 12)
     {
         var latestScan = await db.ScanRuns
-            .Where(s => s.Status == "success")
+            .Where(s => s.Status == "COMPLETED")
             .OrderByDescending(s => s.CompletedAt)
             .FirstOrDefaultAsync();
 
@@ -57,7 +57,7 @@ public class MarketController(AppDbContext db) : ControllerBase
     public async Task<ActionResult<SignalListResponse>> SwingWeek()
     {
         var latestScan = await db.ScanRuns
-            .Where(s => s.Status == "success")
+            .Where(s => s.Status == "COMPLETED")
             .OrderByDescending(s => s.CompletedAt)
             .FirstOrDefaultAsync();
 
@@ -67,7 +67,7 @@ public class MarketController(AppDbContext db) : ControllerBase
         var signals = await db.Signals
             .Include(s => s.Stock)
             .Include(s => s.Breakdown)
-            .Where(s => s.ScanRunId == latestScan.Id && s.SignalType == SignalType.BuyToday)
+            .Where(s => s.ScanRunId == latestScan.Id && s.SignalType == SignalType.BUY_TODAY)
             .OrderByDescending(s => s.ScoreTotal)
             .Take(5)
             .ToListAsync();
@@ -81,7 +81,7 @@ public class MarketController(AppDbContext db) : ControllerBase
         var stock = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker.ToUpper() == ticker.ToUpper());
         if (stock is null) return NotFound(new { message = "Stock not found" });
 
-        return Ok(new StockResponse(stock.Id, stock.Ticker, stock.Name, stock.Exchange, stock.Sector, stock.Industry, stock.MarketCap));
+        return Ok(new StockResponse(stock.Id, stock.Ticker, stock.Name, stock.Exchange, stock.Sector, stock.Industry, stock.MarketCap, stock.FloatShares, stock.Country));
     }
 
     [HttpGet("stocks/{ticker}/chart")]
@@ -103,7 +103,7 @@ public class MarketController(AppDbContext db) : ControllerBase
             .ToListAsync();
 
         return Ok(data.OrderBy(d => d.Ts).Select(d =>
-            new MarketDataResponse(d.Ts, d.Open, d.High, d.Low, d.Close, d.Volume, d.Ma20, d.Ma50, d.Ma200, d.Rsi14)
+            new MarketDataResponse(d.Ts, d.Open, d.High, d.Low, d.Close, d.Volume, d.Ma20, d.Ma50, d.Ma200, d.Rsi)
         ).ToList());
     }
 
@@ -136,17 +136,17 @@ public class MarketController(AppDbContext db) : ControllerBase
             .Take(limit)
             .ToListAsync();
 
-        return Ok(news.Select(n => new NewsResponse(n.Headline, n.Source, n.Url, n.SentimentScore, n.CatalystType, n.PublishedAt)).ToList());
+        return Ok(news.Select(n => new NewsResponse(n.Headline, n.Summary, n.Source, n.Url, n.SentimentScore, n.CatalystType, n.PublishedAt)).ToList());
     }
 
     [HttpGet("performance/overview")]
     public async Task<ActionResult<PerformanceOverviewResponse>> PerformanceOverview()
     {
-        var closed = db.PerformanceTracking.Where(p => p.IsClosed);
+        var closed = db.PerformanceTracking.Where(p => p.Outcome != null);
         var total = await closed.CountAsync();
         var wins = await closed.CountAsync(p => p.ReturnPct > 0);
         var avgReturn = total > 0 ? await closed.AverageAsync(p => p.ReturnPct ?? 0) : 0;
-        var avgDrawdown = total > 0 ? await closed.AverageAsync(p => p.MaxDrawdown ?? 0) : 0;
+        var avgDrawdown = total > 0 ? await closed.AverageAsync(p => p.MaxDrawdownPct ?? 0) : 0;
 
         return Ok(new PerformanceOverviewResponse(
             total,
@@ -159,19 +159,20 @@ public class MarketController(AppDbContext db) : ControllerBase
     [HttpGet("blog/{slug}")]
     public async Task<IActionResult> GetBlogPost(string slug)
     {
-        var article = await db.SeoArticles.FirstOrDefaultAsync(a => a.Slug == slug && a.Published);
+        var article = await db.SeoArticles.FirstOrDefaultAsync(a => a.Slug == slug && a.Status == "published");
         if (article is null) return NotFound(new { message = "Article not found" });
 
-        return Ok(new { article.Slug, article.Title, article.MetaDescription, article.ContentHtml, article.PublishedAt });
+        return Ok(new { article.Slug, article.Title, article.BodyMd, article.PublishedAt });
     }
 
     private static SignalResponse ToDto(Signal s) => new(
         s.Id, s.Stock.Ticker, s.Stock.Name, s.SignalType.ToString(), s.ScoreTotal,
-        s.EntryPrice, s.StopPrice, s.TargetPrice,
+        s.EntryLow, s.EntryHigh, s.StopLoss, s.TargetLow, s.TargetHigh,
+        s.RiskLevel, s.HorizonDays,
         s.Breakdown is not null ? new SignalBreakdownDto(
-            s.Breakdown.MomentumScore, s.Breakdown.VolumeScore, s.Breakdown.CatalystScore,
-            s.Breakdown.FundamentalScore, s.Breakdown.SentimentScore, s.Breakdown.TrendScore,
-            s.Breakdown.RiskScore, s.Breakdown.ExplanationJson
+            s.Breakdown.MomentumScore, s.Breakdown.RelVolumeScore, s.Breakdown.NewsScore,
+            s.Breakdown.FundamentalsScore, s.Breakdown.SentimentScore, s.Breakdown.TrendScore,
+            s.Breakdown.RiskScore, s.Breakdown.ExplanationJson, s.Breakdown.WhyNowSummary
         ) : null,
         s.CreatedAt
     );

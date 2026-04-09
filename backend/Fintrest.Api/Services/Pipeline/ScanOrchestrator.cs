@@ -17,8 +17,20 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
     {
         var sw = Stopwatch.StartNew();
 
-        // 1. Create scan run record
-        var scanRun = new ScanRun { Status = "running", StrategyVersion = "v1.0" };
+        // 1. Load all active stocks (for universe size)
+        var stocks = await db.Stocks
+            .Where(s => s.Active)
+            .ToListAsync(ct);
+
+        // 2. Create scan run record
+        var scanRun = new ScanRun
+        {
+            Status = "RUNNING",
+            StrategyVersion = "v1.0",
+            RunType = "daily",
+            MarketSession = "pre_market",
+            UniverseSize = stocks.Count,
+        };
         db.ScanRuns.Add(scanRun);
         await db.SaveChangesAsync(ct);
 
@@ -26,11 +38,6 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
 
         try
         {
-            // 2. Load all active stocks
-            var stocks = await db.Stocks
-                .Where(s => s.IsActive)
-                .ToListAsync(ct);
-
             logger.LogInformation("Loaded {Count} active stocks", stocks.Count);
 
             var scoredSignals = new List<ScoredSignal>();
@@ -70,9 +77,15 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
                     ScanRunId = scanRun.Id,
                     SignalType = Enum.Parse<SignalType>(scored.SignalType),
                     ScoreTotal = scored.ScoreTotal,
-                    EntryPrice = scored.EntryPrice,
-                    StopPrice = scored.StopPrice,
-                    TargetPrice = scored.TargetPrice,
+                    StrategyVersion = "v1.0",
+                    EntryLow = scored.EntryLow,
+                    EntryHigh = scored.EntryHigh,
+                    StopLoss = scored.StopLoss,
+                    TargetLow = scored.TargetLow,
+                    TargetHigh = scored.TargetHigh,
+                    RiskLevel = scored.RiskLevel,
+                    HorizonDays = scored.HorizonDays,
+                    Status = "ACTIVE",
                 };
                 db.Signals.Add(signal);
                 await db.SaveChangesAsync(ct); // Flush to get signal.Id
@@ -81,14 +94,14 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
                 {
                     SignalId = signal.Id,
                     MomentumScore = scored.Breakdown.Momentum,
-                    VolumeScore = scored.Breakdown.Volume,
-                    CatalystScore = scored.Breakdown.Catalyst,
-                    FundamentalScore = scored.Breakdown.Fundamental,
+                    RelVolumeScore = scored.Breakdown.Volume,
+                    NewsScore = scored.Breakdown.Catalyst,
+                    FundamentalsScore = scored.Breakdown.Fundamental,
                     SentimentScore = scored.Breakdown.Sentiment,
                     TrendScore = scored.Breakdown.Trend,
                     RiskScore = scored.Breakdown.Risk,
                     ExplanationJson = JsonSerializer.Serialize(scored.Explanation),
-                    FactorProvenance = JsonSerializer.Serialize(scored.Provenance),
+                    WhyNowSummary = scored.Explanation.Summary,
                 };
                 db.SignalBreakdowns.Add(breakdown);
 
@@ -97,7 +110,7 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
                 {
                     SignalId = signal.Id,
                     EventType = "signal_created",
-                    Payload = JsonSerializer.Serialize(new
+                    PayloadJson = JsonSerializer.Serialize(new
                     {
                         scored.ScoreTotal,
                         scored.SignalType,
@@ -108,10 +121,9 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
 
             // 6. Finalize scan run
             sw.Stop();
-            scanRun.Status = "success";
+            scanRun.Status = "COMPLETED";
             scanRun.SignalsGenerated = scoredSignals.Count;
             scanRun.CompletedAt = DateTime.UtcNow;
-            scanRun.DurationMs = (int)sw.ElapsedMilliseconds;
 
             await db.SaveChangesAsync(ct);
 
@@ -130,10 +142,8 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
         catch (Exception ex)
         {
             sw.Stop();
-            scanRun.Status = "failed";
-            scanRun.ErrorMessage = ex.Message;
+            scanRun.Status = "FAILED";
             scanRun.CompletedAt = DateTime.UtcNow;
-            scanRun.DurationMs = (int)sw.ElapsedMilliseconds;
             await db.SaveChangesAsync(CancellationToken.None);
 
             logger.LogError(ex, "Scan {ScanId} failed", scanRun.Id);
@@ -148,19 +158,21 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
     private async Task<StockSnapshot?> BuildSnapshot(Stock stock, CancellationToken ct)
     {
         // Load last 250 trading days of market data
-        var marketData = await db.MarketData
+        var marketData = (await db.MarketData
             .Where(m => m.StockId == stock.Id)
-            .OrderBy(m => m.Ts)
+            .OrderByDescending(m => m.Ts)
+            .Take(250)
             .Select(m => new { m.Ts, m.Open, m.High, m.Low, m.Close, m.Volume })
-            .TakeLast(250)
-            .ToListAsync(ct);
+            .ToListAsync(ct))
+            .OrderBy(m => m.Ts)
+            .ToList();
 
         if (marketData.Count < 30) return null; // Need at least 30 days
 
         // Load latest fundamentals
         var fundamental = await db.Fundamentals
             .Where(f => f.StockId == stock.Id)
-            .OrderByDescending(f => f.ReportedAt)
+            .OrderByDescending(f => f.ReportDate)
             .FirstOrDefaultAsync(ct);
 
         // Load recent news sentiment (last 7 days)
@@ -195,14 +207,14 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
             LowPrices = marketData.Select(m => m.Low).ToList(),
             VolumeSeries = marketData.Select(m => m.Volume).ToList(),
             RevenueGrowth = fundamental?.RevenueGrowth,
-            EpsSurprise = fundamental?.EpsSurprise,
+            EpsGrowth = fundamental?.EpsGrowth,
             GrossMargin = fundamental?.GrossMargin,
-            OperatingMargin = fundamental?.OperatingMargin,
+            NetMargin = fundamental?.NetMargin,
             PeRatio = fundamental?.PeRatio,
             NewsSentiment = avgSentiment,
             HasCatalyst = hasCatalyst,
             CatalystType = catalystType,
-            FloatShares = null,  // TODO: from alt data provider
+            FloatShares = stock.FloatShares,
             MarketCap = stock.MarketCap,
         };
     }
@@ -210,7 +222,7 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
 
 public record ScanResult
 {
-    public Guid ScanRunId { get; init; }
+    public long ScanRunId { get; init; }
     public int SignalsGenerated { get; init; }
     public int DurationMs { get; init; }
     public List<ScoredSignal> TopSignals { get; init; } = [];

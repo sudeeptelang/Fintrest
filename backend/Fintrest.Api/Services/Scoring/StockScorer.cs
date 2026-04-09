@@ -44,7 +44,7 @@ public static class StockScorer
             sentimentScore: snap.NewsSentiment,
             hasCatalyst: snap.HasCatalyst,
             revenueGrowth: snap.RevenueGrowth,
-            epsSurprise: snap.EpsSurprise,
+            epsSurprise: snap.EpsGrowth,
             grossMargin: snap.GrossMargin,
             socialScore: snap.SocialScore,
             analystRating: snap.AnalystRating,
@@ -68,7 +68,15 @@ public static class StockScorer
         var explanation = ExplanationGenerator.Generate(
             snap.Ticker, snap.Name, breakdown, snap, zone);
 
-        // 5. Build provenance (audit trail of what data was used)
+        // 5. Determine risk level from score
+        var riskLevel = breakdown.Risk switch
+        {
+            >= 70 => "LOW",
+            >= 40 => "MEDIUM",
+            _ => "HIGH"
+        };
+
+        // 6. Build provenance (audit trail of what data was used)
         var provenance = new Dictionary<string, object?>
         {
             ["price"] = snap.Price,
@@ -86,7 +94,7 @@ public static class StockScorer
             ["has_catalyst"] = snap.HasCatalyst,
             ["catalyst_type"] = snap.CatalystType,
             ["revenue_growth"] = snap.RevenueGrowth,
-            ["eps_surprise"] = snap.EpsSurprise,
+            ["eps_growth"] = snap.EpsGrowth,
             ["gross_margin"] = snap.GrossMargin,
             ["social_score"] = snap.SocialScore,
             ["analyst_rating"] = snap.AnalystRating,
@@ -101,10 +109,14 @@ public static class StockScorer
             Ticker = snap.Ticker,
             Name = snap.Name,
             Breakdown = breakdown,
-            EntryPrice = zone?.Entry,
-            StopPrice = zone?.StopLoss,
-            TargetPrice = zone?.Target,
+            EntryLow = zone?.EntryLow,
+            EntryHigh = zone?.EntryHigh,
+            StopLoss = zone?.StopLoss,
+            TargetLow = zone?.TargetLow,
+            TargetHigh = zone?.TargetHigh,
             RiskRewardRatio = zone?.RiskRewardRatio,
+            RiskLevel = riskLevel,
+            HorizonDays = 5, // Default swing trade horizon
             Explanation = explanation,
             Provenance = provenance,
         };

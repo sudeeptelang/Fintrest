@@ -4,16 +4,17 @@ namespace Fintrest.Api.DTOs.Watchlists;
 
 public record WatchlistCreateRequest(string Name = "My Watchlist");
 
-public record WatchlistItemAddRequest([Required] Guid StockId);
+public record WatchlistItemAddRequest([Required] long StockId);
 
-public record WatchlistItemResponse(Guid Id, Guid StockId, string Ticker, string StockName, DateTime AddedAt);
+public record WatchlistItemResponse(long Id, long StockId, string Ticker, string StockName, DateTime CreatedAt);
 
-public record WatchlistResponse(Guid Id, string Name, List<WatchlistItemResponse> Items, DateTime CreatedAt);
+public record WatchlistResponse(long Id, string Name, List<WatchlistItemResponse> Items, DateTime CreatedAt);
 
 public record AlertCreateRequest(
     [Required] string AlertType,
     [Required] string Channel,
-    string? Config
+    long? StockId,
+    string? ThresholdJson
 );
 
-public record AlertResponse(Guid Id, string AlertType, string Channel, bool IsActive, string? Config, DateTime CreatedAt);
+public record AlertResponse(long Id, string AlertType, string Channel, bool Active, long? StockId, string? ThresholdJson, DateTime CreatedAt);

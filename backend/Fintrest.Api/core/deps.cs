@@ -13,12 +13,12 @@ namespace Fintrest.Api.Core;
 /// </summary>
 public static class AuthExtensions
 {
-    /// <summary>Get the Supabase user ID (GUID) from JWT "sub" claim.</summary>
-    public static Guid? GetUserId(this ClaimsPrincipal principal)
+    /// <summary>Get the Supabase user ID (long) from JWT "sub" claim.</summary>
+    public static long? GetUserId(this ClaimsPrincipal principal)
     {
         var sub = principal.FindFirstValue(ClaimTypes.NameIdentifier)
                   ?? principal.FindFirstValue("sub");
-        return Guid.TryParse(sub, out var id) ? id : null;
+        return long.TryParse(sub, out var id) ? id : null;
     }
 
     /// <summary>Check if the JWT has admin role.</summary>

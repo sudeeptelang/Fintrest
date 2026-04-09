@@ -3,26 +3,43 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Fintrest.Api.Models;
 
-public enum SignalType { BuyToday, Watch, Avoid, TakeProfit, HighRisk }
+public enum SignalType
+{
+    [System.Runtime.Serialization.EnumMember(Value = "BUY_TODAY")]
+    BUY_TODAY,
+    [System.Runtime.Serialization.EnumMember(Value = "WATCH")]
+    WATCH,
+    [System.Runtime.Serialization.EnumMember(Value = "AVOID")]
+    AVOID,
+    [System.Runtime.Serialization.EnumMember(Value = "TAKE_PROFIT")]
+    TAKE_PROFIT,
+    [System.Runtime.Serialization.EnumMember(Value = "HIGH_RISK")]
+    HIGH_RISK
+}
 
 [Table("scan_runs")]
 public class ScanRun
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public DateTime StartedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? CompletedAt { get; set; }
+    [Required, MaxLength(50)]
+    public string RunType { get; set; } = "daily";
 
     [MaxLength(20)]
-    public string Status { get; set; } = "running"; // running, success, failed
-
-    public int SignalsGenerated { get; set; }
-    public int? DurationMs { get; set; }
-    public string? ErrorMessage { get; set; }
+    public string? MarketSession { get; set; }
 
     [MaxLength(20)]
     public string StrategyVersion { get; set; } = "v1.0";
+
+    public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAt { get; set; }
+    public int? UniverseSize { get; set; }
+    public int SignalsGenerated { get; set; }
+
+    [MaxLength(20)]
+    public string Status { get; set; } = "running"; // running, success, failed
 
     public ICollection<Signal> Signals { get; set; } = [];
 }
@@ -31,22 +48,37 @@ public class ScanRun
 public class Signal
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid StockId { get; set; }
-    public Guid ScanRunId { get; set; }
+    public long StockId { get; set; }
+    public long ScanRunId { get; set; }
+
+    public double ScoreTotal { get; set; }
 
     [Required]
     public SignalType SignalType { get; set; }
 
-    public double ScoreTotal { get; set; }
+    [MaxLength(20)]
+    public string? StrategyVersion { get; set; }
 
     // Trade zone
-    public double? EntryPrice { get; set; }
-    public double? StopPrice { get; set; }
-    public double? TargetPrice { get; set; }
+    public double? EntryLow { get; set; }
+    public double? EntryHigh { get; set; }
+    public double? StopLoss { get; set; }
+    public double? TargetLow { get; set; }
+    public double? TargetHigh { get; set; }
+
+    [MaxLength(20)]
+    public string? RiskLevel { get; set; }
+
+    public int? HorizonDays { get; set; }
+
+    [MaxLength(20)]
+    public string? Status { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ClosedAt { get; set; }
 
     // Navigation
     [ForeignKey(nameof(StockId))]
@@ -63,15 +95,16 @@ public class Signal
 public class SignalBreakdown
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid SignalId { get; set; }
+    public long SignalId { get; set; }
 
     // 7 factor scores (0-100)
     public double MomentumScore { get; set; }
-    public double VolumeScore { get; set; }
-    public double CatalystScore { get; set; }
-    public double FundamentalScore { get; set; }
+    public double RelVolumeScore { get; set; }
+    public double NewsScore { get; set; }
+    public double FundamentalsScore { get; set; }
     public double SentimentScore { get; set; }
     public double TrendScore { get; set; }
     public double RiskScore { get; set; }
@@ -80,8 +113,9 @@ public class SignalBreakdown
     [Column(TypeName = "jsonb")]
     public string? ExplanationJson { get; set; }
 
-    [Column(TypeName = "jsonb")]
-    public string? FactorProvenance { get; set; }
+    public string? WhyNowSummary { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [ForeignKey(nameof(SignalId))]
     public Signal Signal { get; set; } = null!;
@@ -91,17 +125,18 @@ public class SignalBreakdown
 public class SignalEvent
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid SignalId { get; set; }
+    public long SignalId { get; set; }
 
     [Required, MaxLength(50)]
     public string EventType { get; set; } = string.Empty;
 
-    [Column(TypeName = "jsonb")]
-    public string? Payload { get; set; }
+    public DateTime EventTs { get; set; } = DateTime.UtcNow;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    [Column(TypeName = "jsonb")]
+    public string? PayloadJson { get; set; }
 
     [ForeignKey(nameof(SignalId))]
     public Signal Signal { get; set; } = null!;

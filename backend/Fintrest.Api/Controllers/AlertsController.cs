@@ -13,7 +13,7 @@ namespace Fintrest.Api.Controllers;
 [Route("api/v1/alerts")]
 public class AlertsController(AppDbContext db) : ControllerBase
 {
-    private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private long UserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet]
     public async Task<ActionResult<List<AlertResponse>>> ListAlerts()
@@ -24,7 +24,7 @@ public class AlertsController(AppDbContext db) : ControllerBase
             .ToListAsync();
 
         return Ok(alerts.Select(a =>
-            new AlertResponse(a.Id, a.AlertType, a.Channel, a.IsActive, a.Config, a.CreatedAt)
+            new AlertResponse(a.Id, a.AlertType, a.Channel, a.Active, a.StockId, a.ThresholdJson, a.CreatedAt)
         ).ToList());
     }
 
@@ -36,11 +36,12 @@ public class AlertsController(AppDbContext db) : ControllerBase
             UserId = UserId,
             AlertType = request.AlertType,
             Channel = request.Channel,
-            Config = request.Config,
+            StockId = request.StockId,
+            ThresholdJson = request.ThresholdJson,
         };
         db.Alerts.Add(alert);
         await db.SaveChangesAsync();
 
-        return Created("", new AlertResponse(alert.Id, alert.AlertType, alert.Channel, alert.IsActive, alert.Config, alert.CreatedAt));
+        return Created("", new AlertResponse(alert.Id, alert.AlertType, alert.Channel, alert.Active, alert.StockId, alert.ThresholdJson, alert.CreatedAt));
     }
 }

@@ -13,7 +13,7 @@ namespace Fintrest.Api.Controllers;
 [Route("api/v1/watchlists")]
 public class WatchlistsController(AppDbContext db) : ControllerBase
 {
-    private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private long UserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet]
     public async Task<ActionResult<List<WatchlistResponse>>> ListWatchlists()
@@ -26,7 +26,7 @@ public class WatchlistsController(AppDbContext db) : ControllerBase
 
         return Ok(watchlists.Select(w => new WatchlistResponse(
             w.Id, w.Name,
-            w.Items.Select(i => new WatchlistItemResponse(i.Id, i.StockId, i.Stock.Ticker, i.Stock.Name, i.AddedAt)).ToList(),
+            w.Items.Select(i => new WatchlistItemResponse(i.Id, i.StockId, i.Stock.Ticker, i.Stock.Name, i.CreatedAt)).ToList(),
             w.CreatedAt
         )).ToList());
     }
@@ -41,7 +41,7 @@ public class WatchlistsController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost("{watchlistId}/items")]
-    public async Task<IActionResult> AddItem(Guid watchlistId, WatchlistItemAddRequest request)
+    public async Task<IActionResult> AddItem(long watchlistId, WatchlistItemAddRequest request)
     {
         var wl = await db.Watchlists.FirstOrDefaultAsync(w => w.Id == watchlistId && w.UserId == UserId);
         if (wl is null) return NotFound(new { message = "Watchlist not found" });
@@ -50,6 +50,6 @@ public class WatchlistsController(AppDbContext db) : ControllerBase
         db.WatchlistItems.Add(item);
         await db.SaveChangesAsync();
 
-        return Created("", new { item.Id, item.StockId, item.AddedAt });
+        return Created("", new { item.Id, item.StockId, item.CreatedAt });
     }
 }

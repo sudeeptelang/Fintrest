@@ -7,7 +7,8 @@ namespace Fintrest.Api.Models;
 public class Stock
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
     [Required, MaxLength(10)]
     public string Ticker { get; set; } = string.Empty;
@@ -25,7 +26,12 @@ public class Stock
     public string? Industry { get; set; }
 
     public double? MarketCap { get; set; }
-    public bool IsActive { get; set; } = true;
+    public double? FloatShares { get; set; }
+
+    [MaxLength(10)]
+    public string? Country { get; set; }
+
+    public bool Active { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation
@@ -38,24 +44,39 @@ public class Stock
 public class MarketData
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid StockId { get; set; }
+    public long StockId { get; set; }
+
+    [MaxLength(10)]
+    public string? Timeframe { get; set; }
+
     public DateTime Ts { get; set; }
     public double Open { get; set; }
     public double High { get; set; }
     public double Low { get; set; }
     public double Close { get; set; }
     public long Volume { get; set; }
+    public double? AvgVolume { get; set; }
+    public double? Vwap { get; set; }
+    public double? PrevClose { get; set; }
 
     // Technical indicators
+    public double? Rsi { get; set; }
+    public double? Macd { get; set; }
+    public double? MacdSignal { get; set; }
     public double? Ma20 { get; set; }
     public double? Ma50 { get; set; }
     public double? Ma200 { get; set; }
-    public double? Rsi14 { get; set; }
-    public double? Adx14 { get; set; }
-    public double? Atr14 { get; set; }
-    public double? VolumeSma30 { get; set; }
+    public double? Atr { get; set; }
+    public double? AtrPct { get; set; }
+
+    [Column(TypeName = "jsonb")]
+    public string? RawJson { get; set; }
+
+    [MaxLength(100)]
+    public string? VendorSourceId { get; set; }
 
     [ForeignKey(nameof(StockId))]
     public Stock Stock { get; set; } = null!;
@@ -65,22 +86,27 @@ public class MarketData
 public class Fundamental
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid StockId { get; set; }
-
-    [Required, MaxLength(10)]
-    public string Period { get; set; } = string.Empty; // e.g. "2025-Q4"
-
-    public double? Revenue { get; set; }
+    public long StockId { get; set; }
+    public DateTime? ReportDate { get; set; }
     public double? RevenueGrowth { get; set; }
-    public double? Eps { get; set; }
-    public double? EpsSurprise { get; set; }
+    public double? EpsGrowth { get; set; }
     public double? GrossMargin { get; set; }
-    public double? OperatingMargin { get; set; }
+    public double? NetMargin { get; set; }
     public double? PeRatio { get; set; }
     public double? PsRatio { get; set; }
-    public DateTime? ReportedAt { get; set; }
+    public double? DebtToEquity { get; set; }
+    public double? MarketCap { get; set; }
+    public double? FloatShares { get; set; }
+
+    [MaxLength(100)]
+    public string? VendorSourceId { get; set; }
+
+    [Column(TypeName = "jsonb")]
+    public string? RawJson { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [ForeignKey(nameof(StockId))]

@@ -12,7 +12,7 @@ public class JwtService(IConfiguration config)
     private readonly string _audience = config["Jwt:Audience"]!;
     private readonly int _expirationMinutes = int.Parse(config["Jwt:ExpirationMinutes"] ?? "1440");
 
-    public string GenerateToken(Guid userId, string email, bool isAdmin)
+    public string GenerateToken(long userId, string email, bool isAdmin)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

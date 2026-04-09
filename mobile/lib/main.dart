@@ -50,8 +50,15 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _showSignup = false;
+  bool _demoMode = false;
 
   Future<void> _handleLogin(String email, String password) async {
+    // Demo mode: skip Supabase auth for preview
+    if (email == 'demo' || SupabaseConfig.supabaseAnonKey.contains('YOUR_')) {
+      setState(() => _demoMode = true);
+      return;
+    }
+
     final response = await SupabaseConfig.auth.signInWithPassword(
       email: email,
       password: password,
@@ -66,6 +73,11 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _handleSignup(String email, String password, String? name) async {
+    if (email == 'demo') {
+      setState(() => _demoMode = true);
+      return;
+    }
+
     final response = await SupabaseConfig.auth.signUp(
       email: email,
       password: password,
@@ -85,6 +97,14 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    // Demo mode — skip auth entirely
+    if (_demoMode) {
+      return MainShell(
+        onLogout: () => setState(() => _demoMode = false),
+        user: null,
+      );
+    }
+
     return StreamBuilder<AuthState>(
       stream: SupabaseConfig.auth.onAuthStateChange,
       builder: (context, snapshot) {

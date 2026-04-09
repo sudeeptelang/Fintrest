@@ -35,10 +35,10 @@ public static class ScoringEngine
 
         public string SignalType => Total switch
         {
-            >= 80 => "BuyToday",
-            >= 60 => "Watch",
-            >= 40 => "HighRisk",
-            _ => "Avoid"
+            >= 80 => "BUY_TODAY",
+            >= 60 => "WATCH",
+            >= 40 => "HIGH_RISK",
+            _ => "AVOID"
         };
     }
 

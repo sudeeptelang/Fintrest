@@ -7,9 +7,10 @@ namespace Fintrest.Api.Models;
 public class SeoArticle
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid StockId { get; set; }
+    public long StockId { get; set; }
 
     [Required, MaxLength(255)]
     public string Slug { get; set; } = string.Empty;
@@ -17,13 +18,12 @@ public class SeoArticle
     [Required, MaxLength(255)]
     public string Title { get; set; } = string.Empty;
 
-    [MaxLength(320)]
-    public string? MetaDescription { get; set; }
-
     [Required]
-    public string ContentHtml { get; set; } = string.Empty;
+    public string BodyMd { get; set; } = string.Empty;
 
-    public bool Published { get; set; }
+    [MaxLength(20)]
+    public string? Status { get; set; }
+
     public DateTime? PublishedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

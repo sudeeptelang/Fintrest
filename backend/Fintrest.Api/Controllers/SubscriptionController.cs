@@ -11,7 +11,7 @@ namespace Fintrest.Api.Controllers;
 [Route("api/v1/subscription")]
 public class SubscriptionController(AppDbContext db) : ControllerBase
 {
-    private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private long UserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet]
     public async Task<IActionResult> GetSubscription()

@@ -14,7 +14,7 @@ namespace Fintrest.Api.Controllers;
 [Route("api/v1/admin")]
 public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataIngestionService ingestion) : ControllerBase
 {
-    private Guid AdminUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private long AdminUserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpPost("scan/run")]
     public async Task<IActionResult> TriggerScan(CancellationToken ct)
@@ -22,9 +22,9 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         // Audit log
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            AdminUserId = AdminUserId,
+            ActorUserId = AdminUserId,
             Action = "trigger_scan",
-            ResourceType = "scan_run",
+            EntityType = "scan_run",
         });
         await db.SaveChangesAsync(ct);
 
@@ -42,9 +42,11 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
                 s.Name,
                 Score = Math.Round(s.ScoreTotal, 1),
                 s.SignalType,
-                s.EntryPrice,
-                s.StopPrice,
-                s.TargetPrice,
+                s.EntryLow,
+                s.EntryHigh,
+                s.StopLoss,
+                s.TargetLow,
+                s.TargetHigh,
                 s.RiskRewardRatio,
                 Explanation = s.Explanation.Summary,
             }),
@@ -59,8 +61,8 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
             .Take(limit)
             .Select(s => new
             {
-                s.Id, s.StartedAt, s.CompletedAt, s.Status,
-                s.SignalsGenerated, s.DurationMs, s.StrategyVersion
+                s.Id, s.RunType, s.MarketSession, s.StartedAt, s.CompletedAt, s.Status,
+                s.UniverseSize, s.SignalsGenerated, s.StrategyVersion
             })
             .ToListAsync();
 
@@ -68,7 +70,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     }
 
     [HttpPost("signals/recompute/{signalId}")]
-    public async Task<IActionResult> RecomputeSignal(Guid signalId, CancellationToken ct)
+    public async Task<IActionResult> RecomputeSignal(long signalId, CancellationToken ct)
     {
         var signal = await db.Signals
             .Include(s => s.Stock)
@@ -77,10 +79,10 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
 
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            AdminUserId = AdminUserId,
+            ActorUserId = AdminUserId,
             Action = "recompute_signal",
-            ResourceType = "signal",
-            ResourceId = signalId.ToString(),
+            EntityType = "signal",
+            EntityId = signalId,
         });
         await db.SaveChangesAsync(ct);
 
@@ -88,18 +90,18 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     }
 
     [HttpGet("provider-health")]
-    public IActionResult ProviderHealth()
+    public async Task<IActionResult> ProviderHealth()
     {
-        return Ok(new
-        {
-            Providers = new[]
+        var records = await db.ProviderHealth
+            .OrderByDescending(p => p.CheckedAt)
+            .Take(20)
+            .Select(p => new
             {
-                new { Name = "Polygon", Status = "healthy", LatencyMs = 45 },
-                new { Name = "Financial Modeling Prep", Status = "healthy", LatencyMs = 120 },
-                new { Name = "Finnhub", Status = "healthy", LatencyMs = 89 },
-            },
-            CheckedAt = DateTime.UtcNow,
-        });
+                p.Provider, p.Success, p.LatencyMs, p.CheckedAt
+            })
+            .ToListAsync();
+
+        return Ok(new { Providers = records, CheckedAt = DateTime.UtcNow });
     }
 
     [HttpGet("audit-logs")]
@@ -110,8 +112,8 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
             .Take(limit)
             .Select(l => new
             {
-                l.Id, l.AdminUserId, l.Action, l.ResourceType,
-                l.ResourceId, l.Details, l.CreatedAt
+                l.Id, l.ActorUserId, l.Action, l.EntityType,
+                l.EntityId, l.MetadataJson, l.CreatedAt
             })
             .ToListAsync();
 
@@ -126,7 +128,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            AdminUserId = AdminUserId,
+            ActorUserId = AdminUserId,
             Action = "trigger_ingestion",
         });
         await db.SaveChangesAsync(ct);
@@ -166,7 +168,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            AdminUserId = AdminUserId,
+            ActorUserId = AdminUserId,
             Action = "run_full_pipeline",
         });
         await db.SaveChangesAsync(ct);
@@ -196,7 +198,8 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
                     s.Ticker, s.Name,
                     Score = Math.Round(s.ScoreTotal, 1),
                     s.SignalType,
-                    s.EntryPrice, s.StopPrice, s.TargetPrice,
+                    s.EntryLow, s.EntryHigh, s.StopLoss,
+                    s.TargetLow, s.TargetHigh,
                 }),
             },
         });

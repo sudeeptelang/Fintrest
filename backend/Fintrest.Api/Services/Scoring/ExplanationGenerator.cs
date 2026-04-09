@@ -55,7 +55,7 @@ public static class ExplanationGenerator
         {
             var parts = new List<string>();
             if (snap.RevenueGrowth is > 20) parts.Add($"revenue growth of {snap.RevenueGrowth:F0}%");
-            if (snap.EpsSurprise is > 5) parts.Add($"EPS beat by {snap.EpsSurprise:F0}%");
+            if (snap.EpsGrowth is > 5) parts.Add($"EPS growth of {snap.EpsGrowth:F0}%");
             if (snap.GrossMargin is > 50) parts.Add($"healthy {snap.GrossMargin:F0}% gross margins");
             bullish.Add($"Solid fundamentals — {(parts.Count > 0 ? string.Join(", ", parts) : "strong overall quality")}.");
         }
@@ -85,8 +85,8 @@ public static class ExplanationGenerator
 
         // Trade zone narrative
         var tradeNarrative = zone is not null
-            ? $"Entry near ${zone.Entry:F2} with a stop-loss at ${zone.StopLoss:F2} " +
-              $"(ATR-based, {zone.RiskRewardRatio:F1}:1 risk-reward). Target ${zone.Target:F2}."
+            ? $"Entry zone ${zone.EntryLow:F2}–${zone.EntryHigh:F2} with a stop-loss at ${zone.StopLoss:F2} " +
+              $"({zone.RiskRewardRatio:F1}:1 risk-reward). Target zone ${zone.TargetLow:F2}–${zone.TargetHigh:F2}."
             : "Trade zone not available — insufficient price history for ATR calculation.";
 
         return new SignalExplanation

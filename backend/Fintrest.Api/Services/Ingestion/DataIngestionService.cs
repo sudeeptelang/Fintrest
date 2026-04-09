@@ -29,7 +29,7 @@ public class DataIngestionService(
     public async Task<IngestionResult> IngestAllAsync(CancellationToken ct = default)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var stocks = await db.Stocks.Where(s => s.IsActive).ToListAsync(ct);
+        var stocks = await db.Stocks.Where(s => s.Active).ToListAsync(ct);
 
         logger.LogInformation("Starting ingestion for {Count} stocks", stocks.Count);
 
@@ -114,6 +114,7 @@ public class DataIngestionService(
             Sector = details.Sector,
             Industry = details.Industry,
             MarketCap = details.MarketCap,
+            FloatShares = details.FloatShares,
         };
         db.Stocks.Add(stock);
         await db.SaveChangesAsync(ct);
@@ -131,9 +132,11 @@ public class DataIngestionService(
             .Select(m => m.Ts)
             .FirstOrDefaultAsync(ct);
 
+        // Partitions exist for 2026 Q1+ only — don't fetch data before that
+        var partitionStart = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var from = latestDate != default
             ? latestDate.AddDays(1)
-            : DateTime.UtcNow.AddYears(-1); // First load: 1 year of history
+            : partitionStart;
 
         if (from.Date >= DateTime.UtcNow.Date) return 0; // Already up to date
 
@@ -144,6 +147,7 @@ public class DataIngestionService(
             db.MarketData.Add(new MarketData
             {
                 StockId = stock.Id,
+                Timeframe = "1d",
                 Ts = bar.Date,
                 Open = bar.Open,
                 High = bar.High,
@@ -161,27 +165,26 @@ public class DataIngestionService(
         var earnings = await fundamentalsProvider.GetQuarterlyEarningsAsync(stock.Ticker, 4, ct);
         if (earnings.Count == 0) return 0;
 
-        // Only insert new periods
-        var existingPeriods = await db.Fundamentals
+        // Only insert new reports (by report date)
+        var existingDates = await db.Fundamentals
             .Where(f => f.StockId == stock.Id)
-            .Select(f => f.Period)
+            .Select(f => f.ReportDate)
             .ToListAsync(ct);
 
-        var newEarnings = earnings.Where(e => !existingPeriods.Contains(e.Period)).ToList();
+        var newEarnings = earnings
+            .Where(e => e.ReportedAt.HasValue && !existingDates.Contains(e.ReportedAt))
+            .ToList();
 
         foreach (var e in newEarnings)
         {
             db.Fundamentals.Add(new Fundamental
             {
                 StockId = stock.Id,
-                Period = e.Period,
-                Revenue = e.Revenue,
+                ReportDate = e.ReportedAt,
                 RevenueGrowth = e.RevenueGrowth,
-                Eps = e.Eps,
-                EpsSurprise = e.EpsSurprise,
+                EpsGrowth = e.EpsSurprise, // Map eps surprise to eps growth
                 GrossMargin = e.GrossMargin,
-                OperatingMargin = e.OperatingMargin,
-                ReportedAt = e.ReportedAt,
+                NetMargin = e.OperatingMargin, // Map operating margin to net margin
             });
         }
 

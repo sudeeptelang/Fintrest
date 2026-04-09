@@ -7,23 +7,29 @@ namespace Fintrest.Api.Models;
 public class NewsItem
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
 
-    public Guid StockId { get; set; }
+    public long StockId { get; set; }
 
     [Required]
     public string Headline { get; set; } = string.Empty;
+
+    public string? Summary { get; set; }
 
     [MaxLength(100)]
     public string? Source { get; set; }
 
     public string? Url { get; set; }
+    public DateTime? PublishedAt { get; set; }
     public double? SentimentScore { get; set; } // -1.0 to 1.0
 
     [MaxLength(50)]
     public string? CatalystType { get; set; }
 
-    public DateTime? PublishedAt { get; set; }
+    [MaxLength(100)]
+    public string? VendorSourceId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [ForeignKey(nameof(StockId))]

@@ -8,7 +8,7 @@ namespace Fintrest.Api.Services.Scoring;
 /// </summary>
 public record ScoredSignal
 {
-    public required Guid StockId { get; init; }
+    public required long StockId { get; init; }
     public required string Ticker { get; init; }
     public required string Name { get; init; }
 
@@ -17,11 +17,17 @@ public record ScoredSignal
     public double ScoreTotal => Breakdown.Total;
     public string SignalType => Breakdown.SignalType;
 
-    // Trade zones
-    public double? EntryPrice { get; init; }
-    public double? StopPrice { get; init; }
-    public double? TargetPrice { get; init; }
+    // Trade zones (range-based: low/high for entry and target)
+    public double? EntryLow { get; init; }
+    public double? EntryHigh { get; init; }
+    public double? StopLoss { get; init; }
+    public double? TargetLow { get; init; }
+    public double? TargetHigh { get; init; }
     public double? RiskRewardRatio { get; init; }
+
+    // Risk metadata
+    public string? RiskLevel { get; init; }
+    public int? HorizonDays { get; init; }
 
     // Explanation
     public required SignalExplanation Explanation { get; init; }
