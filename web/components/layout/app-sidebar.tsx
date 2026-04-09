@@ -13,6 +13,9 @@ import {
   Settings,
   LogOut,
   CandlestickChart,
+  Briefcase,
+  Upload,
+  Brain,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,6 +24,8 @@ const sidebarLinks = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Top Picks", href: "/picks", icon: TrendingUp },
   { label: "Swing Trades", href: "/swing", icon: CandlestickChart },
+  { label: "Portfolio", href: "/portfolio", icon: Briefcase },
+  { label: "Upload Portfolio", href: "/portfolio/upload", icon: Upload },
   { label: "Watchlist", href: "/watchlist", icon: Star },
   { label: "Sector Heatmap", href: "/heatmap", icon: Grid3X3 },
   { label: "Performance", href: "/performance", icon: LineChart },

@@ -119,4 +119,128 @@ export const api = {
 
   // Performance
   performanceOverview: () => fetchApi<PerformanceOverview>("/performance/overview"),
+
+  // Portfolio
+  portfolios: () => fetchApi<PortfolioSummary[]>("/portfolios"),
+  portfolio: (id: number) => fetchApi<PortfolioSummary>(`/portfolios/${id}`),
+  portfolioHoldings: (id: number) => fetchApi<Holding[]>(`/portfolios/${id}/holdings`),
+  portfolioTransactions: (id: number) => fetchApi<Transaction[]>(`/portfolios/${id}/transactions`),
+  portfolioAnalytics: (id: number) => fetchApi<PortfolioAnalytics>(`/portfolios/${id}/analytics`),
+  portfolioAdvisor: (id: number) => fetchApi<AdvisorResult>(`/portfolios/${id}/advisor`),
+  portfolioAiAnalysis: (id: number) => fetchApi<AiAnalysis>(`/portfolios/${id}/ai-analysis`),
+  importCsv: (file: File, name: string, cash?: number) => {
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`${API_BASE}/portfolios/import/analyze?name=${encodeURIComponent(name)}${cash ? `&cash=${cash}` : ""}`, {
+      method: "POST",
+      body: form,
+    }).then(r => r.json()) as Promise<ImportAnalyzeResult>;
+  },
+  importText: (holdings: string, name?: string, cash?: number) =>
+    fetchApi<ImportAnalyzeResult>("/portfolios/import/text", {
+      method: "POST",
+      body: JSON.stringify({ holdings, name, cash }),
+    }),
 };
+
+// --- Portfolio Types ---
+
+export interface PortfolioSummary {
+  id: number;
+  name: string;
+  strategy: string | null;
+  cashBalance: number;
+  totalValue: number;
+  dailyReturnPct: number;
+  holdingsCount: number;
+  createdAt: string;
+}
+
+export interface Holding {
+  id: number;
+  stockId: number;
+  ticker: string;
+  stockName: string;
+  quantity: number;
+  avgCost: number;
+  currentPrice: number;
+  currentValue: number;
+  unrealizedPnl: number;
+  unrealizedPnlPct: number;
+  signalScore: number | null;
+}
+
+export interface Transaction {
+  id: number;
+  ticker: string;
+  type: string;
+  quantity: number;
+  price: number;
+  fees: number;
+  total: number;
+  executedAt: string;
+}
+
+export interface PortfolioAnalytics {
+  riskMetrics: RiskMetrics | null;
+  sectorAllocation: Record<string, number>;
+  topHoldings: Holding[];
+  healthScore: number;
+}
+
+export interface RiskMetrics {
+  date: string;
+  sharpeRatio: number | null;
+  sortinoRatio: number | null;
+  maxDrawdown: number | null;
+  beta: number | null;
+  var95: number | null;
+  volatility: number | null;
+  totalReturn: number | null;
+}
+
+export interface AdvisorResult {
+  healthScore: number;
+  recommendations: Recommendation[];
+  alerts: string[];
+}
+
+export interface Recommendation {
+  id: number;
+  type: string;
+  ticker: string;
+  action: string;
+  reasoning: string;
+  confidence: number;
+  status: string;
+}
+
+export interface AiAnalysis {
+  healthScore: number;
+  overallAssessment: string;
+  keyStrengths: string[];
+  keyRisks: string[];
+  recommendations: { type: string; ticker: string; action: string; reasoning: string; confidence: number }[];
+  diversificationAnalysis: string;
+  riskAssessment: string;
+  marketAlignmentSummary: string;
+  taxOptimizationNotes: string | null;
+}
+
+export interface ImportResult {
+  portfolioId: number;
+  portfolioName: string;
+  holdingsImported: number;
+  tickersNotFound: number;
+  notFoundTickers: string[];
+  tickersAutoAdded: number;
+  totalInvestedValue: number;
+  totalCurrentValue: number;
+  totalPnl: number;
+}
+
+export interface ImportAnalyzeResult {
+  import: ImportResult;
+  analysis: AdvisorResult | null;
+  analysisError?: string;
+}
