@@ -239,7 +239,12 @@ public class PortfolioImporter(
         // Auto-detect column mapping
         var tickerCol = FindColumn(headers, "ticker", "symbol", "stock", "name", "security");
         var qtyCol = FindColumn(headers, "quantity", "shares", "qty", "amount", "units");
-        var costCol = FindColumn(headers, "avgcost", "avg cost", "average cost", "cost basis", "cost basis per share", "price", "purchase price", "cost");
+        // Prefer per-share cost columns over total cost basis
+        var costCol = FindColumnExact(headers, "average cost basis")
+                      ?? FindColumnExact(headers, "cost basis per share")
+                      ?? FindColumnExact(headers, "avg cost")
+                      ?? FindColumnExact(headers, "average cost")
+                      ?? FindColumn(headers, "avgcost", "purchase price", "price");
 
         if (tickerCol is null || qtyCol is null)
         {
@@ -258,17 +263,21 @@ public class PortfolioImporter(
                 if (ticker.Contains(':')) ticker = ticker.Split(':').Last();
                 ticker = ticker.Trim('"', '\'');
 
-                // Skip cash, money market, etc.
-                if (ticker is "CASH" or "SPAXX" or "FDRXX" or "MONEY MARKET" or "--") continue;
+                // Skip cash, money market, warrants, empty rows
+                if (ticker is "CASH" or "SPAXX" or "FDRXX" or "MONEY MARKET" or "--" or "") continue;
+                if (ticker.EndsWith("**")) ticker = ticker.TrimEnd('*'); // SPAXX** → SPAXX
+                if (ticker is "SPAXX" or "FDRXX" or "FCASH") continue;
+                // Skip warrants (OPENL, OPENZ, OPENW, etc.)
+                if (ticker.Length > 4 && ticker.All(c => char.IsLetter(c))) { /* keep, might be valid */ }
 
-                var qtyStr = csv.GetField(qtyCol.Value)?.Trim('$', '"', ' ') ?? "0";
+                var qtyStr = CleanNumber(csv.GetField(qtyCol.Value));
                 if (!double.TryParse(qtyStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var qty) || qty <= 0)
                     continue;
 
                 var avgCost = 0.0;
                 if (costCol.HasValue)
                 {
-                    var costStr = csv.GetField(costCol.Value)?.Trim('$', '"', ' ') ?? "0";
+                    var costStr = CleanNumber(csv.GetField(costCol.Value));
                     double.TryParse(costStr, NumberStyles.Any, CultureInfo.InvariantCulture, out avgCost);
                 }
 
@@ -281,6 +290,26 @@ public class PortfolioImporter(
         }
 
         return holdings;
+    }
+
+    /// <summary>Strip $, commas, quotes, parens from number strings.</summary>
+    private static string CleanNumber(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "0";
+        var cleaned = raw.Trim();
+        // Handle negative in parens: ($1,234.56) → -1234.56
+        var negative = cleaned.StartsWith('(') && cleaned.EndsWith(')');
+        cleaned = cleaned.Trim('$', '"', ' ', '(', ')', '%');
+        cleaned = cleaned.Replace(",", "");
+        if (negative) cleaned = "-" + cleaned;
+        return cleaned;
+    }
+
+    private static int? FindColumnExact(string[] headers, string name)
+    {
+        for (var i = 0; i < headers.Length; i++)
+            if (headers[i].Trim() == name.ToLower().Trim()) return i;
+        return null;
     }
 
     private static int? FindColumn(string[] headers, params string[] candidates)

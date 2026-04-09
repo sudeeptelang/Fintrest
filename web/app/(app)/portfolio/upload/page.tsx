@@ -17,13 +17,16 @@ export default function UploadPortfolioPage() {
   const [cash, setCash] = useState("");
   const [textMode, setTextMode] = useState(false);
   const [textInput, setTextInput] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleFile = useCallback(async (file: File) => {
     setUploading(true);
     setError(null);
     setResult(null);
     try {
-      const res = await api.importCsv(file, name, cash ? parseFloat(cash) : undefined);
+      const raw = await api.importCsv(file, name, cash ? parseFloat(cash) : undefined);
+      // Normalize response (seed endpoint uses import_, auth endpoint uses import)
+      const res = { import: (raw as any).import_ ?? (raw as any).import ?? raw, analysis: (raw as any).analysis ?? null } as ImportAnalyzeResult;
       setResult(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -37,7 +40,8 @@ export default function UploadPortfolioPage() {
     setError(null);
     setResult(null);
     try {
-      const res = await api.importText(textInput, name, cash ? parseFloat(cash) : undefined);
+      const raw = await api.importText(textInput, name, cash ? parseFloat(cash) : undefined);
+      const res = { import: (raw as any).import_ ?? (raw as any).import ?? raw, analysis: (raw as any).analysis ?? null } as ImportAnalyzeResult;
       setResult(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
@@ -103,41 +107,45 @@ export default function UploadPortfolioPage() {
 
       {!textMode ? (
         /* File Upload */
-        <div
-          onDragEnter={(e) => { e.preventDefault(); setDragActive(true); }}
-          onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          className={`relative rounded-2xl border-2 border-dashed p-12 text-center transition-colors ${
-            dragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
-          }`}
-        >
-          {uploading ? (
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-10 w-10 text-primary animate-spin" />
-              <p className="text-sm font-medium">Importing & analyzing with AI...</p>
-              <p className="text-xs text-muted-foreground">This may take a moment</p>
-            </div>
-          ) : (
-            <>
-              <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <p className="text-sm font-medium mb-1">Drag & drop your CSV file here</p>
-              <p className="text-xs text-muted-foreground mb-4">
-                Supports Robinhood, Schwab, Fidelity, and generic CSV formats
+        <div className="space-y-4">
+          {/* Step 1: Select file */}
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <label className="text-sm font-medium mb-3 block">Step 1: Select your CSV file</label>
+            <input
+              type="file"
+              accept=".csv,.txt"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setSelectedFile(f);
+              }}
+              className="block w-full text-sm text-muted-foreground
+                file:mr-4 file:py-2.5 file:px-6
+                file:rounded-lg file:border-0
+                file:text-sm file:font-semibold
+                file:bg-primary file:text-white
+                hover:file:bg-primary/90
+                file:cursor-pointer cursor-pointer"
+            />
+            {selectedFile && (
+              <p className="mt-3 text-sm text-emerald-400 flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
               </p>
-              <label>
-                <input
-                  type="file"
-                  accept=".csv,.txt"
-                  className="hidden"
-                  onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-                />
-                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary text-sm font-medium cursor-pointer hover:bg-primary/20 transition-colors">
-                  Browse Files
-                </span>
-              </label>
-            </>
-          )}
+            )}
+          </div>
+
+          {/* Step 2: Upload & Analyze */}
+          <Button
+            onClick={() => selectedFile && handleFile(selectedFile)}
+            disabled={!selectedFile || uploading}
+            className="w-full h-12 bg-primary hover:bg-primary/90 text-white text-base font-semibold"
+          >
+            {uploading ? (
+              <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Importing & Analyzing with AI...</>
+            ) : (
+              <><Brain className="h-5 w-5 mr-2" /> Upload & Analyze Portfolio</>
+            )}
+          </Button>
         </div>
       ) : (
         /* Text Paste */

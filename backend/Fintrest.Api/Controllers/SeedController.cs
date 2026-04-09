@@ -1,6 +1,9 @@
+using Fintrest.Api.Data;
 using Fintrest.Api.Services.Ingestion;
 using Fintrest.Api.Services.Pipeline;
+using Fintrest.Api.Services.Portfolio;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Fintrest.Api.Controllers;
 
@@ -10,7 +13,7 @@ namespace Fintrest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/seed")]
-public class SeedController(DataIngestionService ingestion, ScanOrchestrator scanner) : ControllerBase
+public class SeedController(AppDbContext db, DataIngestionService ingestion, ScanOrchestrator scanner, PortfolioImporter importer, PortfolioAiAdvisor advisor, ClaudeFinancialAdvisor claudeAdvisor) : ControllerBase
 {
     private static readonly List<string> DefaultTickers =
     [
@@ -113,6 +116,102 @@ public class SeedController(DataIngestionService ingestion, ScanOrchestrator sca
             },
         });
     }
+
+    /// <summary>Upload CSV and analyze (no auth required for dev).</summary>
+    [HttpPost("portfolio/upload")]
+    [RequestSizeLimit(10_000_000)]
+    public async Task<IActionResult> UploadPortfolio(
+        IFormFile file,
+        [FromQuery] string name = "Imported Portfolio",
+        [FromQuery] double? cash = null,
+        CancellationToken ct = default)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "No file uploaded" });
+
+        using var stream = file.OpenReadStream();
+        var importResult = await importer.ImportFromCsvAsync(3, name, stream, cash, ct); // Demo user id=3
+
+        // Run AI analysis
+        object? analysis = null;
+        try
+        {
+            analysis = await advisor.AnalyzePortfolio(importResult.PortfolioId);
+        }
+        catch { /* best effort */ }
+
+        return Ok(new { import_ = importResult, analysis });
+    }
+
+    /// <summary>Paste text and analyze (no auth required for dev).</summary>
+    [HttpPost("portfolio/text")]
+    public async Task<IActionResult> TextPortfolio(
+        [FromBody] SeedPortfolioTextRequest request,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Holdings))
+            return BadRequest(new { message = "No holdings provided" });
+
+        var importResult = await importer.ImportFromTextAsync(
+            3, request.Name ?? "Imported Portfolio", request.Holdings, request.Cash, ct); // Demo user id=3
+
+        object? analysis = null;
+        try
+        {
+            analysis = await advisor.AnalyzePortfolio(importResult.PortfolioId);
+        }
+        catch { /* best effort */ }
+
+        return Ok(new { import_ = importResult, analysis });
+    }
+
+    /// <summary>Run deep Claude AI analysis on a portfolio.</summary>
+    [HttpGet("portfolio/{id}/ai-analysis")]
+    public async Task<IActionResult> AiAnalysis(long id, CancellationToken ct)
+    {
+        var result = await claudeAdvisor.AnalyzePortfolioAsync(id, ct);
+        return Ok(result);
+    }
+
+    /// <summary>Get portfolio holdings (no auth for dev).</summary>
+    [HttpGet("portfolio/{id}/holdings")]
+    public async Task<IActionResult> GetHoldings(long id)
+    {
+        var holdings = await db.PortfolioHoldings
+            .Include(h => h.Stock)
+            .Where(h => h.PortfolioId == id)
+            .ToListAsync();
+
+        // Get latest signal scores
+        var result = new List<object>();
+        foreach (var h in holdings)
+        {
+            var signal = await db.Signals
+                .Where(s => s.StockId == h.StockId)
+                .OrderByDescending(s => s.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            result.Add(new
+            {
+                h.Id, h.StockId,
+                Ticker = h.Stock.Ticker,
+                StockName = h.Stock.Name,
+                h.Quantity, h.AvgCost, h.CurrentPrice, h.CurrentValue,
+                h.UnrealizedPnl, h.UnrealizedPnlPct,
+                SignalScore = signal?.ScoreTotal
+            });
+        }
+        return Ok(result);
+    }
+
+    /// <summary>Get portfolio advisor (no auth for dev).</summary>
+    [HttpGet("portfolio/{id}/advisor")]
+    public async Task<IActionResult> GetAdvisor(long id)
+    {
+        var result = await advisor.AnalyzePortfolio(id);
+        return Ok(result);
+    }
 }
 
 public record SeedRequest(List<string>? Tickers);
+public record SeedPortfolioTextRequest(string Holdings, string? Name = null, double? Cash = null);

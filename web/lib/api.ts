@@ -123,21 +123,24 @@ export const api = {
   // Portfolio
   portfolios: () => fetchApi<PortfolioSummary[]>("/portfolios"),
   portfolio: (id: number) => fetchApi<PortfolioSummary>(`/portfolios/${id}`),
-  portfolioHoldings: (id: number) => fetchApi<Holding[]>(`/portfolios/${id}/holdings`),
-  portfolioTransactions: (id: number) => fetchApi<Transaction[]>(`/portfolios/${id}/transactions`),
-  portfolioAnalytics: (id: number) => fetchApi<PortfolioAnalytics>(`/portfolios/${id}/analytics`),
-  portfolioAdvisor: (id: number) => fetchApi<AdvisorResult>(`/portfolios/${id}/advisor`),
-  portfolioAiAnalysis: (id: number) => fetchApi<AiAnalysis>(`/portfolios/${id}/ai-analysis`),
+  portfolioHoldings: (id: number) => fetchApi<Holding[]>(`/seed/portfolio/${id}/holdings`),
+  portfolioTransactions: (id: number) => fetchApi<Transaction[]>(`/portfolios/${id}/transactions`).catch(() => []),
+  portfolioAnalytics: (id: number) => fetchApi<PortfolioAnalytics>(`/portfolios/${id}/analytics`).catch(() => null),
+  portfolioAdvisor: (id: number) => fetchApi<AdvisorResult>(`/seed/portfolio/${id}/advisor`),
+  portfolioAiAnalysis: (id: number) => fetchApi<AiAnalysis>(`/seed/portfolio/${id}/ai-analysis`),
   importCsv: (file: File, name: string, cash?: number) => {
     const form = new FormData();
     form.append("file", file);
-    return fetch(`${API_BASE}/portfolios/import/analyze?name=${encodeURIComponent(name)}${cash ? `&cash=${cash}` : ""}`, {
+    return fetch(`${API_BASE}/seed/portfolio/upload?name=${encodeURIComponent(name)}${cash ? `&cash=${cash}` : ""}`, {
       method: "POST",
       body: form,
-    }).then(r => r.json()) as Promise<ImportAnalyzeResult>;
+    }).then(r => {
+      if (!r.ok) return r.text().then(t => { throw new Error(t); });
+      return r.json();
+    }) as Promise<ImportAnalyzeResult>;
   },
   importText: (holdings: string, name?: string, cash?: number) =>
-    fetchApi<ImportAnalyzeResult>("/portfolios/import/text", {
+    fetchApi<ImportAnalyzeResult>("/seed/portfolio/text", {
       method: "POST",
       body: JSON.stringify({ holdings, name, cash }),
     }),
