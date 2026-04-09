@@ -1,205 +1,450 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  TrendingUp,
-  ArrowUpRight,
-  BarChart3,
   Brain,
   Target,
-  Shield,
   Newspaper,
+  TrendingUp,
+  Shield,
+  Clock,
+  ArrowUpRight,
+  Star,
+  Bell,
 } from "lucide-react";
+import { useStock, useStockSignals, useStockNews, useStockChart } from "@/lib/hooks";
 import { Button } from "@/components/ui/button";
-
-const scoreBreakdown = [
-  { label: "Momentum", score: 95, weight: "25%", color: "bg-emerald-500" },
-  { label: "Rel. Volume", score: 88, weight: "15%", color: "bg-emerald-500" },
-  { label: "News Catalyst", score: 92, weight: "15%", color: "bg-emerald-500" },
-  { label: "Fundamentals", score: 85, weight: "15%", color: "bg-emerald-400" },
-  { label: "Sentiment", score: 78, weight: "10%", color: "bg-amber-400" },
-  { label: "Trend Strength", score: 90, weight: "10%", color: "bg-emerald-500" },
-  { label: "Risk Filter", score: 72, weight: "10%", color: "bg-amber-400" },
-];
-
-const news = [
-  { title: "NVIDIA beats Q4 estimates, raises guidance on AI demand", time: "2h ago", sentiment: "positive" },
-  { title: "Analyst upgrades NVDA to Overweight, $1000 target", time: "5h ago", sentiment: "positive" },
-  { title: "Data center revenue up 409% year-over-year", time: "1d ago", sentiment: "positive" },
-];
+import { ScoreRing } from "@/components/charts/score-ring";
+import { FactorRadar } from "@/components/charts/factor-radar";
+import { PriceChart } from "@/components/charts/price-chart";
 
 interface StockDetailPageProps {
   params: Promise<{ ticker: string }>;
 }
 
+const fadeIn = {
+  hidden: { opacity: 0, y: 10 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.05, duration: 0.4 },
+  }),
+};
+
 export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { ticker } = use(params);
+  const [chartRange, setChartRange] = useState("3m");
+
+  const { data: stock } = useStock(ticker);
+  const { data: signalsData } = useStockSignals(ticker);
+  const { data: news } = useStockNews(ticker);
+  const { data: chartData } = useStockChart(ticker, chartRange);
+
+  const latestSignal = signalsData?.signals?.[0];
+  const breakdown = latestSignal?.breakdown;
+
+  // Parse explanation
+  let explanation: {
+    Summary?: string;
+    BullishFactors?: string[];
+    BearishFactors?: string[];
+    TradeZoneNarrative?: string;
+  } = {};
+  if (breakdown?.explanationJson) {
+    try {
+      explanation = JSON.parse(breakdown.explanationJson);
+    } catch {
+      /* */
+    }
+  }
+
+  const factors = breakdown
+    ? [
+        { label: "Momentum", score: breakdown.momentumScore, weight: "25%", icon: TrendingUp },
+        { label: "Rel. Volume", score: breakdown.relVolumeScore, weight: "15%", icon: ArrowUpRight },
+        { label: "News Catalyst", score: breakdown.newsScore, weight: "15%", icon: Newspaper },
+        { label: "Fundamentals", score: breakdown.fundamentalsScore, weight: "15%", icon: Target },
+        { label: "Sentiment", score: breakdown.sentimentScore, weight: "10%", icon: Brain },
+        { label: "Trend Strength", score: breakdown.trendScore, weight: "10%", icon: TrendingUp },
+        { label: "Risk Filter", score: breakdown.riskScore, weight: "10%", icon: Shield },
+      ]
+    : [];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Hero header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-            <span className="font-[var(--font-mono)] text-sm font-bold text-primary">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <span className="font-[var(--font-mono)] text-lg font-bold text-primary">
               {ticker.slice(0, 2).toUpperCase()}
             </span>
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <h1 className="font-[var(--font-heading)] text-2xl font-bold uppercase">
                 {ticker}
               </h1>
-              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500">
-                BUY TODAY
-              </span>
+              {latestSignal && (
+                <span
+                  className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                    latestSignal.signalType === "BUY_TODAY"
+                      ? "bg-emerald-500/10 text-emerald-400"
+                      : latestSignal.signalType === "WATCH"
+                        ? "bg-amber-500/10 text-amber-400"
+                        : "bg-red-500/10 text-red-400"
+                  }`}
+                >
+                  {latestSignal.signalType.replace("_", " ")}
+                </span>
+              )}
             </div>
             <p className="text-sm text-muted-foreground">
-              NVIDIA Corporation &middot; NASDAQ
+              {stock?.name ?? "Loading..."}{" "}
+              {stock?.exchange ? `· ${stock.exchange}` : ""}{" "}
+              {stock?.sector ? `· ${stock.sector}` : ""}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm">
-            Add to Watchlist
+            <Star className="h-3.5 w-3.5 mr-1.5" /> Watchlist
           </Button>
           <Button size="sm" className="bg-primary hover:bg-primary/90 text-white">
-            Set Alert
+            <Bell className="h-3.5 w-3.5 mr-1.5" /> Set Alert
           </Button>
         </div>
       </div>
 
-      {/* Price + Score row */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground mb-1">Current Price</p>
-          <p className="font-[var(--font-mono)] text-2xl font-bold">$892.40</p>
-          <p className="text-xs text-emerald-500 font-medium mt-1 flex items-center gap-1">
-            <ArrowUpRight className="h-3 w-3" />
-            +3.2% today
-          </p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground mb-1">Signal Score</p>
-          <p className="font-[var(--font-heading)] text-2xl font-bold">92 <span className="text-sm font-normal text-muted-foreground">/ 100</span></p>
-          <p className="text-xs text-emerald-500 font-medium mt-1">Top 3% today</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground mb-1">Trade Zone</p>
-          <div className="space-y-1">
-            <p className="text-sm"><span className="text-muted-foreground">Entry:</span> <span className="font-[var(--font-mono)] font-semibold">$892</span></p>
-            <p className="text-sm"><span className="text-muted-foreground">Target:</span> <span className="font-[var(--font-mono)] font-semibold text-emerald-500">$945</span></p>
-            <p className="text-sm"><span className="text-muted-foreground">Stop:</span> <span className="font-[var(--font-mono)] font-semibold text-red-500">$865</span></p>
+      {/* Score ring + Radar + Key metrics row */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Score ring */}
+        <motion.div
+          custom={0}
+          initial="hidden"
+          animate="visible"
+          variants={fadeIn}
+          className="rounded-2xl border border-border bg-card p-6 flex flex-col items-center justify-center"
+        >
+          {latestSignal ? (
+            <ScoreRing score={latestSignal.scoreTotal} size={180} />
+          ) : (
+            <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
+              No signal data
+            </div>
+          )}
+          <div className="mt-4 grid grid-cols-2 gap-4 w-full">
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Risk</p>
+              <p
+                className={`text-sm font-semibold ${
+                  latestSignal?.riskLevel === "LOW"
+                    ? "text-emerald-400"
+                    : latestSignal?.riskLevel === "HIGH"
+                      ? "text-red-400"
+                      : "text-amber-400"
+                }`}
+              >
+                {latestSignal?.riskLevel ?? "—"}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Horizon</p>
+              <p className="text-sm font-semibold">
+                {latestSignal?.horizonDays ? `${latestSignal.horizonDays}d` : "—"}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground mb-1">Risk / Reward</p>
-          <p className="font-[var(--font-mono)] text-2xl font-bold">2.1 : 1</p>
-          <p className="text-xs text-muted-foreground mt-1">Favorable setup</p>
-        </div>
+        </motion.div>
+
+        {/* Radar chart */}
+        <motion.div
+          custom={1}
+          initial="hidden"
+          animate="visible"
+          variants={fadeIn}
+          className="rounded-2xl border border-border bg-card p-6"
+        >
+          <h3 className="text-sm font-semibold text-muted-foreground mb-2">
+            Factor Profile
+          </h3>
+          {breakdown ? (
+            <FactorRadar breakdown={breakdown} />
+          ) : (
+            <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
+              No breakdown data
+            </div>
+          )}
+        </motion.div>
+
+        {/* Trade zone + details */}
+        <motion.div
+          custom={2}
+          initial="hidden"
+          animate="visible"
+          variants={fadeIn}
+          className="rounded-2xl border border-border bg-card p-6 space-y-5"
+        >
+          <div>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+              Trade Zone
+            </h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Entry</span>
+                <span className="font-[var(--font-mono)] font-semibold">
+                  {latestSignal?.entryLow
+                    ? `$${latestSignal.entryLow.toFixed(2)} – $${latestSignal.entryHigh?.toFixed(2)}`
+                    : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Target</span>
+                <span className="font-[var(--font-mono)] font-semibold text-emerald-400">
+                  {latestSignal?.targetHigh
+                    ? `$${latestSignal.targetLow?.toFixed(2)} – $${latestSignal.targetHigh.toFixed(2)}`
+                    : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Stop Loss</span>
+                <span className="font-[var(--font-mono)] font-semibold text-red-400">
+                  {latestSignal?.stopLoss ? `$${latestSignal.stopLoss.toFixed(2)}` : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="h-px bg-border" />
+
+          <div>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+              Details
+            </h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Market Cap</span>
+                <span className="font-[var(--font-mono)]">
+                  {stock?.marketCap ? `$${(stock.marketCap / 1e9).toFixed(1)}B` : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Sector</span>
+                <span className="text-xs">{stock?.sector ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Exchange</span>
+                <span className="text-xs">{stock?.exchange ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Float</span>
+                <span className="font-[var(--font-mono)] text-xs">
+                  {stock?.floatShares
+                    ? `${(stock.floatShares / 1e6).toFixed(0)}M`
+                    : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
-      {/* Chart placeholder */}
-      <div className="rounded-xl border border-border bg-card p-6">
+      {/* Price Chart */}
+      <motion.div
+        custom={3}
+        initial="hidden"
+        animate="visible"
+        variants={fadeIn}
+        className="rounded-2xl border border-border bg-card p-6"
+      >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-[var(--font-heading)] text-lg font-semibold flex items-center gap-2">
-            <BarChart3 className="h-4.5 w-4.5 text-muted-foreground" />
+          <h2 className="font-[var(--font-heading)] text-lg font-semibold">
             Price Chart
           </h2>
           <div className="flex gap-1">
-            {["1D", "1W", "1M", "3M", "1Y"].map((range) => (
+            {["1m", "3m", "6m", "1y"].map((range) => (
               <button
                 key={range}
-                className="px-3 py-1 text-xs rounded-md font-medium text-muted-foreground hover:bg-muted transition-colors data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
-                data-active={range === "3M"}
+                onClick={() => setChartRange(range)}
+                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                  chartRange === range
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
               >
-                {range}
+                {range.toUpperCase()}
               </button>
             ))}
           </div>
         </div>
-        <div className="h-64 rounded-lg bg-muted/30 border border-border/50 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">
-            TradingView Lightweight Chart — will render here
-          </p>
-        </div>
-      </div>
+        <PriceChart data={chartData ?? []} height={350} />
+      </motion.div>
 
+      {/* Factor bars + AI + News */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Score breakdown */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-4 flex items-center gap-2">
-            <Target className="h-4.5 w-4.5 text-muted-foreground" />
-            Score Breakdown
-          </h2>
-          <div className="space-y-3">
-            {scoreBreakdown.map((factor, i) => (
-              <motion.div
-                key={factor.label}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm">{factor.label}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{factor.weight}</span>
-                    <span className="font-[var(--font-mono)] text-sm font-bold w-7 text-right">
-                      {factor.score}
-                    </span>
+        {/* 7-Factor Score Bars */}
+        {breakdown && (
+          <motion.div
+            custom={4}
+            initial="hidden"
+            animate="visible"
+            variants={fadeIn}
+            className="rounded-2xl border border-border bg-card p-6"
+          >
+            <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-5 flex items-center gap-2">
+              <Target className="h-4.5 w-4.5 text-muted-foreground" /> Score
+              Breakdown
+            </h2>
+            <div className="space-y-4">
+              {factors.map((f, i) => (
+                <motion.div
+                  key={f.label}
+                  custom={i}
+                  initial="hidden"
+                  animate="visible"
+                  variants={fadeIn}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <f.icon className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-sm">{f.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground">
+                        {f.weight}
+                      </span>
+                      <span className="font-[var(--font-mono)] text-sm font-bold w-7 text-right">
+                        {Math.round(f.score)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <motion.div
-                    className={`h-full rounded-full ${factor.color}`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${factor.score}%` }}
-                    transition={{ delay: 0.2 + i * 0.05, duration: 0.5 }}
-                  />
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+                  <div className="h-2.5 rounded-full bg-muted/30 overflow-hidden">
+                    <motion.div
+                      className={`h-full rounded-full ${
+                        f.score >= 70
+                          ? "bg-emerald-500"
+                          : f.score >= 50
+                            ? "bg-amber-400"
+                            : "bg-red-400"
+                      }`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${f.score}%` }}
+                      transition={{ delay: 0.3 + i * 0.05, duration: 0.6 }}
+                    />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
-        {/* AI Explanation + News */}
         <div className="space-y-6">
           {/* AI Explanation */}
-          <div className="rounded-xl border border-border bg-card p-6">
-            <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-3 flex items-center gap-2">
-              <Brain className="h-4.5 w-4.5 text-muted-foreground" />
-              AI Analysis
-            </h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              NVDA ranks in the <strong className="text-foreground">top 3%</strong> of all scanned
-              stocks today. The primary driver is exceptional <strong className="text-foreground">momentum</strong> — price
-              is trading well above its 20, 50, and 200-day moving averages with accelerating
-              rate of change. <strong className="text-foreground">Relative volume</strong> is 2.8x the 30-day average,
-              confirming institutional interest. A strong earnings catalyst (Q4 beat + raised
-              guidance) provides fundamental support. The risk profile is moderate with ATR-based
-              stop placement at $865.
-            </p>
-          </div>
+          {explanation.Summary && (
+            <motion.div
+              custom={5}
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+              className="rounded-2xl border border-border bg-card p-6"
+            >
+              <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-3 flex items-center gap-2">
+                <Brain className="h-4.5 w-4.5 text-muted-foreground" /> AI
+                Analysis
+              </h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {explanation.Summary}
+              </p>
+              {(explanation.BullishFactors?.length ?? 0) > 0 && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide">
+                    Bullish
+                  </p>
+                  {explanation.BullishFactors?.map((f, i) => (
+                    <p
+                      key={i}
+                      className="text-xs text-muted-foreground flex items-start gap-2 pl-2 border-l-2 border-emerald-500/30"
+                    >
+                      {f}
+                    </p>
+                  ))}
+                </div>
+              )}
+              {(explanation.BearishFactors?.length ?? 0) > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs font-semibold text-red-400 uppercase tracking-wide">
+                    Bearish
+                  </p>
+                  {explanation.BearishFactors?.map((f, i) => (
+                    <p
+                      key={i}
+                      className="text-xs text-muted-foreground flex items-start gap-2 pl-2 border-l-2 border-red-500/30"
+                    >
+                      {f}
+                    </p>
+                  ))}
+                </div>
+              )}
+              {explanation.TradeZoneNarrative && (
+                <p className="mt-4 text-xs text-muted-foreground italic border-t border-border pt-3">
+                  {explanation.TradeZoneNarrative}
+                </p>
+              )}
+            </motion.div>
+          )}
 
           {/* News */}
-          <div className="rounded-xl border border-border bg-card p-6">
+          <motion.div
+            custom={6}
+            initial="hidden"
+            animate="visible"
+            variants={fadeIn}
+            className="rounded-2xl border border-border bg-card p-6"
+          >
             <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-3 flex items-center gap-2">
-              <Newspaper className="h-4.5 w-4.5 text-muted-foreground" />
-              Recent News
+              <Newspaper className="h-4.5 w-4.5 text-muted-foreground" /> Recent
+              News
             </h2>
             <div className="space-y-3">
-              {news.map((item) => (
-                <div key={item.title} className="flex items-start gap-3">
-                  <div className="mt-1 h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+              {(news ?? []).slice(0, 6).map((item, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div
+                    className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${
+                      (item.sentimentScore ?? 0) > 0.2
+                        ? "bg-emerald-500"
+                        : (item.sentimentScore ?? 0) < -0.2
+                          ? "bg-red-500"
+                          : "bg-amber-400"
+                    }`}
+                  />
                   <div>
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{item.time}</p>
+                    <p className="text-sm leading-snug">{item.headline}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-muted-foreground">
+                        {item.source}
+                      </span>
+                      {item.publishedAt && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(item.publishedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                      {item.catalystType && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          {item.catalystType}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
+              {(!news || news.length === 0) && (
+                <p className="text-sm text-muted-foreground">
+                  No recent news for this ticker.
+                </p>
+              )}
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
