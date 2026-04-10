@@ -24,32 +24,38 @@ public class AuthController(AppDbContext db) : ControllerBase
     [HttpGet("me")]
     public async Task<ActionResult<UserResponse>> GetMe()
     {
-        var supabaseId = GetSupabaseUserId();
-        if (supabaseId is null) return Unauthorized();
+        var supabaseUuid = GetSupabaseUuid();
+        if (supabaseUuid is null) return Unauthorized();
 
         var email = User.FindFirstValue(ClaimTypes.Email)
                     ?? User.FindFirstValue("email")
                     ?? "";
 
-        // Find or create local user
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == supabaseId.Value);
+        // Find by supabase_id (UUID mapping)
+        var user = await db.Users.FirstOrDefaultAsync(u => u.SupabaseId == supabaseUuid.Value);
+
+        // Fallback: find by email (for users created before supabase_id column)
+        if (user is null)
+            user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
 
         if (user is null)
         {
             // First time this Supabase user hits our API — create local record
             user = new User
             {
+                SupabaseId = supabaseUuid.Value,
                 Email = email,
-                PasswordHash = "supabase_auth", // Not used — Supabase handles passwords
+                PasswordHash = "supabase_auth",
                 FullName = User.FindFirstValue("user_metadata.full_name"),
             };
             db.Users.Add(user);
             await db.SaveChangesAsync();
         }
-        else if (user.Email != email && !string.IsNullOrEmpty(email))
+        else if (user.SupabaseId is null)
         {
-            // Sync email if changed in Supabase
-            user.Email = email;
+            // Link existing user to their Supabase UUID
+            user.SupabaseId = supabaseUuid.Value;
+            if (!string.IsNullOrEmpty(email)) user.Email = email;
             user.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
         }
@@ -70,19 +76,21 @@ public class AuthController(AppDbContext db) : ControllerBase
     [HttpPost("sync")]
     public async Task<ActionResult<UserResponse>> SyncProfile([FromBody] SyncProfileRequest request)
     {
-        var supabaseId = GetSupabaseUserId();
-        if (supabaseId is null) return Unauthorized();
+        var supabaseUuid = GetSupabaseUuid();
+        if (supabaseUuid is null) return Unauthorized();
 
         var email = User.FindFirstValue(ClaimTypes.Email)
                     ?? User.FindFirstValue("email")
                     ?? "";
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == supabaseId.Value);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.SupabaseId == supabaseUuid.Value)
+                   ?? await db.Users.FirstOrDefaultAsync(u => u.Email == email);
 
         if (user is null)
         {
             user = new User
             {
+                SupabaseId = supabaseUuid.Value,
                 Email = email,
                 PasswordHash = "supabase_auth",
                 FullName = request.FullName,
@@ -91,6 +99,7 @@ public class AuthController(AppDbContext db) : ControllerBase
         }
         else
         {
+            if (user.SupabaseId is null) user.SupabaseId = supabaseUuid.Value;
             if (request.FullName is not null) user.FullName = request.FullName;
             user.UpdatedAt = DateTime.UtcNow;
         }
@@ -105,12 +114,11 @@ public class AuthController(AppDbContext db) : ControllerBase
         ));
     }
 
-    private long? GetSupabaseUserId()
+    private Guid? GetSupabaseUuid()
     {
-        // Supabase puts user ID in the "sub" claim
         var sub = User.FindFirstValue(ClaimTypes.NameIdentifier)
                   ?? User.FindFirstValue("sub");
-        return long.TryParse(sub, out var id) ? id : null;
+        return Guid.TryParse(sub, out var guid) ? guid : null;
     }
 }
 

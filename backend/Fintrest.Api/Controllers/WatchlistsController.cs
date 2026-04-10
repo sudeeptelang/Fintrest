@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using Fintrest.Api.Core;
 using Fintrest.Api.Data;
 using Fintrest.Api.DTOs.Watchlists;
 using Fintrest.Api.Models;
@@ -13,14 +13,19 @@ namespace Fintrest.Api.Controllers;
 [Route("api/v1/watchlists")]
 public class WatchlistsController(AppDbContext db) : ControllerBase
 {
-    private long UserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private async Task<long> GetUserId()
+    {
+        var id = await User.ResolveUserId(db);
+        return id ?? throw new UnauthorizedAccessException();
+    }
 
     [HttpGet]
     public async Task<ActionResult<List<WatchlistResponse>>> ListWatchlists()
     {
+        var userId = await GetUserId();
         var watchlists = await db.Watchlists
             .Include(w => w.Items).ThenInclude(i => i.Stock)
-            .Where(w => w.UserId == UserId)
+            .Where(w => w.UserId == userId)
             .OrderByDescending(w => w.CreatedAt)
             .ToListAsync();
 
@@ -34,7 +39,8 @@ public class WatchlistsController(AppDbContext db) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<WatchlistResponse>> CreateWatchlist(WatchlistCreateRequest request)
     {
-        var wl = new Watchlist { UserId = UserId, Name = request.Name };
+        var userId = await GetUserId();
+        var wl = new Watchlist { UserId = userId, Name = request.Name };
         db.Watchlists.Add(wl);
         await db.SaveChangesAsync();
         return Created($"/api/v1/watchlists/{wl.Id}", new WatchlistResponse(wl.Id, wl.Name, [], wl.CreatedAt));
@@ -43,7 +49,8 @@ public class WatchlistsController(AppDbContext db) : ControllerBase
     [HttpPost("{watchlistId}/items")]
     public async Task<IActionResult> AddItem(long watchlistId, WatchlistItemAddRequest request)
     {
-        var wl = await db.Watchlists.FirstOrDefaultAsync(w => w.Id == watchlistId && w.UserId == UserId);
+        var userId = await GetUserId();
+        var wl = await db.Watchlists.FirstOrDefaultAsync(w => w.Id == watchlistId && w.UserId == userId);
         if (wl is null) return NotFound(new { message = "Watchlist not found" });
 
         var item = new WatchlistItem { WatchlistId = wl.Id, StockId = request.StockId };
@@ -56,8 +63,9 @@ public class WatchlistsController(AppDbContext db) : ControllerBase
     [HttpDelete("{watchlistId}/items/{itemId}")]
     public async Task<IActionResult> RemoveItem(long watchlistId, long itemId)
     {
+        var userId = await GetUserId();
         var item = await db.WatchlistItems
-            .FirstOrDefaultAsync(i => i.Id == itemId && i.WatchlistId == watchlistId && i.Watchlist.UserId == UserId);
+            .FirstOrDefaultAsync(i => i.Id == itemId && i.WatchlistId == watchlistId && i.Watchlist.UserId == userId);
         if (item is null) return NotFound();
         db.WatchlistItems.Remove(item);
         await db.SaveChangesAsync();

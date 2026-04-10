@@ -13,6 +13,8 @@ public class User
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public long Id { get; set; }
 
+    public Guid? SupabaseId { get; set; }
+
     [Required, MaxLength(255)]
     public string Email { get; set; } = string.Empty;
 

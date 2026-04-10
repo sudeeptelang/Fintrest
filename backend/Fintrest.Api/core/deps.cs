@@ -7,24 +7,31 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Fintrest.Api.Core;
 
-/// <summary>
-/// Extracts Supabase user ID from JWT and loads the local User record.
-/// Use as an action filter on controllers that need the full User object.
-/// </summary>
 public static class AuthExtensions
 {
-    /// <summary>Get the Supabase user ID (long) from JWT "sub" claim.</summary>
-    public static long? GetUserId(this ClaimsPrincipal principal)
+    /// <summary>Get the Supabase UUID from JWT "sub" claim.</summary>
+    public static Guid? GetSupabaseUuid(this ClaimsPrincipal principal)
     {
         var sub = principal.FindFirstValue(ClaimTypes.NameIdentifier)
                   ?? principal.FindFirstValue("sub");
-        return long.TryParse(sub, out var id) ? id : null;
+        return Guid.TryParse(sub, out var guid) ? guid : null;
+    }
+
+    /// <summary>
+    /// Resolve the local bigint user ID from the Supabase UUID.
+    /// Requires the AppDbContext to look up the mapping.
+    /// </summary>
+    public static async Task<long?> ResolveUserId(this ClaimsPrincipal principal, AppDbContext db)
+    {
+        var uuid = principal.GetSupabaseUuid();
+        if (uuid is null) return null;
+        var user = await db.Users.FirstOrDefaultAsync(u => u.SupabaseId == uuid.Value);
+        return user?.Id;
     }
 
     /// <summary>Check if the JWT has admin role.</summary>
     public static bool IsAdmin(this ClaimsPrincipal principal)
     {
-        // Supabase custom claims or app_metadata.role
         return principal.IsInRole("Admin")
                || principal.HasClaim("user_role", "admin")
                || principal.HasClaim("role", "admin");

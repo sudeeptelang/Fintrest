@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using Fintrest.Api.Core;
 using Fintrest.Api.Data;
 using Fintrest.Api.DTOs.Watchlists;
 using Fintrest.Api.Models;
@@ -13,13 +13,18 @@ namespace Fintrest.Api.Controllers;
 [Route("api/v1/alerts")]
 public class AlertsController(AppDbContext db) : ControllerBase
 {
-    private long UserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private async Task<long> GetUserId()
+    {
+        var id = await User.ResolveUserId(db);
+        return id ?? throw new UnauthorizedAccessException();
+    }
 
     [HttpGet]
     public async Task<ActionResult<List<AlertResponse>>> ListAlerts()
     {
+        var userId = await GetUserId();
         var alerts = await db.Alerts
-            .Where(a => a.UserId == UserId)
+            .Where(a => a.UserId == userId)
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
 
@@ -31,9 +36,10 @@ public class AlertsController(AppDbContext db) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<AlertResponse>> CreateAlert(AlertCreateRequest request)
     {
+        var userId = await GetUserId();
         var alert = new Alert
         {
-            UserId = UserId,
+            UserId = userId,
             AlertType = request.AlertType,
             Channel = request.Channel,
             StockId = request.StockId,

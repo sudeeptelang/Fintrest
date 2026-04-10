@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using Fintrest.Api.Core;
 using Fintrest.Api.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,12 +11,17 @@ namespace Fintrest.Api.Controllers;
 [Route("api/v1/subscription")]
 public class SubscriptionController(AppDbContext db) : ControllerBase
 {
-    private long UserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private async Task<long> GetUserId()
+    {
+        var id = await User.ResolveUserId(db);
+        return id ?? throw new UnauthorizedAccessException();
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetSubscription()
     {
-        var user = await db.Users.Include(u => u.Subscription).FirstOrDefaultAsync(u => u.Id == UserId);
+        var userId = await GetUserId();
+        var user = await db.Users.Include(u => u.Subscription).FirstOrDefaultAsync(u => u.Id == userId);
         if (user is null) return NotFound();
 
         var sub = user.Subscription;
@@ -30,13 +35,14 @@ public class SubscriptionController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost("checkout")]
-    public IActionResult CreateCheckout()
+    public async Task<IActionResult> CreateCheckout()
     {
+        var userId = await GetUserId();
         // TODO: Integrate Stripe checkout session creation
         return Ok(new
         {
             Message = "Stripe checkout integration pending",
-            UserId,
+            UserId = userId,
         });
     }
 }

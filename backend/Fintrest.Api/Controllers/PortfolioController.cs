@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using Fintrest.Api.Core;
 using Fintrest.Api.Data;
 using Fintrest.Api.DTOs.Portfolio;
 using Fintrest.Api.Services.Portfolio;
@@ -19,13 +19,18 @@ public class PortfolioController(
     PortfolioImporter importer,
     ClaudeFinancialAdvisor claudeAdvisor) : ControllerBase
 {
-    private long UserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private async Task<long> GetUserId()
+    {
+        var id = await User.ResolveUserId(db);
+        return id ?? throw new UnauthorizedAccessException();
+    }
 
     /// <summary>List all portfolios for the authenticated user.</summary>
     [HttpGet]
     public async Task<ActionResult<List<PortfolioResponse>>> ListPortfolios()
     {
-        var portfolios = await portfolioService.GetPortfolios(UserId);
+        var userId = await GetUserId();
+        var portfolios = await portfolioService.GetPortfolios(userId);
 
         var responses = new List<PortfolioResponse>();
         foreach (var p in portfolios)
@@ -52,7 +57,8 @@ public class PortfolioController(
     [HttpPost]
     public async Task<ActionResult<PortfolioResponse>> CreatePortfolio(PortfolioCreateRequest request)
     {
-        var portfolio = await portfolioService.CreatePortfolio(UserId, request);
+        var userId = await GetUserId();
+        var portfolio = await portfolioService.CreatePortfolio(userId, request);
         var response = new PortfolioResponse(
             portfolio.Id, portfolio.Name, portfolio.Strategy, portfolio.CashBalance,
             portfolio.CashBalance, 0, 0, portfolio.CreatedAt
@@ -64,7 +70,8 @@ public class PortfolioController(
     [HttpGet("{id}")]
     public async Task<ActionResult<PortfolioResponse>> GetPortfolio(long id)
     {
-        var portfolio = await portfolioService.GetPortfolio(UserId, id);
+        var userId = await GetUserId();
+        var portfolio = await portfolioService.GetPortfolio(userId, id);
         if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
 
         var investedValue = portfolio.Holdings.Sum(h => h.CurrentValue);
@@ -86,11 +93,12 @@ public class PortfolioController(
     [HttpGet("{id}/holdings")]
     public async Task<ActionResult<List<HoldingResponse>>> GetHoldings(long id)
     {
+        var userId = await GetUserId();
         var portfolio = await db.Portfolios
-            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
         if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
 
-        var holdings = await portfolioService.GetHoldings(UserId, id);
+        var holdings = await portfolioService.GetHoldings(userId, id);
 
         var responses = new List<HoldingResponse>();
         foreach (var h in holdings)
@@ -112,7 +120,8 @@ public class PortfolioController(
     {
         try
         {
-            var transaction = await portfolioService.AddTransaction(UserId, id, request);
+            var userId = await GetUserId();
+            var transaction = await portfolioService.AddTransaction(userId, id, request);
             return Created($"/api/v1/portfolios/{id}/transactions", new TransactionResponse(
                 transaction.Id, transaction.Stock.Ticker, transaction.Type,
                 transaction.Quantity, transaction.Price, transaction.Fees,
@@ -131,7 +140,8 @@ public class PortfolioController(
     {
         try
         {
-            var transactions = await portfolioService.GetTransactions(UserId, id);
+            var userId = await GetUserId();
+            var transactions = await portfolioService.GetTransactions(userId, id);
             return Ok(transactions.Select(t => new TransactionResponse(
                 t.Id, t.Stock.Ticker, t.Type, t.Quantity, t.Price,
                 t.Fees, t.Total, t.ExecutedAt
@@ -147,8 +157,9 @@ public class PortfolioController(
     [HttpGet("{id}/snapshots")]
     public async Task<ActionResult<List<SnapshotResponse>>> GetSnapshots(long id, [FromQuery] string range = "3m")
     {
+        var _uid = await GetUserId();
         var portfolio = await db.Portfolios
-            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == _uid);
         if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
 
         var fromDate = range.ToLowerInvariant() switch
@@ -177,9 +188,10 @@ public class PortfolioController(
     [HttpGet("{id}/analytics")]
     public async Task<ActionResult<PortfolioAnalyticsResponse>> GetAnalytics(long id)
     {
+        var _uid = await GetUserId();
         var portfolio = await db.Portfolios
             .Include(p => p.Holdings).ThenInclude(h => h.Stock)
-            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == _uid);
         if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
 
         var latestRisk = await db.Set<Models.PortfolioRiskMetric>()
@@ -222,8 +234,9 @@ public class PortfolioController(
     [HttpGet("{id}/advisor")]
     public async Task<ActionResult<AdvisorResponse>> GetAdvisor(long id)
     {
+        var _uid = await GetUserId();
         var portfolio = await db.Portfolios
-            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == _uid);
         if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
 
         try
@@ -241,8 +254,9 @@ public class PortfolioController(
     [HttpPost("{id}/advisor/apply/{recommendationId}")]
     public async Task<IActionResult> ApplyRecommendation(long id, long recommendationId, [FromQuery] string action = "APPLIED")
     {
+        var _uid = await GetUserId();
         var portfolio = await db.Portfolios
-            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == _uid);
         if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
 
         var recommendation = await db.Set<Models.PortfolioAiRecommendation>()
@@ -282,7 +296,7 @@ public class PortfolioController(
             return BadRequest(new { message = "Only CSV and TXT files are supported" });
 
         using var stream = file.OpenReadStream();
-        var result = await importer.ImportFromCsvAsync(UserId, name, stream, cash, ct);
+        var result = await importer.ImportFromCsvAsync(await GetUserId(), name, stream, cash, ct);
 
         return Ok(result);
     }
@@ -300,7 +314,7 @@ public class PortfolioController(
             return BadRequest(new { message = "No holdings provided" });
 
         var result = await importer.ImportFromTextAsync(
-            UserId, request.Name ?? "Imported Portfolio", request.Holdings, request.Cash, ct);
+            await GetUserId(), request.Name ?? "Imported Portfolio", request.Holdings, request.Cash, ct);
 
         return Ok(result);
     }
@@ -321,7 +335,7 @@ public class PortfolioController(
 
         // Step 1: Import
         using var stream = file.OpenReadStream();
-        var importResult = await importer.ImportFromCsvAsync(UserId, name, stream, cash, ct);
+        var importResult = await importer.ImportFromCsvAsync(await GetUserId(), name, stream, cash, ct);
 
         // Step 2: Run AI analysis
         AdvisorResponse? analysis = null;
@@ -346,8 +360,9 @@ public class PortfolioController(
     [HttpGet("{id}/ai-analysis")]
     public async Task<IActionResult> GetAiAnalysis(long id, CancellationToken ct)
     {
+        var _uid = await GetUserId();
         var portfolio = await db.Portfolios
-            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId, ct);
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == _uid, ct);
         if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
 
         var analysis = await claudeAdvisor.AnalyzePortfolioAsync(id, ct);
