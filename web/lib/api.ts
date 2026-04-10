@@ -150,6 +150,7 @@ export interface AlertResponse {
   channel: string;
   active: boolean;
   stockId: number | null;
+  ticker: string | null;
   thresholdJson: string | null;
   createdAt: string;
 }
@@ -204,6 +205,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify(req),
     }),
+
+  // Athena Chat (authenticated)
+  athenaChat: (message: string, sessionId?: number) =>
+    authFetchApi<{ reply: string; sessionId: number | null }>("/athena/chat", {
+      method: "POST",
+      body: JSON.stringify({ message, sessionId }),
+    }),
+  athenaSessions: () =>
+    authFetchApi<{ id: number; title: string; createdAt: string; updatedAt: string }[]>("/athena/sessions"),
+  athenaSession: (id: number) =>
+    authFetchApi<{ id: number; title: string; messages: { Role: string; Content: string }[]; createdAt: string }>(`/athena/sessions/${id}`),
+  deleteAthenaSession: (id: number) =>
+    authFetchApi<void>(`/athena/sessions/${id}`, { method: "DELETE" }),
 
   // Portfolio (authenticated)
   portfolios: () => authFetchApi<PortfolioSummary[]>("/portfolios"),

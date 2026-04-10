@@ -23,6 +23,10 @@ When implementing any screen, match the HTML mockup exactly:
 - Athena output always in navy gradient cards (`#0d1a2e` to `#172640`)
 - Bottom nav: 5 tabs with blur backdrop, active = `#00b87c`
 
+## Factor Profile (Prospero.ai Style)
+
+The stock detail page's 7-factor score breakdown must show **7 individual mini-charts/gauges** — one per factor (Momentum, Rel Volume, News, Fundamentals, Sentiment, Trend, Risk). NOT just a single radar chart. Each factor gets its own circular arc gauge or score card showing score (0-100), weight, and a brief data source label. Reference: Prospero.ai factor profile layout.
+
 ## Key Component Patterns
 
 ### SignalCard

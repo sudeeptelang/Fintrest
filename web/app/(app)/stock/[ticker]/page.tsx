@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Brain,
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { FactorRadar } from "@/components/charts/factor-radar";
 import { PriceChart } from "@/components/charts/price-chart";
+import { FactorGauges } from "@/components/charts/factor-gauges";
 
 interface StockDetailPageProps {
   params: Promise<{ ticker: string }>;
@@ -36,6 +38,7 @@ const fadeIn = {
 
 export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { ticker } = use(params);
+  const router = useRouter();
   const [chartRange, setChartRange] = useState("3m");
 
   const { data: stock } = useStock(ticker);
@@ -150,7 +153,11 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
             )}
             {isInWatchlist ? "In Watchlist" : "Watchlist"}
           </Button>
-          <Button size="sm" className="bg-primary hover:bg-primary/90 text-white">
+          <Button
+            size="sm"
+            className="bg-primary hover:bg-primary/90 text-white"
+            onClick={() => router.push(`/alerts/create?ticker=${ticker.toUpperCase()}`)}
+          >
             <Bell className="h-3.5 w-3.5 mr-1.5" /> Set Alert
           </Button>
         </div>
@@ -320,64 +327,23 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         <PriceChart data={chartData ?? []} height={350} />
       </motion.div>
 
-      {/* Factor bars + AI + News */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* 7-Factor Score Bars */}
-        {breakdown && (
-          <motion.div
-            custom={4}
-            initial="hidden"
-            animate="visible"
-            variants={fadeIn}
-            className="rounded-2xl border border-border bg-card p-6"
-          >
-            <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-5 flex items-center gap-2">
-              <Target className="h-4.5 w-4.5 text-muted-foreground" /> Score
-              Breakdown
-            </h2>
-            <div className="space-y-4">
-              {factors.map((f, i) => (
-                <motion.div
-                  key={f.label}
-                  custom={i}
-                  initial="hidden"
-                  animate="visible"
-                  variants={fadeIn}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <f.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-sm">{f.label}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground">
-                        {f.weight}
-                      </span>
-                      <span className="font-[var(--font-mono)] text-sm font-bold w-7 text-right">
-                        {Math.round(f.score)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="h-2.5 rounded-full bg-muted/30 overflow-hidden">
-                    <motion.div
-                      className={`h-full rounded-full ${
-                        f.score >= 70
-                          ? "bg-emerald-500"
-                          : f.score >= 50
-                            ? "bg-amber-400"
-                            : "bg-red-400"
-                      }`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${f.score}%` }}
-                      transition={{ delay: 0.3 + i * 0.05, duration: 0.6 }}
-                    />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        )}
+      {/* 7-Factor Gauges (Prospero.ai style) */}
+      {breakdown && (
+        <motion.div
+          custom={4}
+          initial="hidden"
+          animate="visible"
+          variants={fadeIn}
+        >
+          <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-4 flex items-center gap-2">
+            <Target className="h-4.5 w-4.5 text-muted-foreground" /> Factor Profile
+          </h2>
+          <FactorGauges breakdown={breakdown} />
+        </motion.div>
+      )}
 
+      {/* AI + News */}
+      <div className="grid lg:grid-cols-2 gap-6">
         <div className="space-y-6">
           {/* AI Explanation */}
           {explanation.Summary && (

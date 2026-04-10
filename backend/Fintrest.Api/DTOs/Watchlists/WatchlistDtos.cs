@@ -17,4 +17,4 @@ public record AlertCreateRequest(
     string? ThresholdJson
 );
 
-public record AlertResponse(long Id, string AlertType, string Channel, bool Active, long? StockId, string? ThresholdJson, DateTime CreatedAt);
+public record AlertResponse(long Id, string AlertType, string Channel, bool Active, long? StockId, string? Ticker, string? ThresholdJson, DateTime CreatedAt);

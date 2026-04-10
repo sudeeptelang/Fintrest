@@ -24,12 +24,13 @@ public class AlertsController(AppDbContext db) : ControllerBase
     {
         var userId = await GetUserId();
         var alerts = await db.Alerts
+            .Include(a => a.Stock)
             .Where(a => a.UserId == userId)
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
 
         return Ok(alerts.Select(a =>
-            new AlertResponse(a.Id, a.AlertType, a.Channel, a.Active, a.StockId, a.ThresholdJson, a.CreatedAt)
+            new AlertResponse(a.Id, a.AlertType, a.Channel, a.Active, a.StockId, a.Stock?.Ticker, a.ThresholdJson, a.CreatedAt)
         ).ToList());
     }
 
@@ -48,6 +49,14 @@ public class AlertsController(AppDbContext db) : ControllerBase
         db.Alerts.Add(alert);
         await db.SaveChangesAsync();
 
-        return Created("", new AlertResponse(alert.Id, alert.AlertType, alert.Channel, alert.Active, alert.StockId, alert.ThresholdJson, alert.CreatedAt));
+        // Load stock for ticker
+        string? ticker = null;
+        if (alert.StockId.HasValue)
+        {
+            var stock = await db.Stocks.FindAsync(alert.StockId.Value);
+            ticker = stock?.Ticker;
+        }
+
+        return Created("", new AlertResponse(alert.Id, alert.AlertType, alert.Channel, alert.Active, alert.StockId, ticker, alert.ThresholdJson, alert.CreatedAt));
     }
 }

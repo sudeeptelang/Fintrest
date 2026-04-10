@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   TrendingUp,
   Star,
-  Grid3X3,
+  BarChart3,
   LineChart,
   Settings,
   LogOut,
@@ -15,6 +15,8 @@ import {
   Briefcase,
   Upload,
   Bell,
+  Bot,
+  BellDot,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,7 @@ const sidebarSections = [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { label: "Top Picks", href: "/picks", icon: TrendingUp },
       { label: "Swing Trades", href: "/swing", icon: CandlestickChart },
+      { label: "Ask Athena", href: "/athena", icon: Bot },
     ],
   },
   {
@@ -41,8 +44,9 @@ const sidebarSections = [
     links: [
       { label: "Watchlist", href: "/watchlist", icon: Star },
       { label: "Alerts", href: "/alerts", icon: Bell },
-      { label: "Sector Heatmap", href: "/heatmap", icon: Grid3X3 },
+      { label: "Markets", href: "/markets", icon: BarChart3 },
       { label: "Performance", href: "/performance", icon: LineChart },
+      { label: "Notifications", href: "/notifications", icon: BellDot },
     ],
   },
 ];

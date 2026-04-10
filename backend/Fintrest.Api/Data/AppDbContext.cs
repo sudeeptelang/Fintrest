@@ -25,6 +25,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ProviderHealth> ProviderHealth => Set<ProviderHealth>();
     public DbSet<LlmTraceLog> LlmTraceLogs => Set<LlmTraceLog>();
 
+    // Chat
+    public DbSet<ChatSession> ChatSessions => Set<ChatSession>();
+
     // Portfolio
     public DbSet<Portfolio> Portfolios => Set<Portfolio>();
     public DbSet<PortfolioHolding> PortfolioHoldings => Set<PortfolioHolding>();
