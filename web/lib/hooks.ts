@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
 
 export function useMarketSummary() {
@@ -33,4 +33,48 @@ export function useStockNews(ticker: string) {
 
 export function usePerformanceOverview() {
   return useQuery({ queryKey: ["performance"], queryFn: api.performanceOverview });
+}
+
+// --- Authenticated hooks ---
+
+export function useCurrentUser() {
+  return useQuery({ queryKey: ["current-user"], queryFn: api.me });
+}
+
+export function useSubscription() {
+  return useQuery({ queryKey: ["subscription"], queryFn: api.subscription });
+}
+
+export function useWatchlists() {
+  return useQuery({ queryKey: ["watchlists"], queryFn: api.watchlists });
+}
+
+export function useCreateWatchlist() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api.createWatchlist(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["watchlists"] }),
+  });
+}
+
+export function useAddWatchlistItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ watchlistId, stockId }: { watchlistId: number; stockId: number }) =>
+      api.addWatchlistItem(watchlistId, stockId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["watchlists"] }),
+  });
+}
+
+export function useRemoveWatchlistItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ watchlistId, itemId }: { watchlistId: number; itemId: number }) =>
+      api.removeWatchlistItem(watchlistId, itemId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["watchlists"] }),
+  });
+}
+
+export function useAlerts() {
+  return useQuery({ queryKey: ["alerts"], queryFn: api.alerts });
 }

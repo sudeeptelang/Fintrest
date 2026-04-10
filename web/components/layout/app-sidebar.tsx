@@ -6,7 +6,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard,
   TrendingUp,
-  BarChart3,
   Star,
   Grid3X3,
   LineChart,
@@ -15,20 +14,37 @@ import {
   CandlestickChart,
   Briefcase,
   Upload,
-  Brain,
+  Bell,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { signOut } from "@/lib/auth";
 
-const sidebarLinks = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Top Picks", href: "/picks", icon: TrendingUp },
-  { label: "Swing Trades", href: "/swing", icon: CandlestickChart },
-  { label: "Portfolio", href: "/portfolio", icon: Briefcase },
-  { label: "Upload Portfolio", href: "/portfolio/upload", icon: Upload },
-  { label: "Watchlist", href: "/watchlist", icon: Star },
-  { label: "Sector Heatmap", href: "/heatmap", icon: Grid3X3 },
-  { label: "Performance", href: "/performance", icon: LineChart },
+const sidebarSections = [
+  {
+    label: "Discover",
+    links: [
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Top Picks", href: "/picks", icon: TrendingUp },
+      { label: "Swing Trades", href: "/swing", icon: CandlestickChart },
+    ],
+  },
+  {
+    label: "Portfolio",
+    links: [
+      { label: "Overview", href: "/portfolio", icon: Briefcase },
+      { label: "Upload", href: "/portfolio/upload", icon: Upload },
+    ],
+  },
+  {
+    label: "Tools",
+    links: [
+      { label: "Watchlist", href: "/watchlist", icon: Star },
+      { label: "Alerts", href: "/alerts", icon: Bell },
+      { label: "Sector Heatmap", href: "/heatmap", icon: Grid3X3 },
+      { label: "Performance", href: "/performance", icon: LineChart },
+    ],
+  },
 ];
 
 interface AppSidebarProps {
@@ -63,26 +79,35 @@ export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {sidebarLinks.map((link) => {
-          const isActive = pathname === link.href;
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={onClose}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <link.icon className="h-4.5 w-4.5 shrink-0" />
-              {link.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
+        {sidebarSections.map((section) => (
+          <div key={section.label}>
+            <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+              {section.label}
+            </p>
+            <div className="space-y-0.5">
+              {section.links.map((link) => {
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={onClose}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <link.icon className="h-4.5 w-4.5 shrink-0" />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Bottom */}
@@ -95,7 +120,13 @@ export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
           <Settings className="h-4.5 w-4.5" />
           Settings
         </Link>
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+        <button
+          onClick={async () => {
+            await signOut();
+            window.location.href = "/auth/login";
+          }}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        >
           <LogOut className="h-4.5 w-4.5" />
           Log out
         </button>

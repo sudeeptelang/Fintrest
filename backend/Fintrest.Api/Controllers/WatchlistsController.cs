@@ -52,4 +52,15 @@ public class WatchlistsController(AppDbContext db) : ControllerBase
 
         return Created("", new { item.Id, item.StockId, item.CreatedAt });
     }
+
+    [HttpDelete("{watchlistId}/items/{itemId}")]
+    public async Task<IActionResult> RemoveItem(long watchlistId, long itemId)
+    {
+        var item = await db.WatchlistItems
+            .FirstOrDefaultAsync(i => i.Id == itemId && i.WatchlistId == watchlistId && i.Watchlist.UserId == UserId);
+        if (item is null) return NotFound();
+        db.WatchlistItems.Remove(item);
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
 }

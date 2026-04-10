@@ -1,93 +1,184 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Star, Bell, Trash2 } from "lucide-react";
+import { Plus, Star, Trash2, Loader2, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const watchlistItems = [
-  { ticker: "NVDA", name: "NVIDIA Corp", score: 92, price: "$892.40", change: "+3.2%", alert: true },
-  { ticker: "AAPL", name: "Apple Inc", score: 87, price: "$198.20", change: "+1.8%", alert: true },
-  { ticker: "TSLA", name: "Tesla Inc", score: 78, price: "$175.60", change: "+2.4%", alert: false },
-  { ticker: "AMZN", name: "Amazon.com", score: 81, price: "$186.40", change: "+1.4%", alert: true },
-  { ticker: "AMD", name: "AMD Inc", score: 74, price: "$162.80", change: "+1.9%", alert: false },
-];
+import { useWatchlists, useCreateWatchlist, useRemoveWatchlistItem, useAddWatchlistItem } from "@/lib/hooks";
+import Link from "next/link";
 
 export default function WatchlistPage() {
+  const { data: watchlists, isLoading, error } = useWatchlists();
+  const createWatchlist = useCreateWatchlist();
+  const removeItem = useRemoveWatchlistItem();
+  const addItem = useAddWatchlistItem();
+
+  const [activeTab, setActiveTab] = useState(0);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  const activeWatchlist = watchlists?.[activeTab];
+
+  function handleCreate() {
+    if (!newName.trim()) return;
+    createWatchlist.mutate(newName.trim(), {
+      onSuccess: () => {
+        setNewName("");
+        setShowCreate(false);
+      },
+    });
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p>Failed to load watchlists. Please try again.</p>
+      </div>
+    );
+  }
+
+  if (!watchlists || watchlists.length === 0) {
+    return (
+      <div className="text-center py-16 space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+          <Star className="h-8 w-8 text-primary" />
+        </div>
+        <h2 className="font-[var(--font-heading)] text-xl font-bold">Create your first watchlist</h2>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+          Track stocks you&apos;re interested in and get signal updates.
+        </p>
+        <div className="flex items-center gap-2 justify-center">
+          <input
+            type="text"
+            placeholder="Watchlist name..."
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            className="px-3 py-2 rounded-lg border border-border bg-card text-sm w-48"
+          />
+          <Button
+            size="sm"
+            className="bg-primary hover:bg-primary/90 text-white"
+            onClick={handleCreate}
+            disabled={createWatchlist.isPending}
+          >
+            {createWatchlist.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Create"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const totalItems = watchlists.reduce((sum, wl) => sum + wl.items.length, 0);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-[var(--font-heading)] text-2xl font-bold">
-            Watchlist
-          </h1>
+          <h1 className="font-[var(--font-heading)] text-2xl font-bold">Watchlist</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {watchlistItems.length} stocks tracked &middot;{" "}
-            {watchlistItems.filter((i) => i.alert).length} with alerts
+            {totalItems} stocks tracked &middot; {watchlists.length} lists
           </p>
         </div>
-        <Button size="sm" className="bg-primary hover:bg-primary/90 text-white">
+        <Button
+          size="sm"
+          className="bg-primary hover:bg-primary/90 text-white"
+          onClick={() => setShowCreate(!showCreate)}
+        >
           <Plus className="h-3.5 w-3.5 mr-1.5" />
-          Add Stock
+          New List
         </Button>
       </div>
 
-      <div className="grid gap-3">
-        {watchlistItems.map((item, i) => (
-          <motion.div
-            key={item.ticker}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 hover:border-primary/20 transition-colors"
+      {showCreate && (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Watchlist name..."
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            className="px-3 py-2 rounded-lg border border-border bg-card text-sm flex-1"
+            autoFocus
+          />
+          <Button size="sm" className="bg-primary text-white" onClick={handleCreate} disabled={createWatchlist.isPending}>
+            {createWatchlist.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Create"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {watchlists.map((wl, idx) => (
+          <button
+            key={wl.id}
+            onClick={() => setActiveTab(idx)}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
+              idx === activeTab
+                ? "bg-primary text-white"
+                : "bg-card border border-border text-muted-foreground hover:text-foreground"
+            }`}
           >
-            <div className="flex items-center gap-4">
-              <Star className="h-4 w-4 fill-primary text-primary" />
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                <span className="font-[var(--font-mono)] text-xs font-bold text-primary">
-                  {item.ticker.slice(0, 2)}
-                </span>
-              </div>
-              <div>
-                <p className="font-[var(--font-mono)] font-semibold text-sm">
-                  {item.ticker}
-                </p>
-                <p className="text-xs text-muted-foreground">{item.name}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6">
-              <div className="text-right">
-                <p className="font-[var(--font-mono)] text-sm font-semibold">
-                  {item.price}
-                </p>
-                <p className="text-xs text-emerald-500 font-medium">
-                  {item.change}
-                </p>
-              </div>
-
-              <div className="text-center">
-                <p className="font-[var(--font-mono)] text-sm font-bold">
-                  {item.score}
-                </p>
-                <p className="text-[10px] text-muted-foreground">Score</p>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className={item.alert ? "text-primary" : "text-muted-foreground"}
-                >
-                  <Bell className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-red-500">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          </motion.div>
+            {wl.name}
+            <span className="ml-1.5 text-xs opacity-70">{wl.items.length}</span>
+          </button>
         ))}
       </div>
+
+      {/* Items */}
+      {activeWatchlist && activeWatchlist.items.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <List className="h-10 w-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">No stocks in this watchlist yet.</p>
+          <p className="text-xs mt-1">Search for a stock and add it from the stock detail page.</p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {activeWatchlist?.items.map((item, i) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 hover:border-primary/20 transition-colors"
+            >
+              <Link href={`/stock/${item.ticker}`} className="flex items-center gap-4 flex-1 min-w-0">
+                <Star className="h-4 w-4 fill-primary text-primary flex-shrink-0" />
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="font-[var(--font-mono)] text-xs font-bold text-primary">
+                    {item.ticker.slice(0, 2)}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-[var(--font-mono)] font-semibold text-sm">{item.ticker}</p>
+                  <p className="text-xs text-muted-foreground truncate">{item.stockName}</p>
+                </div>
+              </Link>
+
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:text-red-500 flex-shrink-0"
+                onClick={() =>
+                  removeItem.mutate({ watchlistId: activeWatchlist.id, itemId: item.id })
+                }
+                disabled={removeItem.isPending}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

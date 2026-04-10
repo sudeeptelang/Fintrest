@@ -1,3 +1,5 @@
+import { createClient } from "@/lib/supabase/client";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5185/api/v1";
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -14,6 +16,17 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   return res.json();
+}
+
+async function authFetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("Not authenticated");
+  return fetchApi<T>(path, {
+    ...options,
+    headers: { ...options?.headers, Authorization: `Bearer ${token}` },
+  });
 }
 
 // --- Types ---
@@ -100,15 +113,56 @@ export interface PerformanceOverview {
   avgDrawdown: number;
 }
 
+// --- Auth & Account Types ---
+
+export interface UserResponse {
+  id: number;
+  email: string;
+  fullName: string | null;
+  plan: string;
+}
+
+export interface SubscriptionResponse {
+  plan: string;
+  status: string;
+  stripeCustomerId: string | null;
+  currentPeriodEnd: string | null;
+}
+
+export interface WatchlistItemResponse {
+  id: number;
+  stockId: number;
+  ticker: string;
+  stockName: string;
+  createdAt: string;
+}
+
+export interface WatchlistResponse {
+  id: number;
+  name: string;
+  items: WatchlistItemResponse[];
+  createdAt: string;
+}
+
+export interface AlertResponse {
+  id: number;
+  alertType: string;
+  channel: string;
+  active: boolean;
+  stockId: number | null;
+  thresholdJson: string | null;
+  createdAt: string;
+}
+
 // --- API Functions ---
 
 export const api = {
-  // Market
+  // Market (public)
   marketSummary: () => fetchApi<MarketSummary>("/market/summary"),
   topPicks: (limit = 12) => fetchApi<SignalListResponse>(`/picks/top-today?limit=${limit}`),
   swingWeek: () => fetchApi<SignalListResponse>("/picks/swing-week"),
 
-  // Stocks
+  // Stocks (public)
   stock: (ticker: string) => fetchApi<StockInfo>(`/stocks/${ticker}`),
   stockChart: (ticker: string, range = "3m") =>
     fetchApi<MarketDataPoint[]>(`/stocks/${ticker}/chart?range=${range}`),
@@ -117,8 +171,39 @@ export const api = {
   stockNews: (ticker: string) =>
     fetchApi<NewsItem[]>(`/stocks/${ticker}/news`),
 
-  // Performance
+  // Performance (public)
   performanceOverview: () => fetchApi<PerformanceOverview>("/performance/overview"),
+
+  // Auth (authenticated)
+  me: () => authFetchApi<UserResponse>("/auth/me"),
+
+  // Subscription (authenticated)
+  subscription: () => authFetchApi<SubscriptionResponse>("/subscription"),
+
+  // Watchlists (authenticated)
+  watchlists: () => authFetchApi<WatchlistResponse[]>("/watchlists"),
+  createWatchlist: (name: string) =>
+    authFetchApi<WatchlistResponse>("/watchlists", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  addWatchlistItem: (watchlistId: number, stockId: number) =>
+    authFetchApi<WatchlistItemResponse>(`/watchlists/${watchlistId}/items`, {
+      method: "POST",
+      body: JSON.stringify({ stockId }),
+    }),
+  removeWatchlistItem: (watchlistId: number, itemId: number) =>
+    authFetchApi<void>(`/watchlists/${watchlistId}/items/${itemId}`, {
+      method: "DELETE",
+    }),
+
+  // Alerts (authenticated)
+  alerts: () => authFetchApi<AlertResponse[]>("/alerts"),
+  createAlert: (req: { alertType: string; channel: string; stockId?: number; thresholdJson?: string }) =>
+    authFetchApi<AlertResponse>("/alerts", {
+      method: "POST",
+      body: JSON.stringify(req),
+    }),
 
   // Portfolio
   portfolios: () => fetchApi<PortfolioSummary[]>("/portfolios"),
