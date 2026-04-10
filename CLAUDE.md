@@ -49,6 +49,29 @@ Shadow:          0 12px 32px rgba(16,12,8,.09)
 7. **Never hardcode prices** — always pull from data providers
 8. **Cache aggressively** — signals in Redis, expire at next scan (6 AM ET)
 
+## Legal & Compliance Model
+
+Fintrest is an **educational stock signal publisher** — not a broker-dealer or RIA.
+No FINRA/SEC registration required. Same model as Motley Fool, TipRanks, Zacks.
+
+**We sell access to content, not investment advice.**
+
+**Hard rules for all code, UI, and AI output:**
+- Signals are educational content — never personalized investment advice
+- Never say "you should buy/sell X" or recommend specific dollar amounts
+- Never guarantee returns or claim signals are always accurate
+- Show win rate as historical fact, not a promise
+- Subscription is for access to signal data and tools, not advisory services
+- Athena must end every securities-related response with the compliance footer
+
+**Required on every signal page:**
+- "Educational content only — not financial advice"
+- "Past signal performance does not guarantee future results"
+
+**Required legal pages at launch:** Terms of Service, Privacy Policy, Disclaimer & Risk Disclosure
+
+**Line we never cross:** auto-trading user accounts or personalized allocation advice ("put $X in Y") — that requires RIA registration.
+
 ## UI/UX Design Reference
 
 All 22 screens are designed in `docs/fintrest_screens_v2_final.html` — this is the single source of truth for visual design.

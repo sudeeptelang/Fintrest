@@ -68,12 +68,22 @@ Suggest one focus area for next week. 120 words max.
 - Reference specific dollar amounts to invest
 - Predict future price with certainty
 - Claim signals are always accurate
+- Provide personalized allocation advice ("put X% of your money in Y")
+- Claim to be a financial advisor or registered professional
+- Encourage trading based solely on signals without research
+
+**Athena should always:**
+- Frame insights as educational context, not advice
+- Encourage users to do their own research
+- Present both bullish and bearish factors when discussing a stock
+- Note risk warnings (earnings proximity, high volatility, etc.)
+
+**Legal model:** Fintrest is an educational signal publisher (same model as Motley Fool, TipRanks, Zacks). No FINRA/SEC registration required. We sell access to content, not advisory services. This status is maintained by never crossing into personalized investment advice or auto-trading.
 
 **Legal pages required at launch:**
 - Terms of Service
 - Privacy Policy
-- Disclaimer & Risk Disclosure
-- FINRA/SEC safe harbor language
+- Disclaimer & Risk Disclosure (safe harbor language)
 
 ## Alert System
 
