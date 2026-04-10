@@ -12,8 +12,10 @@ import {
   ArrowUpRight,
   Star,
   Bell,
+  Check,
+  Loader2,
 } from "lucide-react";
-import { useStock, useStockSignals, useStockNews, useStockChart } from "@/lib/hooks";
+import { useStock, useStockSignals, useStockNews, useStockChart, useWatchlists, useAddWatchlistItem, useCreateWatchlist } from "@/lib/hooks";
 import { Button } from "@/components/ui/button";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { FactorRadar } from "@/components/charts/factor-radar";
@@ -40,6 +42,30 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { data: signalsData } = useStockSignals(ticker);
   const { data: news } = useStockNews(ticker);
   const { data: chartData } = useStockChart(ticker, chartRange);
+  const { data: watchlists } = useWatchlists();
+  const addToWatchlist = useAddWatchlistItem();
+  const createWatchlist = useCreateWatchlist();
+  const [watchlistAdding, setWatchlistAdding] = useState(false);
+
+  const isInWatchlist = watchlists?.some(wl =>
+    wl.items.some(item => item.ticker.toUpperCase() === ticker.toUpperCase())
+  );
+
+  async function handleAddToWatchlist() {
+    if (!stock || watchlistAdding) return;
+    setWatchlistAdding(true);
+    try {
+      let wl = watchlists?.[0];
+      if (!wl) {
+        wl = await createWatchlist.mutateAsync("My Watchlist");
+      }
+      await addToWatchlist.mutateAsync({ watchlistId: wl.id, stockId: stock.id });
+    } catch {
+      // already in watchlist or error
+    } finally {
+      setWatchlistAdding(false);
+    }
+  }
 
   const latestSignal = signalsData?.signals?.[0];
   const breakdown = latestSignal?.breakdown;
@@ -108,8 +134,21 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Star className="h-3.5 w-3.5 mr-1.5" /> Watchlist
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAddToWatchlist}
+            disabled={isInWatchlist || watchlistAdding}
+            className={isInWatchlist ? "border-primary/30 text-primary" : ""}
+          >
+            {watchlistAdding ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : isInWatchlist ? (
+              <Check className="h-3.5 w-3.5 mr-1.5" />
+            ) : (
+              <Star className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            {isInWatchlist ? "In Watchlist" : "Watchlist"}
           </Button>
           <Button size="sm" className="bg-primary hover:bg-primary/90 text-white">
             <Bell className="h-3.5 w-3.5 mr-1.5" /> Set Alert

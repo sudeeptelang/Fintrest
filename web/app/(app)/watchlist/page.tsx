@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Star, Trash2, Loader2, List } from "lucide-react";
+import { Plus, Star, Trash2, Loader2, List, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWatchlists, useCreateWatchlist, useRemoveWatchlistItem, useAddWatchlistItem } from "@/lib/hooks";
+import { api } from "@/lib/api";
 import Link from "next/link";
 
 export default function WatchlistPage() {
@@ -16,6 +17,24 @@ export default function WatchlistPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
+  const [tickerInput, setTickerInput] = useState("");
+  const [addingStock, setAddingStock] = useState(false);
+  const [addError, setAddError] = useState("");
+
+  async function handleAddStock() {
+    if (!tickerInput.trim() || !activeWatchlist) return;
+    setAddingStock(true);
+    setAddError("");
+    try {
+      const stock = await api.stock(tickerInput.trim().toUpperCase());
+      await addItem.mutateAsync({ watchlistId: activeWatchlist.id, stockId: stock.id });
+      setTickerInput("");
+    } catch {
+      setAddError(`"${tickerInput.toUpperCase()}" not found in our stock universe.`);
+    } finally {
+      setAddingStock(false);
+    }
+  }
 
   const activeWatchlist = watchlists?.[activeTab];
 
@@ -134,12 +153,40 @@ export default function WatchlistPage() {
         ))}
       </div>
 
+      {/* Add stock */}
+      {activeWatchlist && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Add ticker (e.g. AAPL, NVDA)..."
+                value={tickerInput}
+                onChange={(e) => { setTickerInput(e.target.value); setAddError(""); }}
+                onKeyDown={(e) => e.key === "Enter" && handleAddStock()}
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-card text-sm font-[var(--font-mono)]"
+              />
+            </div>
+            <Button
+              size="sm"
+              className="bg-primary hover:bg-primary/90 text-white"
+              onClick={handleAddStock}
+              disabled={addingStock || !tickerInput.trim()}
+            >
+              {addingStock ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Plus className="h-3.5 w-3.5 mr-1" />Add</>}
+            </Button>
+          </div>
+          {addError && <p className="text-xs text-red-500">{addError}</p>}
+        </div>
+      )}
+
       {/* Items */}
       {activeWatchlist && activeWatchlist.items.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <List className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p className="text-sm">No stocks in this watchlist yet.</p>
-          <p className="text-xs mt-1">Search for a stock and add it from the stock detail page.</p>
+          <p className="text-xs mt-1">Type a ticker above and click Add.</p>
         </div>
       ) : (
         <div className="grid gap-3">

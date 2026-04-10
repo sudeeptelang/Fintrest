@@ -205,19 +205,24 @@ export const api = {
       body: JSON.stringify(req),
     }),
 
-  // Portfolio
-  portfolios: () => fetchApi<PortfolioSummary[]>("/portfolios"),
-  portfolio: (id: number) => fetchApi<PortfolioSummary>(`/portfolios/${id}`),
-  portfolioHoldings: (id: number) => fetchApi<Holding[]>(`/seed/portfolio/${id}/holdings`),
-  portfolioTransactions: (id: number) => fetchApi<Transaction[]>(`/portfolios/${id}/transactions`).catch(() => []),
-  portfolioAnalytics: (id: number) => fetchApi<PortfolioAnalytics>(`/portfolios/${id}/analytics`).catch(() => null),
-  portfolioAdvisor: (id: number) => fetchApi<AdvisorResult>(`/seed/portfolio/${id}/advisor`),
-  portfolioAiAnalysis: (id: number) => fetchApi<AiAnalysis>(`/seed/portfolio/${id}/ai-analysis`),
-  importCsv: (file: File, name: string, cash?: number) => {
+  // Portfolio (authenticated)
+  portfolios: () => authFetchApi<PortfolioSummary[]>("/portfolios"),
+  portfolio: (id: number) => authFetchApi<PortfolioSummary>(`/portfolios/${id}`),
+  portfolioHoldings: (id: number) => authFetchApi<Holding[]>(`/portfolios/${id}/holdings`),
+  portfolioTransactions: (id: number) => authFetchApi<Transaction[]>(`/portfolios/${id}/transactions`).catch(() => []),
+  portfolioAnalytics: (id: number) => authFetchApi<PortfolioAnalytics>(`/portfolios/${id}/analytics`).catch(() => null),
+  portfolioAdvisor: (id: number) => authFetchApi<AdvisorResult>(`/portfolios/${id}/advisor`),
+  portfolioAiAnalysis: (id: number) => authFetchApi<AiAnalysis>(`/portfolios/${id}/ai-analysis`),
+  importCsv: async (file: File, name: string, cash?: number) => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error("Not authenticated");
     const form = new FormData();
     form.append("file", file);
-    return fetch(`${API_BASE}/seed/portfolio/upload?name=${encodeURIComponent(name)}${cash ? `&cash=${cash}` : ""}`, {
+    return fetch(`${API_BASE}/portfolios/import/csv?name=${encodeURIComponent(name)}${cash ? `&cash=${cash}` : ""}`, {
       method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
       body: form,
     }).then(r => {
       if (!r.ok) return r.text().then(t => { throw new Error(t); });
@@ -225,7 +230,7 @@ export const api = {
     }) as Promise<ImportAnalyzeResult>;
   },
   importText: (holdings: string, name?: string, cash?: number) =>
-    fetchApi<ImportAnalyzeResult>("/seed/portfolio/text", {
+    authFetchApi<ImportAnalyzeResult>("/portfolios/import/text", {
       method: "POST",
       body: JSON.stringify({ holdings, name, cash }),
     }),

@@ -1,14 +1,34 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, Search, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useCurrentUser } from "@/lib/hooks";
 
 interface AppHeaderProps {
   onMenuToggle: () => void;
 }
 
 export function AppHeader({ onMenuToggle }: AppHeaderProps) {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const { data: user } = useCurrentUser();
+
+  const initials = user?.fullName
+    ? user.fullName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)
+    : "U";
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const ticker = query.trim().toUpperCase();
+    if (ticker) {
+      router.push(`/stock/${ticker}`);
+      setQuery("");
+    }
+  }
+
   return (
     <header className="sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-4 sm:px-6">
       {/* Left */}
@@ -22,26 +42,28 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         </button>
 
         {/* Search */}
-        <div className="relative max-w-md flex-1">
+        <form onSubmit={handleSearch} className="relative max-w-md flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search stocks, signals..."
-            className="w-full h-9 pl-9 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-colors"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search ticker (e.g. AAPL, NVDA)..."
+            className="w-full h-9 pl-9 pr-4 rounded-lg bg-muted/50 border border-border text-sm font-[var(--font-mono)] placeholder:font-[var(--font-body)] placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-colors"
           />
-        </div>
+        </form>
       </div>
 
       {/* Right side */}
       <div className="flex items-center gap-2 sm:gap-3">
         <ThemeToggle />
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative" onClick={() => router.push("/alerts")}>
           <Bell className="h-4.5 w-4.5" />
           <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
         </Button>
-        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-          <span className="text-xs font-semibold text-primary">U</span>
-        </div>
+        <button onClick={() => router.push("/settings")} className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+          <span className="text-xs font-semibold text-primary">{initials}</span>
+        </button>
       </div>
     </header>
   );

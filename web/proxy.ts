@@ -7,9 +7,8 @@ export async function proxy(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Skip auth check in dev mode or if Supabase not configured
-  const isDev = process.env.NODE_ENV === "development";
-  if (!supabaseUrl || !supabaseKey || supabaseKey === "YOUR_SUPABASE_ANON_KEY" || isDev) {
+  // Skip auth check if Supabase not configured
+  if (!supabaseUrl || !supabaseKey || supabaseKey === "YOUR_SUPABASE_ANON_KEY") {
     return supabaseResponse;
   }
 

@@ -12,21 +12,21 @@ builder.Services.AddDbContext<AppDbContext>(options =>
            .UseSnakeCaseNamingConvention());
 
 // Auth — Validate Supabase JWT tokens
-var supabaseJwtSecret = builder.Configuration["Supabase:JwtSecret"]!;
+var supabaseUrl = builder.Configuration["Supabase:Url"]!;
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.Authority = $"{supabaseUrl}/auth/v1";
+        options.MetadataAddress = $"{supabaseUrl}/auth/v1/.well-known/openid-configuration";
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = $"{builder.Configuration["Supabase:Url"]}/auth/v1",
+            ValidIssuer = $"{supabaseUrl}/auth/v1",
             ValidAudience = "authenticated",
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(supabaseJwtSecret)),
-            NameClaimType = "sub",  // Supabase user ID is in "sub" claim
+            NameClaimType = "sub",
         };
     });
 builder.Services.AddAuthorization();
