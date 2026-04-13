@@ -1,10 +1,9 @@
 using Fintrest.Api.Services.Indicators;
-using static Fintrest.Api.Services.ScoringEngine;
 
 namespace Fintrest.Api.Services.Scoring;
 
 /// <summary>
-/// Scores a single stock from its snapshot.
+/// Scores a single stock from its snapshot using the V2 scoring engine.
 /// Pure function: snapshot in, scored signal out. No DB access.
 /// </summary>
 public static class StockScorer
@@ -22,7 +21,6 @@ public static class StockScorer
         var rsi = TechnicalIndicators.RSI(closes);
         var adx = TechnicalIndicators.ADX(highs, lows, closes);
         var atrPct = TechnicalIndicators.ATRPercent(highs, lows, closes);
-        var roc10 = TechnicalIndicators.ROC(closes, 10);
         var trendDir = TechnicalIndicators.TrendDirection(snap.Price, ma20, ma50, ma200);
 
         // Volume average (30-day)
@@ -32,28 +30,42 @@ public static class StockScorer
                 ? snap.VolumeSeries.Average(v => (double)v)
                 : (double?)null;
 
-        // 2. Run 7-factor scoring engine
-        var breakdown = ScoringEngine.Compute(
+        // 2. Run V2 scoring engine with all available data
+        var breakdown = ScoringEngineV2.Compute(
+            closes: closes,
+            highs: highs,
+            lows: lows,
+            volumes: snap.VolumeSeries,
             price: snap.Price,
-            ma20: ma20,
-            ma50: ma50,
-            ma200: ma200,
-            roc10: roc10,
             currentVolume: snap.Volume,
-            avgVolume30D: avgVolume30D,
-            sentimentScore: snap.NewsSentiment,
-            hasCatalyst: snap.HasCatalyst,
-            revenueGrowth: snap.RevenueGrowth,
-            epsSurprise: snap.EpsGrowth,
-            grossMargin: snap.GrossMargin,
-            socialScore: snap.SocialScore,
-            analystRating: snap.AnalystRating,
-            insiderBuying: snap.InsiderBuying,
-            adx: adx,
+            ma20: ma20, ma50: ma50, ma200: ma200,
+            rsi: rsi, adx: adx, atrPct: atrPct,
             trendDirection: trendDir,
-            atrPct: atrPct,
+            avgSentiment: snap.NewsSentiment,
+            hasCatalyst: snap.HasCatalyst,
+            catalystType: snap.CatalystType,
+            newsCount: snap.NewsCount,
+            peRatio: snap.PeRatio,
+            pegRatio: snap.PegRatio,
+            roe: snap.ReturnOnEquity,
+            roa: snap.ReturnOnAssets,
+            operatingMargin: snap.OperatingMargin,
+            grossMargin: snap.GrossMargin,
+            debtToEquity: snap.DebtToEquity,
+            revenueGrowth: snap.RevenueGrowth,
+            epsGrowth: snap.EpsGrowth,
+            analystRating: snap.AnalystRating,
+            analystCount: snap.AnalystCount,
+            analystTargetPrice: snap.AnalystTargetPrice,
+            insiderBuying: snap.InsiderBuying,
+            insiderBuyCount: snap.InsiderBuyCount,
+            insiderSellCount: snap.InsiderSellCount,
+            beta: snap.Beta,
             avgDailyVolume: avgVolume30D,
-            floatShares: snap.FloatShares
+            floatShares: snap.FloatShares,
+            nextEarningsDate: snap.NextEarningsDate,
+            lastEpsSurprise: snap.LastEpsSurprise,
+            spyTrendDirection: snap.SpyTrendDirection
         );
 
         // 3. Calculate trade zones (only for actionable signals)
@@ -76,36 +88,34 @@ public static class StockScorer
             _ => "HIGH"
         };
 
-        // 6. Build provenance (audit trail of what data was used)
+        // 6. Build provenance
         var provenance = new Dictionary<string, object?>
         {
+            ["engine"] = "v2",
             ["price"] = snap.Price,
-            ["ma20"] = ma20,
-            ["ma50"] = ma50,
-            ["ma200"] = ma200,
-            ["rsi14"] = rsi,
-            ["adx14"] = adx,
-            ["atr_pct"] = atrPct,
-            ["roc10"] = roc10,
-            ["volume"] = snap.Volume,
-            ["avg_volume_30d"] = avgVolume30D,
+            ["ma20"] = ma20, ["ma50"] = ma50, ["ma200"] = ma200,
+            ["rsi14"] = rsi, ["adx14"] = adx, ["atr_pct"] = atrPct,
             ["trend_direction"] = trendDir,
+            ["volume"] = snap.Volume, ["avg_volume_30d"] = avgVolume30D,
             ["news_sentiment"] = snap.NewsSentiment,
             ["has_catalyst"] = snap.HasCatalyst,
             ["catalyst_type"] = snap.CatalystType,
-            ["revenue_growth"] = snap.RevenueGrowth,
-            ["eps_growth"] = snap.EpsGrowth,
-            ["gross_margin"] = snap.GrossMargin,
-            ["social_score"] = snap.SocialScore,
+            ["news_count"] = snap.NewsCount,
+            ["pe_ratio"] = snap.PeRatio, ["peg_ratio"] = snap.PegRatio,
+            ["roe"] = snap.ReturnOnEquity, ["roa"] = snap.ReturnOnAssets,
+            ["beta"] = snap.Beta,
             ["analyst_rating"] = snap.AnalystRating,
+            ["analyst_count"] = snap.AnalystCount,
             ["insider_buying"] = snap.InsiderBuying,
-            ["float_shares"] = snap.FloatShares,
+            ["insider_buy_count"] = snap.InsiderBuyCount,
+            ["insider_sell_count"] = snap.InsiderSellCount,
+            ["next_earnings"] = snap.NextEarningsDate,
+            ["spy_trend"] = snap.SpyTrendDirection,
             ["close_count"] = snap.ClosePrices.Count,
         };
 
         return new ScoredSignal
         {
-
             StockId = snap.StockId,
             Ticker = snap.Ticker,
             Name = snap.Name,
@@ -117,40 +127,19 @@ public static class StockScorer
             TargetHigh = zone?.TargetHigh,
             RiskRewardRatio = zone?.RiskRewardRatio,
             RiskLevel = riskLevel,
-            // Horizon based on signal characteristics:
-            // - Strong momentum + high volume → short-term (1-5 days, day/swing trade)
-            // - Moderate score + catalyst → mid-term (6-20 days, swing trade)
-            // - Fundamentals/value-driven → long-term (21-60 days, position trade)
             HorizonDays = DetermineHorizon(breakdown, snap),
             Explanation = explanation,
             Provenance = provenance,
         };
     }
 
-    /// <summary>Determine trade horizon based on signal characteristics.</summary>
-    private static int DetermineHorizon(ScoringEngine.ScoreBreakdown breakdown, StockSnapshot snap)
+    private static int DetermineHorizon(ScoringEngineV2.ScoreBreakdown breakdown, StockSnapshot snap)
     {
-        // High momentum + high volume = short-term momentum play (1-5 days)
-        if (breakdown.Momentum >= 80 && breakdown.Volume >= 70)
-            return 3;
-
-        // Strong catalyst (news) = short-term event trade (2-5 days)
-        if (breakdown.Catalyst >= 75 && snap.HasCatalyst)
-            return 5;
-
-        // Moderate momentum, decent trend = swing trade (7-14 days)
-        if (breakdown.Momentum >= 60 && breakdown.Trend >= 60)
-            return 10;
-
-        // Fundamentals-driven = position trade (14-30 days)
-        if (breakdown.Fundamental >= 70)
-            return 21;
-
-        // Low momentum, value-oriented = longer hold (30-60 days)
-        if (breakdown.Momentum < 50 && breakdown.Fundamental >= 60)
-            return 45;
-
-        // Default swing trade
+        if (breakdown.Momentum >= 80 && breakdown.Volume >= 70) return 3;
+        if (breakdown.Catalyst >= 75 && snap.HasCatalyst) return 5;
+        if (breakdown.Momentum >= 60 && breakdown.Trend >= 60) return 10;
+        if (breakdown.Fundamental >= 70) return 21;
+        if (breakdown.Momentum < 50 && breakdown.Fundamental >= 60) return 45;
         return 7;
     }
 }

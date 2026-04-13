@@ -1,4 +1,4 @@
-using static Fintrest.Api.Services.ScoringEngine;
+using static Fintrest.Api.Services.ScoringEngineV2;
 
 namespace Fintrest.Api.Services.Scoring;
 

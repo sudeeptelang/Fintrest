@@ -38,6 +38,9 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
 
         try
         {
+            // Compute market regime once for all stocks
+            await ComputeMarketRegime(ct);
+
             logger.LogInformation("Loaded {Count} active stocks", stocks.Count);
 
             var scoredSignals = new List<ScoredSignal>();
@@ -231,17 +234,65 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
             HighPrices = marketData.Select(m => m.High).ToList(),
             LowPrices = marketData.Select(m => m.Low).ToList(),
             VolumeSeries = marketData.Select(m => m.Volume).ToList(),
+            // Fundamentals (quarterly + TTM from Stock model)
             RevenueGrowth = fundamental?.RevenueGrowth,
             EpsGrowth = fundamental?.EpsGrowth,
             GrossMargin = fundamental?.GrossMargin,
             NetMargin = fundamental?.NetMargin,
-            PeRatio = fundamental?.PeRatio,
+            PeRatio = fundamental?.PeRatio ?? stock.ForwardPe,
+            PegRatio = stock.PegRatio,
+            ReturnOnEquity = stock.ReturnOnEquity,
+            ReturnOnAssets = stock.ReturnOnAssets,
+            OperatingMargin = stock.OperatingMargin,
+            DebtToEquity = fundamental?.DebtToEquity,
+            // News & Catalyst
             NewsSentiment = avgSentiment,
             HasCatalyst = hasCatalyst,
             CatalystType = catalystType,
+            NewsCount = newsItems.Count,
+            // Analyst
+            AnalystTargetPrice = stock.AnalystTargetPrice,
+            // Insider (defaults — populated if Finnhub data exists)
+            InsiderBuying = false,
+            InsiderBuyCount = 0,
+            InsiderSellCount = 0,
+            // Float/market
             FloatShares = stock.FloatShares,
             MarketCap = stock.MarketCap,
+            Beta = stock.Beta,
+            // Earnings
+            NextEarningsDate = stock.NextEarningsDate,
+            LastEpsSurprise = fundamental?.EpsGrowth, // Proxy: EPS growth as surprise indicator
+            // Market regime (set separately)
+            SpyTrendDirection = _spyTrendDirection,
         };
+    }
+
+    private int _spyTrendDirection;
+
+    /// <summary>Compute SPY trend direction once per scan for market regime awareness.</summary>
+    private async Task ComputeMarketRegime(CancellationToken ct)
+    {
+        var spy = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker == "SPY", ct);
+        if (spy is null) { _spyTrendDirection = 0; return; }
+
+        var spyBars = await db.MarketData
+            .Where(m => m.StockId == spy.Id)
+            .OrderByDescending(m => m.Ts)
+            .Take(200)
+            .Select(m => m.Close)
+            .ToListAsync(ct);
+
+        if (spyBars.Count < 50) { _spyTrendDirection = 0; return; }
+
+        spyBars.Reverse();
+        var ma50 = spyBars.TakeLast(50).Average();
+        var ma200 = spyBars.Count >= 200 ? spyBars.Average() : ma50;
+        var price = spyBars[^1];
+
+        _spyTrendDirection = Indicators.TechnicalIndicators.TrendDirection(price, null, ma50, ma200);
+        logger.LogInformation("Market regime: SPY trend = {Dir} (price={Price}, MA50={MA50})",
+            _spyTrendDirection, price, ma50);
     }
 }
 
