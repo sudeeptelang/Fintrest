@@ -150,7 +150,7 @@ export default function DashboardPage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-primary/20 bg-gradient-to-br from-[#0d1a2e] to-[#172640] p-6 text-white flex flex-col sm:flex-row items-start sm:items-center gap-6 hover:border-primary/40 transition-colors"
+            className="rounded-2xl border border-primary/20 bg-gradient-to-br from-[#0a1f17] to-[#14352a] p-6 text-white flex flex-col sm:flex-row items-start sm:items-center gap-6 hover:border-primary/40 transition-colors"
           >
             <div className="flex items-center gap-4 flex-1">
               <StockLogo ticker={topSignal.ticker} size={56} className="rounded-2xl" />

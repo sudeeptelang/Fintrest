@@ -86,7 +86,7 @@ export default function AthenaPage() {
               className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === "user"
                   ? "bg-primary text-white rounded-br-sm"
-                  : "bg-[#0d1a2e] text-white/85 rounded-bl-sm border border-primary/20"
+                  : "bg-[#0a1f17] text-white/85 rounded-bl-sm border border-primary/20"
               }`}
             >
               {msg.role === "assistant" && (
@@ -103,7 +103,7 @@ export default function AthenaPage() {
         ))}
         {sending && (
           <div className="flex justify-start">
-            <div className="bg-[#0d1a2e] text-white/60 rounded-2xl rounded-bl-sm px-4 py-3 border border-primary/20">
+            <div className="bg-[#0a1f17] text-white/60 rounded-2xl rounded-bl-sm px-4 py-3 border border-primary/20">
               <div className="flex items-center gap-2">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 <span className="text-xs">Athena is thinking...</span>

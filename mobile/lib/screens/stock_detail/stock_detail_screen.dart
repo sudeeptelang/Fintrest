@@ -276,7 +276,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0d1a2e), Color(0xFF172640)],
+          colors: [Color(0xFF0a1f17), Color(0xFF14352a)],
           begin: Alignment.topLeft, end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
