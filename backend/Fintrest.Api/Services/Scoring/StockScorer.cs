@@ -58,7 +58,7 @@ public static class StockScorer
 
         // 3. Calculate trade zones (only for actionable signals)
         TradeZoneCalculator.TradeZone? zone = null;
-        if (breakdown.SignalType is "BuyToday" or "Watch")
+        if (breakdown.SignalType is "BUY_TODAY" or "WATCH")
         {
             zone = TradeZoneCalculator.Calculate(snap);
             zone = TradeZoneCalculator.AdjustForConviction(zone, breakdown.Total);

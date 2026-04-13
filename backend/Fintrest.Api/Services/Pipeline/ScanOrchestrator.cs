@@ -68,8 +68,33 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
                 scoredSignals.Count,
                 scoredSignals.FirstOrDefault()?.Ticker ?? "none");
 
+            // 4b. Filter: only publish actionable signals per CLAUDE.md rules
+            //   - BUY_TODAY: must have valid trade zone AND R:R >= 1.5
+            //   - WATCH: must have valid trade zone, keep top 20
+            //   - HIGH_RISK / AVOID: don't publish
+            var publishable = new List<ScoredSignal>();
+
+            var buySignals = scoredSignals
+                .Where(s => s.SignalType == "BUY_TODAY"
+                         && s.RiskRewardRatio.HasValue
+                         && s.RiskRewardRatio.Value >= 1.5)
+                .ToList();
+
+            var watchSignals = scoredSignals
+                .Where(s => s.SignalType == "WATCH"
+                         && s.EntryLow.HasValue) // has trade zone
+                .Take(20)
+                .ToList();
+
+            publishable.AddRange(buySignals);
+            publishable.AddRange(watchSignals);
+
+            logger.LogInformation(
+                "Publishing {Buy} BUY_TODAY + {Watch} WATCH signals (filtered from {Total} scored)",
+                buySignals.Count, watchSignals.Count, scoredSignals.Count);
+
             // 5. Persist signals + breakdowns
-            foreach (var scored in scoredSignals)
+            foreach (var scored in publishable)
             {
                 var signal = new Signal
                 {
@@ -122,7 +147,7 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
             // 6. Finalize scan run
             sw.Stop();
             scanRun.Status = "COMPLETED";
-            scanRun.SignalsGenerated = scoredSignals.Count;
+            scanRun.SignalsGenerated = publishable.Count;
             scanRun.CompletedAt = DateTime.UtcNow;
 
             await db.SaveChangesAsync(ct);
@@ -136,7 +161,7 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
                 ScanRunId = scanRun.Id,
                 SignalsGenerated = scoredSignals.Count,
                 DurationMs = (int)sw.ElapsedMilliseconds,
-                TopSignals = scoredSignals.Take(12).ToList(),
+                TopSignals = publishable.Take(12).ToList(),
             };
         }
         catch (Exception ex)
