@@ -135,9 +135,20 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
               )}
             </div>
             {latestSignal?.currentPrice && (
-              <p className="font-[var(--font-mono)] text-xl font-bold mt-0.5">
-                ${latestSignal.currentPrice.toFixed(2)}
-              </p>
+              <div className="flex items-center gap-3 mt-0.5">
+                <p className="font-[var(--font-mono)] text-xl font-bold">
+                  ${latestSignal.currentPrice.toFixed(2)}
+                </p>
+                {latestSignal.changePct !== null && (
+                  <span className={`font-[var(--font-mono)] text-sm font-bold px-2 py-0.5 rounded-md ${
+                    latestSignal.changePct >= 0
+                      ? "bg-emerald-500/10 text-emerald-500"
+                      : "bg-red-500/10 text-red-500"
+                  }`}>
+                    {latestSignal.changePct >= 0 ? "+" : ""}{latestSignal.changePct.toFixed(2)}%
+                  </span>
+                )}
+              </div>
             )}
             <p className="text-sm text-muted-foreground">
               {stock?.name ?? "Loading..."}{" "}
