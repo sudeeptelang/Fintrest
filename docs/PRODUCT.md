@@ -46,43 +46,55 @@ Display historical win rate, signal performance tracking, confidence levels, ris
 
 ## Competitive Landscape
 
-### Tier 1 — Mass Market Platforms (Biggest Revenue)
+> Full competitor deep-dive with 78 citations: see `@docs/COMPETITORS.md`
 
-| Platform | Revenue | Users | Strength | Weakness | Our Opportunity |
-|---|---|---|---|---|---|
-| **TradingView** | $100M+/yr | 50M+ | Charts + community + signals as feature | Complex UI, not AI-first | Simpler AI-first UX |
-| **Robinhood** | $1B+/yr | 20M+ | Trading + UX | No deep insights | Add intelligence layer |
-| **Webull** | High | 10M+ | Technical indicators + community | Cluttered | Cleaner signal experience |
-| **Yahoo Finance** | High (ads) | Millions | News + watchlist | No actionable signals | Explainable signals |
+### Landscape Summary Grid
 
-### Tier 2 — Pro Signal Platforms (High Revenue Per User)
-
-| Platform | Price | Strength | Weakness | Our Opportunity |
+| Category | Players | Strength | Weakness | Our Opportunity |
 |---|---|---|---|---|
-| **Benzinga Pro** | $100-300/mo | Real-time news + momentum | Expensive, no AI copilot | AI explanation at lower price |
-| **Trade Ideas** | $1,000+/yr | Holly AI automated signals | Complex, expensive | Simpler, more accessible |
-| **Stock Market Guides** | $49-69/mo | Backtested returns | Limited personalization | Adaptive signals |
-| **Mindful Trader** | $47/mo | Swing trading focus | No AI, no explanation | Full AI layer |
+| **Top Players** | TradingView, Robinhood, Webull, Moomoo | Scale, UX, ecosystem | No AI intelligence, no opinionated "why now" | Add AI explanation + decision layer |
+| **Mid Tier (Signals)** | Benzinga, Trade Ideas, TrendSpider | High-quality signals, scanners, automation | Complex, expensive, intimidating for retail | Simplify + personalize with risk/timeframe/confidence framing |
+| **AI Startups** | Tickeron, Danelfin, Kavout | AI-first scoring, simple ranks | Trust, scale, polish weaker | Build trust + UX with public scorecards and factor logic |
+| **Data Portals** | Yahoo Finance, Finviz | Free data, screeners, huge traffic | Low guidance, no decision support | Convert data → decisions with ranked ideas + reasons |
+| **Portfolio Analytics** | Simply Wall St, Snowball Analytics, Finary | Multi-broker aggregation, portfolio KPIs, diversification | Focused on "how your portfolio is doing," not "what to buy" | Become the idea engine that talks to portfolios |
+| **AI Advisor/Copilot** | PortfolioPilot, WallStreetZen | AI/quant layer, portfolio scores, analyst ranking | Advisor tone, less trade-ready | Swing-trade friendly signals with concrete entries/exits |
+| **Mobile Signal Apps** | Stock Signal, Top Day Trading | Real-time alerts, screeners, watchlists, earnings calendars | Transparency complaints, signal credibility issues | Lead with explainability, proof dashboards, honest scorecards |
 
-### Tier 3 — Pure Signal Apps (Our Direct Competitors)
-
-| Platform | Users | Model | Why We Win |
-|---|---|---|---|
-| **Stock Alarm** | 295K+ | Freemium alerts | No explanation, no AI |
-| **ProTicker Signals** | Growing | Subscription signals | No personalization |
-| **Stocks Signals** | Growing | AI scanning | No copilot, weak UX |
+### Closest Benchmark: Danelfin
+Danelfin validates demand for score-plus-explanation UX. They do AI scores with explanation-led discovery and daily refreshes. We go deeper: 7-factor breakdown, Athena narrative, entry/target/stop with R:R, analyst consensus, and technical analysis panel.
 
 ### Competitive Comparison Matrix
 
-| Capability | Typical Signal Apps | TradingView | Benzinga | **fintrest.ai** |
-|---|---|---|---|---|
-| Signals | Yes | Yes | Yes | **Yes** |
-| Explanation (WHY) | No | No | Partial | **Yes** |
-| AI Copilot | No | No | No | **Yes** |
-| Personalization | No | No | No | **Yes** |
-| Smart Money Insights | No | Limited | Yes | **Yes** |
-| Performance Tracking | No | No | No | **Yes** |
-| Factor Scoring (0-100) | No | No | No | **Yes** |
+| Capability | Signal Apps | TradingView | Benzinga | Danelfin | **fintrest.ai** |
+|---|---|---|---|---|---|
+| Signals | Yes | Yes | Yes | Yes | **Yes** |
+| Explanation (WHY) | No | No | Partial | Partial | **Yes (Athena)** |
+| AI Copilot (chat) | No | No | No | No | **Yes** |
+| Factor Scoring (0-100) | No | No | No | Yes (3 factors) | **Yes (7 factors)** |
+| Entry/Target/Stop zones | Some | No | No | No | **Yes (ATR-based)** |
+| Technical Analysis panel | No | Yes (manual) | No | No | **Yes (auto)** |
+| Analyst Consensus | No | No | Yes | No | **Yes** |
+| Earnings History | No | No | Yes | No | **Yes** |
+| Personalization | No | No | No | No | **Planned** |
+| Performance Tracking | No | No | No | Partial | **Yes** |
+| Portfolio-aware signals | No | No | No | No | **Planned** |
+| Mobile-first | Some | Yes | No | No | **Yes** |
+
+### Market Gaps We Exploit
+
+1. **Too much complexity** for everyday retail users (pro trader platforms)
+2. **Too much raw data**, not enough decision-ready interpretation (research sites)
+3. **Weak transparency** around signal generation and outcome tracking
+4. **Poor affordability filtering** for small-account users
+5. **Fragmented workflow** across discovery → validation → alerts → portfolio follow-up
+
+### Five Differentiators We Own
+
+1. **Explainable signal logic** — not opaque AI claims
+2. **Retail-friendly interface** — action in under two minutes
+3. **Affordable-stock awareness** — smaller investors not ignored
+4. **Honest public scorecards** — wins, losses, average holding period
+5. **AI-generated briefings** — raw data → concise recommendation narrative
 
 ### Revenue Model Comparison
 
@@ -91,6 +103,7 @@ Display historical win rate, signal performance tracking, confidence levels, ris
 | Pure signal app | $20-200/month | Limited |
 | Trading platform + signals | $100-1,000+/user/year | Massive |
 | AI signal SaaS (us) | $50-300/month | Growing fast |
+| Mobile signal apps (App Store) | $29.99-49.99/mo | Growing |
 
 ---
 

@@ -87,7 +87,8 @@ Open this file in a browser to see every screen in Finxoom's warm editorial styl
 
 Detailed specs are split into focused files — use `@` imports when needed:
 
-- `@docs/PRODUCT.md` — screen inventory, subscription plans, roadmap
+- `@docs/PRODUCT.md` — screen inventory, subscription plans, roadmap, competitive positioning
+- `@docs/COMPETITORS.md` — full competitor landscape (78 citations), feature matrix, market gaps, differentiators
 - `@docs/SCHEMA.md` — database tables and relationships
 - `@docs/API.md` — all REST endpoints
 - `@docs/SIGNALS.md` — 7-factor scoring engine and thresholds
