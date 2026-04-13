@@ -6,7 +6,7 @@ import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useTopPicks } from "@/lib/hooks";
 import type { Signal } from "@/lib/api";
 
-type SortKey = "score" | "ticker" | "signal" | "risk" | "entry" | "stop" | "target";
+type SortKey = "score" | "ticker" | "signal" | "risk" | "price" | "entry" | "stop" | "target";
 type SortDir = "asc" | "desc";
 
 const RISK_ORDER: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
@@ -26,6 +26,9 @@ function compare(a: Signal, b: Signal, key: SortKey, dir: SortDir): number {
       break;
     case "risk":
       diff = (RISK_ORDER[a.riskLevel ?? ""] ?? 9) - (RISK_ORDER[b.riskLevel ?? ""] ?? 9);
+      break;
+    case "price":
+      diff = (a.currentPrice ?? 0) - (b.currentPrice ?? 0);
       break;
     case "entry":
       diff = (a.entryLow ?? 0) - (b.entryLow ?? 0);
@@ -115,6 +118,7 @@ export default function PicksPage() {
                 <Th label="Score" sortKeyVal="score" />
                 <Th label="Signal" sortKeyVal="signal" />
                 <Th label="Risk" sortKeyVal="risk" />
+                <Th label="Price" sortKeyVal="price" align="right" />
                 <Th label="Entry Zone" sortKeyVal="entry" align="right" />
                 <Th label="Stop" sortKeyVal="stop" align="right" />
                 <Th label="Target" sortKeyVal="target" align="right" />
@@ -124,7 +128,7 @@ export default function PicksPage() {
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-5 py-8 text-center text-muted-foreground"
                   >
                     Loading...
@@ -133,7 +137,7 @@ export default function PicksPage() {
               ) : signals.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-5 py-8 text-center text-muted-foreground"
                   >
                     No signals yet.
@@ -196,6 +200,9 @@ function SignalTableRow({ signal: s }: { signal: Signal }) {
       </td>
       <td className={`px-5 py-3.5 text-center text-xs font-medium ${riskColor}`}>
         {s.riskLevel ?? "—"}
+      </td>
+      <td className="px-5 py-3.5 text-right font-[var(--font-mono)] font-semibold text-xs">
+        {s.currentPrice ? `$${s.currentPrice.toFixed(2)}` : "—"}
       </td>
       <td className="px-5 py-3.5 text-right font-[var(--font-mono)] text-muted-foreground text-xs">
         {s.entryLow && s.entryHigh

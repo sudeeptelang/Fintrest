@@ -182,7 +182,7 @@ public class MarketController(AppDbContext db) : ControllerBase
             .Take(limit)
             .ToListAsync();
 
-        return Ok(new SignalListResponse(signals.Select(ToDto).ToList(), signals.Count));
+        return Ok(await ToSignalList(signals));
     }
 
     [HttpGet("picks/swing-week")]
@@ -204,7 +204,7 @@ public class MarketController(AppDbContext db) : ControllerBase
             .Take(5)
             .ToListAsync();
 
-        return Ok(new SignalListResponse(signals.Select(ToDto).ToList(), signals.Count));
+        return Ok(await ToSignalList(signals));
     }
 
     [HttpGet("stocks/{ticker}")]
@@ -253,7 +253,7 @@ public class MarketController(AppDbContext db) : ControllerBase
             .Take(limit)
             .ToListAsync();
 
-        return Ok(new SignalListResponse(signals.Select(ToDto).ToList(), signals.Count));
+        return Ok(await ToSignalList(signals));
     }
 
     [HttpGet("stocks/{ticker}/snapshot")]
@@ -371,8 +371,34 @@ public class MarketController(AppDbContext db) : ControllerBase
         return Ok(new { article.Slug, article.Title, article.BodyMd, article.PublishedAt });
     }
 
-    private static SignalResponse ToDto(Signal s) => new(
+    /// <summary>Batch-load latest close price for a list of signals' stocks.</summary>
+    private async Task<Dictionary<long, double>> GetLatestPricesAsync(IEnumerable<Signal> signals)
+    {
+        var stockIds = signals.Select(s => s.StockId).Distinct().ToList();
+        if (stockIds.Count == 0) return new();
+
+        var cutoff = DateTime.UtcNow.AddDays(-7);
+        var recentBars = await db.MarketData
+            .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
+            .Select(m => new { m.StockId, m.Ts, m.Close })
+            .ToListAsync();
+
+        return recentBars
+            .GroupBy(m => m.StockId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(m => m.Ts).First().Close);
+    }
+
+    private async Task<SignalListResponse> ToSignalList(List<Signal> signals)
+    {
+        var prices = await GetLatestPricesAsync(signals);
+        return new SignalListResponse(
+            signals.Select(s => ToDto(s, prices.GetValueOrDefault(s.StockId))).ToList(),
+            signals.Count);
+    }
+
+    private static SignalResponse ToDto(Signal s, double? currentPrice = null) => new(
         s.Id, s.Stock.Ticker, s.Stock.Name, s.SignalType.ToString(), s.ScoreTotal,
+        currentPrice,
         s.EntryLow, s.EntryHigh, s.StopLoss, s.TargetLow, s.TargetHigh,
         s.RiskLevel, s.HorizonDays,
         s.Breakdown is not null ? new SignalBreakdownDto(

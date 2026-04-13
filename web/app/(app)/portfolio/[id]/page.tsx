@@ -1,12 +1,12 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Brain, BarChart3, ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload } from "lucide-react";
+import { Brain, BarChart3, ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { api, type Holding } from "@/lib/api";
 import { ScoreRing } from "@/components/charts/score-ring";
 
 interface PortfolioDetailPageProps {
@@ -31,6 +31,41 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
     queryKey: ["portfolio-advisor", portfolioId],
     queryFn: () => api.portfolioAdvisor(portfolioId),
   });
+
+  // Sortable holdings
+  type HoldingSortKey = "ticker" | "shares" | "avgCost" | "price" | "value" | "pnl" | "signal";
+  type SortDir = "asc" | "desc";
+  const [sortKey, setSortKey] = useState<HoldingSortKey>("value");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const sortedHoldings = useMemo(() => {
+    if (!holdings) return [];
+    return [...holdings].sort((a, b) => {
+      let diff = 0;
+      switch (sortKey) {
+        case "ticker": diff = a.ticker.localeCompare(b.ticker); break;
+        case "shares": diff = a.quantity - b.quantity; break;
+        case "avgCost": diff = a.avgCost - b.avgCost; break;
+        case "price": diff = a.currentPrice - b.currentPrice; break;
+        case "value": diff = a.currentValue - b.currentValue; break;
+        case "pnl": diff = a.unrealizedPnlPct - b.unrealizedPnlPct; break;
+        case "signal": diff = (a.signalScore ?? 0) - (b.signalScore ?? 0); break;
+      }
+      return sortDir === "asc" ? diff : -diff;
+    });
+  }, [holdings, sortKey, sortDir]);
+
+  function handleSort(key: HoldingSortKey) {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir(key === "ticker" ? "asc" : "desc"); }
+  }
+
+  function SortIcon({ k }: { k: HoldingSortKey }) {
+    if (sortKey !== k) return <ChevronsUpDown className="h-3 w-3 text-muted-foreground/40 inline ml-0.5" />;
+    return sortDir === "asc"
+      ? <ChevronUp className="h-3 w-3 text-primary inline ml-0.5" />
+      : <ChevronDown className="h-3 w-3 text-primary inline ml-0.5" />;
+  }
 
   const totalValue = holdings?.reduce((sum, h) => sum + h.currentValue, 0) ?? 0;
   const totalPnl = holdings?.reduce((sum, h) => sum + h.unrealizedPnl, 0) ?? 0;
@@ -100,21 +135,31 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-5 py-3 font-medium text-muted-foreground">Stock</th>
-                <th className="text-right px-5 py-3 font-medium text-muted-foreground">Shares</th>
-                <th className="text-right px-5 py-3 font-medium text-muted-foreground">Avg Cost</th>
-                <th className="text-right px-5 py-3 font-medium text-muted-foreground">Price</th>
-                <th className="text-right px-5 py-3 font-medium text-muted-foreground">Value</th>
-                <th className="text-right px-5 py-3 font-medium text-muted-foreground">P&L</th>
-                <th className="text-center px-5 py-3 font-medium text-muted-foreground">Signal</th>
+                {([
+                  ["Stock", "ticker", "left"],
+                  ["Shares", "shares", "right"],
+                  ["Avg Cost", "avgCost", "right"],
+                  ["Price", "price", "right"],
+                  ["Value", "value", "right"],
+                  ["P&L", "pnl", "right"],
+                  ["Signal", "signal", "center"],
+                ] as const).map(([label, key, align]) => (
+                  <th
+                    key={key}
+                    className={`text-${align} px-5 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors`}
+                    onClick={() => handleSort(key)}
+                  >
+                    {label}<SortIcon k={key} />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {holdingsLoading ? (
                 <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Loading...</td></tr>
-              ) : !holdings || holdings.length === 0 ? (
+              ) : sortedHoldings.length === 0 ? (
                 <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">No holdings</td></tr>
-              ) : holdings.map((h) => (
+              ) : sortedHoldings.map((h) => (
                 <tr key={h.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-5 py-3.5">
                     <Link href={`/stock/${h.ticker}`} className="flex items-center gap-3">

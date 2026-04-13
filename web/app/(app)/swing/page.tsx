@@ -85,6 +85,12 @@ function SwingCard({ signal: s }: { signal: Signal }) {
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Trade Zone</h4>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Price</span>
+              <span className="font-[var(--font-mono)] font-bold">
+                {s.currentPrice ? `$${s.currentPrice.toFixed(2)}` : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Entry</span>
               <span className="font-[var(--font-mono)] font-semibold">
                 {s.entryLow ? `$${s.entryLow.toFixed(0)}–$${s.entryHigh?.toFixed(0)}` : "—"}

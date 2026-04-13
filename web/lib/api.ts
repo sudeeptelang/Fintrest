@@ -37,6 +37,7 @@ export interface Signal {
   stockName: string;
   signalType: string;
   scoreTotal: number;
+  currentPrice: number | null;
   entryLow: number | null;
   entryHigh: number | null;
   stopLoss: number | null;

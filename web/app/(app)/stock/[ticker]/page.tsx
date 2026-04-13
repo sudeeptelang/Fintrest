@@ -132,6 +132,11 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
                 </span>
               )}
             </div>
+            {latestSignal?.currentPrice && (
+              <p className="font-[var(--font-mono)] text-xl font-bold mt-0.5">
+                ${latestSignal.currentPrice.toFixed(2)}
+              </p>
+            )}
             <p className="text-sm text-muted-foreground">
               {stock?.name ?? "Loading..."}{" "}
               {stock?.exchange ? `· ${stock.exchange}` : ""}{" "}
