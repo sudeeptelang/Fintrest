@@ -21,9 +21,10 @@ import {
   useMarketMostActive,
   useMarketEarningsCalendar,
   useMarketIndices,
+  useMarketNews,
 } from "@/lib/hooks";
 import { SignalRow } from "@/components/signals/signal-row";
-import type { TrendingStock, EarningsCalendarItem, Signal } from "@/lib/api";
+import type { TrendingStock, EarningsCalendarItem, Signal, NewsItem } from "@/lib/api";
 
 export default function DashboardPage() {
   const { data: summary } = useMarketSummary();
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const { data: mostActive } = useMarketMostActive(8);
   const { data: earnings } = useMarketEarningsCalendar(14);
   const { data: indices } = useMarketIndices();
+  const { data: marketNews } = useMarketNews(8);
 
   const signals = picks?.signals ?? [];
   const buyCount = signals.filter((s) => s.signalType === "BUY_TODAY").length;
@@ -50,36 +52,63 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard
-          label="Top Signal"
-          value={topSignal?.ticker ?? "—"}
-          sub={topSignal ? `Score: ${Math.round(topSignal.scoreTotal)}` : "No signals yet"}
-          icon={TrendingUp}
-        />
-        <SummaryCard
-          label="Active Signals"
-          value={String(summary?.signalsToday ?? 0)}
-          sub={`${buyCount} buy · ${watchCount} watch`}
-          icon={Activity}
-        />
-        <SummaryCard
-          label="Market Status"
-          value={summary?.marketStatus?.replace("_", " ") ?? "—"}
-          icon={BarChart3}
-          capitalize
-        />
-        <SummaryCard
-          label="Avg Score"
-          value={
-            signals.length > 0
-              ? String(Math.round(signals.reduce((sum, s) => sum + s.scoreTotal, 0) / signals.length))
-              : "—"
-          }
-          sub={`Across ${signals.length} stocks`}
-          icon={TrendingUp}
-        />
+      {/* Summary strip — compact, data-dense */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-primary/20 bg-primary/5 p-4"
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Top Signal</p>
+          <p className="font-[var(--font-mono)] text-xl font-bold mt-1">{topSignal?.ticker ?? "—"}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {topSignal ? `Score ${Math.round(topSignal.scoreTotal)} · ${topSignal.signalType.replace("_"," ")}` : "Run a scan"}
+          </p>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.03 }}
+          className="rounded-xl border border-border bg-card p-4"
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Signals Today</p>
+          <p className="font-[var(--font-heading)] text-xl font-bold mt-1">{summary?.signalsToday ?? 0}</p>
+          <p className="text-xs mt-0.5">
+            <span className="text-emerald-500 font-semibold">{buyCount} buy</span>
+            <span className="text-muted-foreground"> · </span>
+            <span className="text-amber-500 font-semibold">{watchCount} watch</span>
+          </p>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.06 }}
+          className="rounded-xl border border-border bg-card p-4"
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Market</p>
+          <p className="font-[var(--font-heading)] text-xl font-bold mt-1 capitalize">
+            {summary?.marketStatus?.replace("_", " ") ?? "—"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {summary?.latestScanAt
+              ? new Date(summary.latestScanAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : "No scan yet"}
+          </p>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.09 }}
+          className="rounded-xl border border-border bg-card p-4"
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Avg Score</p>
+          <p className="font-[var(--font-heading)] text-xl font-bold mt-1">
+            {signals.length > 0
+              ? Math.round(signals.reduce((sum, s) => sum + s.scoreTotal, 0) / signals.length)
+              : "—"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{signals.length} stocks scanned</p>
+        </motion.div>
       </div>
 
       {/* Index strip */}
@@ -253,6 +282,52 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Trending Stock News */}
+      {marketNews && marketNews.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-6">
+          <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-4 flex items-center gap-2">
+            <Activity className="h-5 w-5 text-muted-foreground" /> Trending Stock News
+          </h2>
+          <div className="grid md:grid-cols-2 gap-3">
+            {marketNews.map((item, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/20 transition-colors"
+              >
+                <div
+                  className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${
+                    (item.sentimentScore ?? 0) > 0.2
+                      ? "bg-emerald-500"
+                      : (item.sentimentScore ?? 0) < -0.2
+                        ? "bg-red-500"
+                        : "bg-amber-400"
+                  }`}
+                />
+                <div className="min-w-0">
+                  <p className="text-sm leading-snug line-clamp-2">{item.headline}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] text-muted-foreground">{item.source}</span>
+                    {item.publishedAt && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {new Date(item.publishedAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    )}
+                    {item.catalystType && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                        {item.catalystType}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* In Case You Missed — yesterday's signals that are still relevant */}
       {signals.length > 5 && (
         <div className="rounded-xl border border-border bg-card">
@@ -274,33 +349,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  sub,
-  icon: Icon,
-  capitalize,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: typeof TrendingUp;
-  capitalize?: boolean;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </div>
-      <p className={`font-[var(--font-heading)] text-2xl font-bold ${capitalize ? "capitalize" : ""}`}>
-        {value}
-      </p>
-      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
     </div>
   );
 }

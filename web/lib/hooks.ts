@@ -27,6 +27,10 @@ export function useMarketEarningsCalendar(days = 14) {
   return useQuery({ queryKey: ["market-earnings-calendar", days], queryFn: () => api.marketEarningsCalendar(days) });
 }
 
+export function useMarketNews(limit = 10) {
+  return useQuery({ queryKey: ["market-news", limit], queryFn: () => api.marketNews(limit) });
+}
+
 export function useTopPicks(limit = 12) {
   return useQuery({ queryKey: ["top-picks", limit], queryFn: () => api.topPicks(limit) });
 }
@@ -53,6 +57,14 @@ export function useStockNews(ticker: string) {
 
 export function useStockSnapshot(ticker: string) {
   return useQuery({ queryKey: ["stock-snapshot", ticker], queryFn: () => api.stockSnapshot(ticker), enabled: !!ticker });
+}
+
+export function useStockAnalyst(ticker: string) {
+  return useQuery({ queryKey: ["stock-analyst", ticker], queryFn: () => api.stockAnalyst(ticker), enabled: !!ticker });
+}
+
+export function useStockEarnings(ticker: string) {
+  return useQuery({ queryKey: ["stock-earnings", ticker], queryFn: () => api.stockEarnings(ticker), enabled: !!ticker });
 }
 
 export function usePerformanceOverview() {

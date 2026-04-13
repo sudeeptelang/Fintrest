@@ -35,6 +35,32 @@ public record NewsResponse(
     DateTime? PublishedAt
 );
 
+public record AnalystConsensusResponse(
+    string Ticker,
+    int StrongBuy,
+    int Buy,
+    int Hold,
+    int Sell,
+    int StrongSell,
+    int TotalAnalysts,
+    double Rating,
+    double? TargetHigh,
+    double? TargetLow,
+    double? TargetConsensus,
+    double? TargetMedian
+);
+
+public record EarningsHistoryItem(
+    string Period,
+    DateTime? ReportedAt,
+    double? Revenue,
+    double? RevenueGrowth,
+    double? Eps,
+    double? EpsSurprise,
+    double? GrossMargin,
+    double? OperatingMargin
+);
+
 public record TrendingStockResponse(
     string Ticker,
     string Name,

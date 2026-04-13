@@ -148,6 +148,32 @@ export interface MarketIndex {
   changePct: number | null;
 }
 
+export interface AnalystConsensus {
+  ticker: string;
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+  totalAnalysts: number;
+  rating: number;
+  targetHigh: number | null;
+  targetLow: number | null;
+  targetConsensus: number | null;
+  targetMedian: number | null;
+}
+
+export interface EarningsHistoryItem {
+  period: string;
+  reportedAt: string | null;
+  revenue: number | null;
+  revenueGrowth: number | null;
+  eps: number | null;
+  epsSurprise: number | null;
+  grossMargin: number | null;
+  operatingMargin: number | null;
+}
+
 export interface StockSnapshot {
   // Identity
   ticker: string;
@@ -262,6 +288,7 @@ export const api = {
   marketTrending: (limit = 10) => fetchApi<TrendingStock[]>(`/market/trending?limit=${limit}`),
   marketMostActive: (limit = 10) => fetchApi<TrendingStock[]>(`/market/most-active?limit=${limit}`),
   marketEarningsCalendar: (days = 14) => fetchApi<EarningsCalendarItem[]>(`/market/earnings-calendar?days=${days}`),
+  marketNews: (limit = 10) => fetchApi<NewsItem[]>(`/market/news?limit=${limit}`),
   topPicks: (limit = 12) => fetchApi<SignalListResponse>(`/picks/top-today?limit=${limit}`),
   swingWeek: () => fetchApi<SignalListResponse>("/picks/swing-week"),
 
@@ -275,6 +302,10 @@ export const api = {
     fetchApi<NewsItem[]>(`/stocks/${ticker}/news`),
   stockSnapshot: (ticker: string) =>
     fetchApi<StockSnapshot>(`/stocks/${ticker}/snapshot`),
+  stockAnalyst: (ticker: string) =>
+    fetchApi<AnalystConsensus>(`/stocks/${ticker}/analyst`),
+  stockEarnings: (ticker: string) =>
+    fetchApi<EarningsHistoryItem[]>(`/stocks/${ticker}/earnings`),
 
   // Performance (public)
   performanceOverview: () => fetchApi<PerformanceOverview>("/performance/overview"),

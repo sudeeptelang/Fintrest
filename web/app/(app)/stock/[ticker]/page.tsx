@@ -17,13 +17,16 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
-import { useStock, useStockSignals, useStockNews, useStockChart, useStockSnapshot, useWatchlists, useAddWatchlistItem, useCreateWatchlist } from "@/lib/hooks";
+import { useStock, useStockSignals, useStockNews, useStockChart, useStockSnapshot, useStockAnalyst, useStockEarnings, useWatchlists, useAddWatchlistItem, useCreateWatchlist } from "@/lib/hooks";
 import { Button } from "@/components/ui/button";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { FactorRadar } from "@/components/charts/factor-radar";
 import { PriceChart } from "@/components/charts/price-chart";
 import { FactorGauges } from "@/components/charts/factor-gauges";
 import { StockSnapshot } from "@/components/stock/stock-snapshot";
+import { AnalystConsensusWidget } from "@/components/stock/analyst-consensus";
+import { TechnicalAnalysis } from "@/components/stock/technical-analysis";
+import { EarningsHistory } from "@/components/stock/earnings-history";
 
 interface StockDetailPageProps {
   params: Promise<{ ticker: string }>;
@@ -48,6 +51,8 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { data: news } = useStockNews(ticker);
   const { data: chartData } = useStockChart(ticker, chartRange);
   const { data: snapshot } = useStockSnapshot(ticker);
+  const { data: analystData } = useStockAnalyst(ticker);
+  const { data: earningsData } = useStockEarnings(ticker);
   const { data: watchlists } = useWatchlists();
   const addToWatchlist = useAddWatchlistItem();
   const createWatchlist = useCreateWatchlist();
@@ -366,6 +371,19 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           </h2>
           <FactorGauges breakdown={breakdown} />
         </motion.div>
+      )}
+
+      {/* Analyst Consensus + Technical Analysis */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {analystData && analystData.totalAnalysts > 0 && (
+          <AnalystConsensusWidget data={analystData} currentPrice={latestSignal?.currentPrice} />
+        )}
+        {snapshot && <TechnicalAnalysis snapshot={snapshot} />}
+      </div>
+
+      {/* Earnings History */}
+      {earningsData && earningsData.length > 0 && (
+        <EarningsHistory earnings={earningsData} />
       )}
 
       {/* AI + News */}
