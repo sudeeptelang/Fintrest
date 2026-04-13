@@ -60,30 +60,31 @@ export function FactorBarChart({ breakdown }: Props) {
         <BarChart data={data} layout="vertical" barCategoryGap="15%">
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="rgba(255,255,255,0.04)"
+            stroke="rgba(0,0,0,0.06)"
             horizontal={false}
           />
           <XAxis
             type="number"
             domain={[0, 100]}
-            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
+            tick={{ fontSize: 10, fill: "#6b6259" }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
             type="category"
             dataKey="label"
-            tick={{ fontSize: 11, fill: "rgba(255,255,255,0.6)" }}
+            tick={{ fontSize: 11, fill: "#1a1510" }}
             axisLine={false}
             tickLine={false}
             width={90}
           />
           <Tooltip
             contentStyle={{
-              background: "#1a1510",
-              border: "1px solid rgba(255,255,255,0.1)",
+              background: "#fbfaf7",
+              border: "1px solid rgba(35,29,22,0.12)",
               borderRadius: 8,
               fontSize: 12,
+              color: "#1a1510",
             }}
             formatter={(value, _name, props) => [
               `${Number(value)} / 100 (${(props as any).payload.grade})`,

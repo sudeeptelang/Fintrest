@@ -38,17 +38,17 @@ export function EarningsChart({ earnings }: Props) {
           <BarChart data={data} barCategoryGap="20%">
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="rgba(255,255,255,0.04)"
+              stroke="rgba(0,0,0,0.06)"
               vertical={false}
             />
             <XAxis
               dataKey="period"
-              tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
+              tick={{ fontSize: 10, fill: "#6b6259" }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
+              tick={{ fontSize: 10, fill: "#6b6259" }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(v) => `$${v.toFixed(0)}B`}
@@ -56,10 +56,11 @@ export function EarningsChart({ earnings }: Props) {
             />
             <Tooltip
               contentStyle={{
-                background: "#1a1510",
-                border: "1px solid rgba(255,255,255,0.1)",
+                background: "#fbfaf7",
+                border: "1px solid rgba(35,29,22,0.12)",
                 borderRadius: 8,
                 fontSize: 12,
+                color: "#1a1510",
               }}
               formatter={(value) => [`$${Number(value).toFixed(1)}B`, "Revenue"]}
             />
@@ -87,17 +88,17 @@ export function EarningsChart({ earnings }: Props) {
           <BarChart data={data} barCategoryGap="20%">
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="rgba(255,255,255,0.04)"
+              stroke="rgba(0,0,0,0.06)"
               vertical={false}
             />
             <XAxis
               dataKey="period"
-              tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
+              tick={{ fontSize: 10, fill: "#6b6259" }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
+              tick={{ fontSize: 10, fill: "#6b6259" }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(v) => `$${v.toFixed(2)}`}
@@ -105,10 +106,11 @@ export function EarningsChart({ earnings }: Props) {
             />
             <Tooltip
               contentStyle={{
-                background: "#1a1510",
-                border: "1px solid rgba(255,255,255,0.1)",
+                background: "#fbfaf7",
+                border: "1px solid rgba(35,29,22,0.12)",
                 borderRadius: 8,
                 fontSize: 12,
+                color: "#1a1510",
               }}
               formatter={(value) => [`$${Number(value).toFixed(2)}`, "EPS"]}
             />

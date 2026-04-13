@@ -37,17 +37,17 @@ export function PerformanceChart({ snapshot: s }: Props) {
         <BarChart data={data} barCategoryGap="25%">
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="rgba(255,255,255,0.04)"
+            stroke="rgba(0,0,0,0.06)"
             vertical={false}
           />
           <XAxis
             dataKey="period"
-            tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)", fontWeight: 600 }}
+            tick={{ fontSize: 11, fill: "#6b6259", fontWeight: 600 }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
+            tick={{ fontSize: 10, fill: "#6b6259" }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`}
@@ -55,17 +55,18 @@ export function PerformanceChart({ snapshot: s }: Props) {
           />
           <Tooltip
             contentStyle={{
-              background: "#1a1510",
-              border: "1px solid rgba(255,255,255,0.1)",
+              background: "#fbfaf7",
+              border: "1px solid rgba(35,29,22,0.12)",
               borderRadius: 8,
               fontSize: 12,
+              color: "#1a1510",
             }}
             formatter={(value) => [
               `${Number(value) >= 0 ? "+" : ""}${Number(value).toFixed(2)}%`,
               "Return",
             ]}
           />
-          <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
+          <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
             {data.map((entry, i) => (
               <Cell
