@@ -1,19 +1,108 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import Link from "next/link";
+import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useTopPicks } from "@/lib/hooks";
 import type { Signal } from "@/lib/api";
 
+type SortKey = "score" | "ticker" | "signal" | "risk" | "entry" | "stop" | "target";
+type SortDir = "asc" | "desc";
+
+const RISK_ORDER: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+const SIGNAL_ORDER: Record<string, number> = { BUY_TODAY: 0, WATCH: 1, HIGH_RISK: 2, AVOID: 3 };
+
+function compare(a: Signal, b: Signal, key: SortKey, dir: SortDir): number {
+  let diff = 0;
+  switch (key) {
+    case "score":
+      diff = a.scoreTotal - b.scoreTotal;
+      break;
+    case "ticker":
+      diff = a.ticker.localeCompare(b.ticker);
+      break;
+    case "signal":
+      diff = (SIGNAL_ORDER[a.signalType] ?? 9) - (SIGNAL_ORDER[b.signalType] ?? 9);
+      break;
+    case "risk":
+      diff = (RISK_ORDER[a.riskLevel ?? ""] ?? 9) - (RISK_ORDER[b.riskLevel ?? ""] ?? 9);
+      break;
+    case "entry":
+      diff = (a.entryLow ?? 0) - (b.entryLow ?? 0);
+      break;
+    case "stop":
+      diff = (a.stopLoss ?? 0) - (b.stopLoss ?? 0);
+      break;
+    case "target":
+      diff = (a.targetHigh ?? 0) - (b.targetHigh ?? 0);
+      break;
+  }
+  return dir === "asc" ? diff : -diff;
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <ChevronsUpDown className="h-3 w-3 text-muted-foreground/40" />;
+  return dir === "asc" ? (
+    <ChevronUp className="h-3 w-3 text-primary" />
+  ) : (
+    <ChevronDown className="h-3 w-3 text-primary" />
+  );
+}
+
 export default function PicksPage() {
   const { data, isLoading } = useTopPicks(50);
-  const signals = data?.signals ?? [];
+  const [sortKey, setSortKey] = useState<SortKey>("score");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const signals = useMemo(() => {
+    const list = data?.signals ?? [];
+    return [...list].sort((a, b) => compare(a, b, sortKey, sortDir));
+  }, [data, sortKey, sortDir]);
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "ticker" ? "asc" : "desc");
+    }
+  }
+
+  function Th({
+    label,
+    sortKeyVal,
+    align = "center",
+  }: {
+    label: string;
+    sortKeyVal: SortKey;
+    align?: "left" | "center" | "right";
+  }) {
+    const textAlign =
+      align === "left"
+        ? "text-left"
+        : align === "right"
+          ? "text-right"
+          : "text-center";
+    return (
+      <th
+        className={`${textAlign} px-5 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors`}
+        onClick={() => handleSort(sortKeyVal)}
+      >
+        <span className="inline-flex items-center gap-1">
+          {label}
+          <SortIcon active={sortKey === sortKeyVal} dir={sortDir} />
+        </span>
+      </th>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-[var(--font-heading)] text-2xl font-bold">Top Picks</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Today&apos;s highest-ranked signals, scored 0–100.
+          Today&apos;s highest-ranked signals, scored 0–100. Click any column to
+          sort.
         </p>
       </div>
 
@@ -22,23 +111,37 @@ export default function PicksPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-5 py-3 font-medium text-muted-foreground">Stock</th>
-                <th className="text-center px-5 py-3 font-medium text-muted-foreground">Score</th>
-                <th className="text-center px-5 py-3 font-medium text-muted-foreground">Signal</th>
-                <th className="text-center px-5 py-3 font-medium text-muted-foreground">Risk</th>
-                <th className="text-right px-5 py-3 font-medium text-muted-foreground">Entry Zone</th>
-                <th className="text-right px-5 py-3 font-medium text-muted-foreground">Stop</th>
-                <th className="text-right px-5 py-3 font-medium text-muted-foreground">Target</th>
+                <Th label="Stock" sortKeyVal="ticker" align="left" />
+                <Th label="Score" sortKeyVal="score" />
+                <Th label="Signal" sortKeyVal="signal" />
+                <Th label="Risk" sortKeyVal="risk" />
+                <Th label="Entry Zone" sortKeyVal="entry" align="right" />
+                <Th label="Stop" sortKeyVal="stop" align="right" />
+                <Th label="Target" sortKeyVal="target" align="right" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
-                <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Loading...</td></tr>
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-5 py-8 text-center text-muted-foreground"
+                  >
+                    Loading...
+                  </td>
+                </tr>
               ) : signals.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">No signals yet.</td></tr>
-              ) : signals.map((s) => (
-                <SignalTableRow key={s.id} signal={s} />
-              ))}
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-5 py-8 text-center text-muted-foreground"
+                  >
+                    No signals yet.
+                  </td>
+                </tr>
+              ) : (
+                signals.map((s) => <SignalTableRow key={s.id} signal={s} />)
+              )}
             </tbody>
           </table>
         </div>
@@ -48,14 +151,19 @@ export default function PicksPage() {
 }
 
 function SignalTableRow({ signal: s }: { signal: Signal }) {
-  const typeColor = s.signalType === "BUY_TODAY"
-    ? "bg-emerald-500/10 text-emerald-500"
-    : s.signalType === "AVOID" || s.signalType === "HIGH_RISK"
-      ? "bg-red-500/10 text-red-500"
-      : "bg-amber-500/10 text-amber-500";
+  const typeColor =
+    s.signalType === "BUY_TODAY"
+      ? "bg-emerald-500/10 text-emerald-500"
+      : s.signalType === "AVOID" || s.signalType === "HIGH_RISK"
+        ? "bg-red-500/10 text-red-500"
+        : "bg-amber-500/10 text-amber-500";
 
-  const riskColor = s.riskLevel === "LOW"
-    ? "text-emerald-500" : s.riskLevel === "HIGH" ? "text-red-500" : "text-amber-500";
+  const riskColor =
+    s.riskLevel === "LOW"
+      ? "text-emerald-500"
+      : s.riskLevel === "HIGH"
+        ? "text-red-500"
+        : "text-amber-500";
 
   return (
     <tr className="hover:bg-muted/20 transition-colors">
@@ -68,15 +176,21 @@ function SignalTableRow({ signal: s }: { signal: Signal }) {
           </div>
           <div>
             <p className="font-semibold font-[var(--font-mono)]">{s.ticker}</p>
-            <p className="text-xs text-muted-foreground truncate max-w-[140px]">{s.stockName}</p>
+            <p className="text-xs text-muted-foreground truncate max-w-[140px]">
+              {s.stockName}
+            </p>
           </div>
         </Link>
       </td>
       <td className="px-5 py-3.5 text-center">
-        <span className="font-[var(--font-mono)] font-bold">{Math.round(s.scoreTotal)}</span>
+        <span className="font-[var(--font-mono)] font-bold">
+          {Math.round(s.scoreTotal)}
+        </span>
       </td>
       <td className="px-5 py-3.5 text-center">
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${typeColor}`}>
+        <span
+          className={`text-xs font-medium px-2.5 py-1 rounded-full ${typeColor}`}
+        >
           {s.signalType.replace("_", " ")}
         </span>
       </td>
@@ -84,13 +198,17 @@ function SignalTableRow({ signal: s }: { signal: Signal }) {
         {s.riskLevel ?? "—"}
       </td>
       <td className="px-5 py-3.5 text-right font-[var(--font-mono)] text-muted-foreground text-xs">
-        {s.entryLow && s.entryHigh ? `$${s.entryLow.toFixed(0)}–$${s.entryHigh.toFixed(0)}` : "—"}
+        {s.entryLow && s.entryHigh
+          ? `$${s.entryLow.toFixed(0)}–$${s.entryHigh.toFixed(0)}`
+          : "—"}
       </td>
       <td className="px-5 py-3.5 text-right font-[var(--font-mono)] text-red-400 text-xs">
         {s.stopLoss ? `$${s.stopLoss.toFixed(0)}` : "—"}
       </td>
       <td className="px-5 py-3.5 text-right font-[var(--font-mono)] text-emerald-400 text-xs">
-        {s.targetLow && s.targetHigh ? `$${s.targetLow.toFixed(0)}–$${s.targetHigh.toFixed(0)}` : "—"}
+        {s.targetLow && s.targetHigh
+          ? `$${s.targetLow.toFixed(0)}–$${s.targetHigh.toFixed(0)}`
+          : "—"}
       </td>
     </tr>
   );
