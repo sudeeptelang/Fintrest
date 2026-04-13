@@ -28,6 +28,9 @@ import { StockLogo } from "@/components/stock/stock-logo";
 import { AnalystConsensusWidget } from "@/components/stock/analyst-consensus";
 import { TechnicalAnalysis } from "@/components/stock/technical-analysis";
 import { EarningsHistory } from "@/components/stock/earnings-history";
+import { EarningsChart } from "@/components/charts/earnings-chart";
+import { PerformanceChart } from "@/components/charts/performance-chart";
+import { FactorBarChart } from "@/components/charts/factor-bar-chart";
 
 interface StockDetailPageProps {
   params: Promise<{ ticker: string }>;
@@ -381,6 +384,12 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         </motion.div>
       )}
 
+      {/* Performance + Factor Score Charts */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {snapshot && <PerformanceChart snapshot={snapshot} />}
+        {breakdown && <FactorBarChart breakdown={breakdown} />}
+      </div>
+
       {/* Analyst Consensus + Technical Analysis */}
       <div className="grid lg:grid-cols-2 gap-6">
         {analystData && analystData.totalAnalysts > 0 && (
@@ -389,9 +398,17 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         {snapshot && <TechnicalAnalysis snapshot={snapshot} />}
       </div>
 
-      {/* Earnings History */}
+      {/* Earnings History + Charts */}
       {earningsData && earningsData.length > 0 && (
-        <EarningsHistory earnings={earningsData} />
+        <div className="grid lg:grid-cols-2 gap-6">
+          <EarningsHistory earnings={earningsData} />
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <h3 className="text-sm font-semibold text-muted-foreground mb-4">
+              Earnings Trend
+            </h3>
+            <EarningsChart earnings={earningsData} />
+          </div>
+        </div>
       )}
 
       {/* AI + News */}
