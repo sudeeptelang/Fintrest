@@ -25,6 +25,7 @@ import {
 } from "@/lib/hooks";
 import { SignalRow } from "@/components/signals/signal-row";
 import type { TrendingStock, EarningsCalendarItem, Signal, NewsItem } from "@/lib/api";
+import { StockLogo } from "@/components/stock/stock-logo";
 
 export default function DashboardPage() {
   const { data: summary } = useMarketSummary();
@@ -169,11 +170,7 @@ export default function DashboardPage() {
                   className="flex items-center justify-between py-2 hover:bg-white/5 rounded-lg px-2 -mx-2 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                      <span className="font-[var(--font-mono)] text-[10px] font-bold text-primary">
-                        {s.ticker.slice(0, 2)}
-                      </span>
-                    </div>
+                    <StockLogo ticker={s.ticker} size={32} />
                     <div>
                       <p className="font-[var(--font-mono)] font-semibold text-sm">{s.ticker}</p>
                       <p className="text-[10px] text-white/40">{s.stockName}</p>
@@ -252,11 +249,7 @@ export default function DashboardPage() {
                   className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/20 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                      <span className="font-[var(--font-mono)] text-[10px] font-bold text-purple-500">
-                        {e.ticker.slice(0, 2)}
-                      </span>
-                    </div>
+                    <StockLogo ticker={e.ticker} size={32} />
                     <div>
                       <p className="font-[var(--font-mono)] font-semibold text-sm">{e.ticker}</p>
                       <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{e.name}</p>
@@ -367,19 +360,7 @@ function StockMiniRow({
       className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/20 transition-colors"
     >
       <div className="flex items-center gap-3">
-        <div
-          className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-            positive ? "bg-emerald-500/10" : "bg-red-500/10"
-          }`}
-        >
-          <span
-            className={`font-[var(--font-mono)] text-[10px] font-bold ${
-              positive ? "text-emerald-500" : "text-red-500"
-            }`}
-          >
-            {s.ticker.slice(0, 2)}
-          </span>
-        </div>
+        <StockLogo ticker={s.ticker} size={32} />
         <div>
           <p className="font-[var(--font-mono)] font-semibold text-sm">{s.ticker}</p>
           <p className="text-[10px] text-muted-foreground truncate max-w-[100px]">

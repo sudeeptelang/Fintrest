@@ -6,6 +6,7 @@ import '../../core/network/api_client.dart';
 import '../../core/network/api_service.dart';
 import '../../models/signal.dart';
 import '../../widgets/score_bar.dart';
+import '../../widgets/stock_logo.dart';
 
 class StockDetailScreen extends StatefulWidget {
   final Signal signal;
@@ -175,19 +176,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   Widget _buildHeader() {
     return Row(
       children: [
-        Container(
-          width: 52, height: 52,
-          decoration: BoxDecoration(
-            color: AppColors.emerald.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Center(
-            child: Text(
-              signal.ticker.length >= 2 ? signal.ticker.substring(0, 2) : signal.ticker,
-              style: GoogleFonts.dmMono(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.emerald),
-            ),
-          ),
-        ),
+        StockLogo(ticker: signal.ticker, size: 52, borderRadius: 14),
         const SizedBox(width: 14),
         Expanded(
           child: Column(

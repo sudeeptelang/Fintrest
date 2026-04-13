@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useTopPicks } from "@/lib/hooks";
 import type { Signal } from "@/lib/api";
+import { StockLogo } from "@/components/stock/stock-logo";
 
 type SortKey = "score" | "ticker" | "signal" | "risk" | "price" | "entry" | "stop" | "target";
 type SortDir = "asc" | "desc";
@@ -216,11 +217,7 @@ function SignalTableRow({ signal: s }: { signal: Signal }) {
     <tr className="hover:bg-muted/20 transition-colors">
       <td className="px-5 py-3.5">
         <Link href={`/stock/${s.ticker}`} className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <span className="font-[var(--font-mono)] text-[10px] font-bold text-primary">
-              {s.ticker.slice(0, 2)}
-            </span>
-          </div>
+          <StockLogo ticker={s.ticker} size={32} />
           <div>
             <p className="font-semibold font-[var(--font-mono)]">{s.ticker}</p>
             <p className="text-xs text-muted-foreground truncate max-w-[140px]">
@@ -244,8 +241,17 @@ function SignalTableRow({ signal: s }: { signal: Signal }) {
       <td className={`px-5 py-3.5 text-center text-xs font-medium ${riskColor}`}>
         {s.riskLevel ?? "—"}
       </td>
-      <td className="px-5 py-3.5 text-right font-[var(--font-mono)] font-semibold text-xs">
-        {s.currentPrice ? `$${s.currentPrice.toFixed(2)}` : "—"}
+      <td className="px-5 py-3.5 text-right">
+        <span className="font-[var(--font-mono)] font-semibold text-xs block">
+          {s.currentPrice ? `$${s.currentPrice.toFixed(2)}` : "—"}
+        </span>
+        {s.changePct !== null && (
+          <span className={`font-[var(--font-mono)] text-[10px] font-semibold ${
+            s.changePct >= 0 ? "text-emerald-500" : "text-red-500"
+          }`}>
+            {s.changePct >= 0 ? "+" : ""}{s.changePct.toFixed(2)}%
+          </span>
+        )}
       </td>
       <td className="px-5 py-3.5 text-right font-[var(--font-mono)] text-muted-foreground text-xs">
         {s.entryLow && s.entryHigh

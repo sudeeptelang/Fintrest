@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/theme/app_theme.dart';
 import '../models/signal.dart';
+import 'stock_logo.dart';
 
 class SignalCard extends StatelessWidget {
   final Signal signal;
@@ -22,26 +23,7 @@ class SignalCard extends StatelessWidget {
               // Top row: ticker + signal badge + score
               Row(
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.emerald.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        signal.ticker.length >= 2
-                            ? signal.ticker.substring(0, 2)
-                            : signal.ticker,
-                        style: GoogleFonts.dmMono(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.emerald,
-                        ),
-                      ),
-                    ),
-                  ),
+                  StockLogo(ticker: signal.ticker, size: 44),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

@@ -24,6 +24,7 @@ import { FactorRadar } from "@/components/charts/factor-radar";
 import { PriceChart } from "@/components/charts/price-chart";
 import { FactorGauges } from "@/components/charts/factor-gauges";
 import { StockSnapshot } from "@/components/stock/stock-snapshot";
+import { StockLogo } from "@/components/stock/stock-logo";
 import { AnalystConsensusWidget } from "@/components/stock/analyst-consensus";
 import { TechnicalAnalysis } from "@/components/stock/technical-analysis";
 import { EarningsHistory } from "@/components/stock/earnings-history";
@@ -113,11 +114,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
       {/* Hero header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <span className="font-[var(--font-mono)] text-lg font-bold text-primary">
-              {ticker.slice(0, 2).toUpperCase()}
-            </span>
-          </div>
+          <StockLogo ticker={ticker} size={56} className="rounded-2xl" />
           <div>
             <div className="flex items-center gap-3">
               <h1 className="font-[var(--font-heading)] text-2xl font-bold uppercase">
