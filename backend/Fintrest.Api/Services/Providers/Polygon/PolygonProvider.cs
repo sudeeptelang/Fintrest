@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Fintrest.Api.Services.Providers;
 using Fintrest.Api.Services.Providers.Contracts;
 
 namespace Fintrest.Api.Services.Providers.Polygon;
@@ -23,7 +24,7 @@ public class PolygonProvider(HttpClient http, IConfiguration config, ILogger<Pol
 
         try
         {
-            var response = await http.GetFromJsonAsync<PolygonAggsResponse>(url, ct);
+            var response = await Fetch<PolygonAggsResponse>(url, ct);
             if (response?.Results is null) return [];
 
             return response.Results.Select(r => new OhlcvBar(
@@ -48,7 +49,7 @@ public class PolygonProvider(HttpClient http, IConfiguration config, ILogger<Pol
 
         try
         {
-            var response = await http.GetFromJsonAsync<PolygonSnapshotWrapper>(url, ct);
+            var response = await Fetch<PolygonSnapshotWrapper>(url, ct);
             var snap = response?.Ticker;
             if (snap is null) return null;
 
@@ -75,7 +76,7 @@ public class PolygonProvider(HttpClient http, IConfiguration config, ILogger<Pol
 
         try
         {
-            var response = await http.GetFromJsonAsync<PolygonAllSnapshotsResponse>(url, ct);
+            var response = await Fetch<PolygonAllSnapshotsResponse>(url, ct);
             if (response?.Tickers is null) return [];
 
             return response.Tickers.Select(snap => new TickerSnapshot(
@@ -101,7 +102,7 @@ public class PolygonProvider(HttpClient http, IConfiguration config, ILogger<Pol
 
         try
         {
-            var response = await http.GetFromJsonAsync<PolygonTickerDetailsResponse>(url, ct);
+            var response = await Fetch<PolygonTickerDetailsResponse>(url, ct);
             var r = response?.Results;
             if (r is null) return null;
 
@@ -130,7 +131,7 @@ public class PolygonProvider(HttpClient http, IConfiguration config, ILogger<Pol
 
         try
         {
-            var response = await http.GetFromJsonAsync<PolygonTickerSearchResponse>(url, ct);
+            var response = await Fetch<PolygonTickerSearchResponse>(url, ct);
             if (response?.Results is null) return [];
 
             return response.Results.Select(r => new TickerSearchResult(
@@ -142,6 +143,15 @@ public class PolygonProvider(HttpClient http, IConfiguration config, ILogger<Pol
             logger.LogWarning(ex, "Polygon: Search failed for '{Query}'", query);
             return [];
         }
+    }
+
+    private async Task<T?> Fetch<T>(string url, CancellationToken ct) where T : class
+    {
+        return await HttpRetry.WithBackoffAsync(
+            token => http.GetFromJsonAsync<T>(url, token),
+            logger,
+            "Polygon fetch",
+            ct: ct);
     }
 }
 

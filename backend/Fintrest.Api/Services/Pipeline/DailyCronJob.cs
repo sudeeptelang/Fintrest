@@ -75,7 +75,7 @@ public class DailyCronJob(
 
             // Step 1: Data Ingestion
             logger.LogInformation("Pipeline Step 1: Data ingestion");
-            var ingestionResult = await ingestion.IngestAllAsync(ct);
+            var ingestionResult = await ingestion.IngestAllAsync(ct: ct);
             logger.LogInformation(
                 "Ingestion complete: {Bars} bars, {Funds} fundamentals, {News} news",
                 ingestionResult.BarsIngested, ingestionResult.FundamentalsIngested, ingestionResult.NewsIngested);

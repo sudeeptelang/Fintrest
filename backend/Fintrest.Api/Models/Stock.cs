@@ -31,6 +31,20 @@ public class Stock
     [MaxLength(10)]
     public string? Country { get; set; }
 
+    // Slow-changing per-stock profile metrics (refreshed by FMP /profile, /key-metrics-ttm,
+    // /ratios-ttm, /price-target-consensus, /earning_calendar). Live on Stock rather than
+    // Fundamental because Fundamental rows are quarterly and these are TTM/forward.
+    public double? Beta { get; set; }
+    public double? AnalystTargetPrice { get; set; }
+    public DateTime? NextEarningsDate { get; set; }
+    public double? ForwardPe { get; set; }
+    public double? PegRatio { get; set; }
+    public double? PriceToBook { get; set; }
+    public double? ReturnOnEquity { get; set; }
+    public double? ReturnOnAssets { get; set; }
+    public double? OperatingMargin { get; set; }
+    public DateTime? MetricsUpdatedAt { get; set; }
+
     public bool Active { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

@@ -113,6 +113,83 @@ export interface PerformanceOverview {
   avgDrawdown: number;
 }
 
+export interface SectorPerformance {
+  sector: string;
+  stockCount: number;
+  changePct: number | null;
+  signalCount: number;
+}
+
+export interface MarketIndex {
+  ticker: string;
+  label: string;
+  price: number | null;
+  prevClose: number | null;
+  changePct: number | null;
+}
+
+export interface StockSnapshot {
+  // Identity
+  ticker: string;
+  name: string;
+  sector: string | null;
+  industry: string | null;
+  exchange: string | null;
+  country: string | null;
+  // Latest price
+  price: number | null;
+  prevClose: number | null;
+  change: number | null;
+  changePct: number | null;
+  dayOpen: number | null;
+  dayHigh: number | null;
+  dayLow: number | null;
+  // Volume
+  volume: number | null;
+  avgVolume: number | null;
+  relVolume: number | null;
+  // Valuation
+  marketCap: number | null;
+  floatShares: number | null;
+  peRatio: number | null;
+  forwardPe: number | null;
+  pegRatio: number | null;
+  psRatio: number | null;
+  priceToBook: number | null;
+  debtToEquity: number | null;
+  // Margins / Growth
+  grossMargin: number | null;
+  netMargin: number | null;
+  operatingMargin: number | null;
+  returnOnEquity: number | null;
+  returnOnAssets: number | null;
+  revenueGrowth: number | null;
+  epsGrowth: number | null;
+  // Profile (slow-changing per-stock)
+  beta: number | null;
+  analystTargetPrice: number | null;
+  nextEarningsDate: string | null;
+  // Technicals
+  rsi: number | null;
+  atr: number | null;
+  atrPct: number | null;
+  ma20: number | null;
+  ma50: number | null;
+  ma200: number | null;
+  pctFromMa20: number | null;
+  pctFromMa50: number | null;
+  pctFromMa200: number | null;
+  // 52W & Performance
+  week52High: number | null;
+  week52Low: number | null;
+  week52RangePct: number | null;
+  perfWeek: number | null;
+  perfMonth: number | null;
+  perfQuarter: number | null;
+  perfYtd: number | null;
+  perfYear: number | null;
+}
+
 // --- Auth & Account Types ---
 
 export interface UserResponse {
@@ -160,6 +237,8 @@ export interface AlertResponse {
 export const api = {
   // Market (public)
   marketSummary: () => fetchApi<MarketSummary>("/market/summary"),
+  marketSectors: () => fetchApi<SectorPerformance[]>("/market/sectors"),
+  marketIndices: () => fetchApi<MarketIndex[]>("/market/indices"),
   topPicks: (limit = 12) => fetchApi<SignalListResponse>(`/picks/top-today?limit=${limit}`),
   swingWeek: () => fetchApi<SignalListResponse>("/picks/swing-week"),
 
@@ -171,6 +250,8 @@ export const api = {
     fetchApi<SignalListResponse>(`/stocks/${ticker}/signals`),
   stockNews: (ticker: string) =>
     fetchApi<NewsItem[]>(`/stocks/${ticker}/news`),
+  stockSnapshot: (ticker: string) =>
+    fetchApi<StockSnapshot>(`/stocks/${ticker}/snapshot`),
 
   // Performance (public)
   performanceOverview: () => fetchApi<PerformanceOverview>("/performance/overview"),
@@ -226,6 +307,15 @@ export const api = {
   portfolioTransactions: (id: number) => authFetchApi<Transaction[]>(`/portfolios/${id}/transactions`).catch(() => []),
   portfolioAnalytics: (id: number) => authFetchApi<PortfolioAnalytics>(`/portfolios/${id}/analytics`).catch(() => null),
   portfolioAdvisor: (id: number) => authFetchApi<AdvisorResult>(`/portfolios/${id}/advisor`),
+  addTransaction: (portfolioId: number, req: { stockTicker: string; type: string; quantity: number; price: number; fees?: number }) =>
+    authFetchApi<Transaction>(`/portfolios/${portfolioId}/transactions`, {
+      method: "POST",
+      body: JSON.stringify(req),
+    }),
+  applyRecommendation: (portfolioId: number, recommendationId: number, action: "APPLIED" | "DISMISSED") =>
+    authFetchApi<{ id: number; status: string }>(`/portfolios/${portfolioId}/advisor/apply/${recommendationId}?action=${action}`, {
+      method: "POST",
+    }),
   portfolioAiAnalysis: (id: number) => authFetchApi<AiAnalysis>(`/portfolios/${id}/ai-analysis`),
   importCsv: async (file: File, name: string, cash?: number) => {
     const supabase = createClient();

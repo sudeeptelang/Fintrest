@@ -10,7 +10,7 @@ Design reference: `docs/fintrest_screens_v2_final.html` (open in browser)
 | 02 | Sign Up | `/signup` | Public |
 | 03 | Dashboard | `/dashboard` | Free |
 | 04 | Signals List | `/signals` | Free (2/day) |
-| 05 | Signal Detail | `/signals/[ticker]` | Starter+ |
+| 05 | Signal Detail | `/stock/[ticker]` | Starter+ |
 | 06 | Ask Athena | `/athena` | Starter+ |
 | 07 | Portfolio Overview | `/portfolio` | Pro+ |
 | 08 | Holding Detail | `/portfolio/[ticker]` | Pro+ |
@@ -26,8 +26,8 @@ Design reference: `docs/fintrest_screens_v2_final.html` (open in browser)
 | 18 | Pricing | `/pricing` | Public |
 | 19 | Profile & Settings | `/settings` | Free |
 | 20 | Weekly Summary | `/summary` | Starter+ |
-| 21 | Signal Score Breakdown | `/signals/[ticker]/score` | Starter+ |
-| 22 | Candlestick Chart | `/signals/[ticker]/chart` | Starter+ |
+| 21 | Signal Score Breakdown | `/stock/[ticker]/score` | Starter+ |
+| 22 | Candlestick Chart | `/stock/[ticker]/chart` | Starter+ |
 
 ## Subscription Plans
 

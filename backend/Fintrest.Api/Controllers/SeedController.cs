@@ -2,6 +2,7 @@ using Fintrest.Api.Data;
 using Fintrest.Api.Services.Ingestion;
 using Fintrest.Api.Services.Pipeline;
 using Fintrest.Api.Services.Portfolio;
+using Fintrest.Api.Services.Providers.Contracts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +14,7 @@ namespace Fintrest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/seed")]
-public class SeedController(AppDbContext db, DataIngestionService ingestion, ScanOrchestrator scanner, PortfolioImporter importer, PortfolioAiAdvisor advisor, ClaudeFinancialAdvisor claudeAdvisor) : ControllerBase
+public class SeedController(AppDbContext db, DataIngestionService ingestion, ScanOrchestrator scanner, PortfolioImporter importer, PortfolioAiAdvisor advisor, ClaudeFinancialAdvisor claudeAdvisor, IFundamentalsProvider fundamentalsProvider) : ControllerBase
 {
     private static readonly List<string> DefaultTickers =
     [
@@ -32,11 +33,40 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
         return Ok(new { Added = added, Tickers = tickers });
     }
 
-    /// <summary>Ingest market data for all stocks.</summary>
-    [HttpPost("ingest")]
-    public async Task<IActionResult> SeedIngest(CancellationToken ct)
+    /// <summary>Add a major-index constituent set to the universe.
+    /// Supported keys: "sp500" (~503), "nasdaq" (~100), "dowjones" (~30).
+    /// Idempotent — only inserts new tickers. Always also adds index ETF proxies (SPY/QQQ/DIA/IWM)
+    /// so the /market/indices endpoint has data. Does NOT trigger ingestion — call /seed/ingest after.</summary>
+    [HttpPost("preset/{key}")]
+    public async Task<IActionResult> SeedPreset(string key, CancellationToken ct)
     {
-        var result = await ingestion.IngestAllAsync(ct);
+        var indexTickers = await fundamentalsProvider.GetIndexConstituentsAsync(key, ct);
+        if (indexTickers.Count == 0)
+            return BadRequest(new { message = $"No tickers returned for preset '{key}'. Supported: sp500, nasdaq, dowjones" });
+
+        // Always include the index ETF proxies so /market/indices has data
+        var etfProxies = new[] { "SPY", "QQQ", "DIA", "IWM" };
+        var fullList = indexTickers.Concat(etfProxies).Distinct().ToList();
+
+        var added = await ingestion.SyncStockUniverseAsync(fullList, ct);
+
+        return Ok(new
+        {
+            Preset = key,
+            ConstituentsFromFmp = indexTickers.Count,
+            EtfProxiesAdded = etfProxies.Length,
+            TotalRequested = fullList.Count,
+            NewlyAdded = added,
+            NextStep = "Run POST /api/v1/seed/ingest to fetch market data + fundamentals for the new tickers (rate-limited, may take a while).",
+        });
+    }
+
+    /// <summary>Ingest market data for all stocks.
+    /// <paramref name="maxParallel"/> caps concurrent stock fetches (default 6).</summary>
+    [HttpPost("ingest")]
+    public async Task<IActionResult> SeedIngest([FromQuery] int maxParallel = 6, CancellationToken ct = default)
+    {
+        var result = await ingestion.IngestAllAsync(maxParallel, ct);
 
         return Ok(new
         {
@@ -76,13 +106,13 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
 
     /// <summary>Full pipeline: add tickers → ingest → score.</summary>
     [HttpPost("full")]
-    public async Task<IActionResult> SeedFull(CancellationToken ct)
+    public async Task<IActionResult> SeedFull([FromQuery] int maxParallel = 6, CancellationToken ct = default)
     {
         // Step 1: Add tickers
         var added = await ingestion.SyncStockUniverseAsync(DefaultTickers, ct);
 
         // Step 2: Ingest data
-        var ingestResult = await ingestion.IngestAllAsync(ct);
+        var ingestResult = await ingestion.IngestAllAsync(maxParallel, ct);
 
         // Step 3: Score
         var scanResult = await scanner.RunScanAsync(ct);

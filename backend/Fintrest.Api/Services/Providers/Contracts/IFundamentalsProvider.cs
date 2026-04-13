@@ -11,6 +11,15 @@ public interface IFundamentalsProvider
 
     /// <summary>Get key financial ratios and metrics.</summary>
     Task<FinancialMetrics?> GetMetricsAsync(string ticker, CancellationToken ct = default);
+
+    /// <summary>Get slow-changing per-stock profile data: Beta, analyst target, next earnings date,
+    /// forward valuation ratios. Pulled from FMP /profile, /key-metrics-ttm, /ratios-ttm,
+    /// /price-target-consensus, /earning_calendar.</summary>
+    Task<StockProfile?> GetStockProfileAsync(string ticker, CancellationToken ct = default);
+
+    /// <summary>Fetch constituent ticker list for a major index. Supported keys: "sp500", "nasdaq", "dowjones".
+    /// Used by the seed/preset endpoints to expand the scan universe without hardcoding lists.</summary>
+    Task<List<string>> GetIndexConstituentsAsync(string indexKey, CancellationToken ct = default);
 }
 
 public record QuarterlyEarnings(
@@ -32,4 +41,16 @@ public record FinancialMetrics(
     double? DebtToEquity,
     double? CurrentRatio,
     double? Roe
+);
+
+public record StockProfile(
+    double? Beta,
+    double? AnalystTargetPrice,
+    DateTime? NextEarningsDate,
+    double? ForwardPe,
+    double? PegRatio,
+    double? PriceToBook,
+    double? ReturnOnEquity,
+    double? ReturnOnAssets,
+    double? OperatingMargin
 );

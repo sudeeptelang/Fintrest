@@ -122,9 +122,11 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
 
     // --- Data Ingestion ---
 
-    /// <summary>Run full data ingestion for all tracked stocks.</summary>
+    /// <summary>Run full data ingestion for all tracked stocks.
+    /// <paramref name="maxParallel"/> caps how many stocks are ingested concurrently (default 6,
+    /// raise on paid provider tiers, lower on free tiers).</summary>
     [HttpPost("ingest/run")]
-    public async Task<IActionResult> TriggerIngestion(CancellationToken ct)
+    public async Task<IActionResult> TriggerIngestion([FromQuery] int maxParallel = 6, CancellationToken ct = default)
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
@@ -133,7 +135,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         });
         await db.SaveChangesAsync(ct);
 
-        var result = await ingestion.IngestAllAsync(ct);
+        var result = await ingestion.IngestAllAsync(maxParallel, ct);
 
         return Ok(new
         {
@@ -164,7 +166,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
 
     /// <summary>Run full pipeline: ingest → score → generate signals.</summary>
     [HttpPost("pipeline/run")]
-    public async Task<IActionResult> RunFullPipeline(CancellationToken ct)
+    public async Task<IActionResult> RunFullPipeline([FromQuery] int maxParallel = 6, CancellationToken ct = default)
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
@@ -174,7 +176,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         await db.SaveChangesAsync(ct);
 
         // Step 1: Ingest latest data
-        var ingestionResult = await ingestion.IngestAllAsync(ct);
+        var ingestionResult = await ingestion.IngestAllAsync(maxParallel, ct);
 
         // Step 2: Run scoring engine
         var scanResult = await scanner.RunScanAsync(ct);

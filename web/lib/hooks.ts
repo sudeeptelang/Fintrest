@@ -7,6 +7,14 @@ export function useMarketSummary() {
   return useQuery({ queryKey: ["market-summary"], queryFn: api.marketSummary });
 }
 
+export function useMarketSectors() {
+  return useQuery({ queryKey: ["market-sectors"], queryFn: api.marketSectors });
+}
+
+export function useMarketIndices() {
+  return useQuery({ queryKey: ["market-indices"], queryFn: api.marketIndices });
+}
+
 export function useTopPicks(limit = 12) {
   return useQuery({ queryKey: ["top-picks", limit], queryFn: () => api.topPicks(limit) });
 }
@@ -29,6 +37,10 @@ export function useStockSignals(ticker: string) {
 
 export function useStockNews(ticker: string) {
   return useQuery({ queryKey: ["stock-news", ticker], queryFn: () => api.stockNews(ticker), enabled: !!ticker });
+}
+
+export function useStockSnapshot(ticker: string) {
+  return useQuery({ queryKey: ["stock-snapshot", ticker], queryFn: () => api.stockSnapshot(ticker), enabled: !!ticker });
 }
 
 export function usePerformanceOverview() {
@@ -77,4 +89,39 @@ export function useRemoveWatchlistItem() {
 
 export function useAlerts() {
   return useQuery({ queryKey: ["alerts"], queryFn: api.alerts });
+}
+
+export function usePortfolios() {
+  return useQuery({ queryKey: ["portfolios"], queryFn: api.portfolios });
+}
+
+export function usePortfolioAdvisor(portfolioId: number) {
+  return useQuery({
+    queryKey: ["portfolio-advisor", portfolioId],
+    queryFn: () => api.portfolioAdvisor(portfolioId),
+    enabled: portfolioId > 0,
+  });
+}
+
+export function useAddTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ portfolioId, ...req }: { portfolioId: number; stockTicker: string; type: string; quantity: number; price: number; fees?: number }) =>
+      api.addTransaction(portfolioId, req),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["portfolio-holdings", vars.portfolioId] });
+      qc.invalidateQueries({ queryKey: ["portfolios"] });
+    },
+  });
+}
+
+export function useApplyRecommendation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ portfolioId, recommendationId, action }: { portfolioId: number; recommendationId: number; action: "APPLIED" | "DISMISSED" }) =>
+      api.applyRecommendation(portfolioId, recommendationId, action),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["portfolio-advisor", vars.portfolioId] });
+    },
+  });
 }

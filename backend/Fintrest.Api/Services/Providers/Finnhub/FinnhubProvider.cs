@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Fintrest.Api.Services.Providers;
 using Fintrest.Api.Services.Providers.Contracts;
 
 namespace Fintrest.Api.Services.Providers.Finnhub;
@@ -23,7 +24,7 @@ public class FinnhubProvider(HttpClient http, IConfiguration config, ILogger<Fin
 
         try
         {
-            var articles = await http.GetFromJsonAsync<List<FinnhubNews>>(url, ct);
+            var articles = await Fetch<List<FinnhubNews>>(url, ct);
             if (articles is null) return [];
 
             return articles.Select(a => new NewsArticle(
@@ -48,7 +49,7 @@ public class FinnhubProvider(HttpClient http, IConfiguration config, ILogger<Fin
 
         try
         {
-            var recs = await http.GetFromJsonAsync<List<FinnhubRecommendation>>(url, ct);
+            var recs = await Fetch<List<FinnhubRecommendation>>(url, ct);
             var latest = recs?.FirstOrDefault();
             if (latest is null) return null;
 
@@ -84,7 +85,7 @@ public class FinnhubProvider(HttpClient http, IConfiguration config, ILogger<Fin
 
         try
         {
-            var response = await http.GetFromJsonAsync<FinnhubInsiderResponse>(url, ct);
+            var response = await Fetch<FinnhubInsiderResponse>(url, ct);
             var txns = response?.Data;
             if (txns is null or { Count: 0 }) return null;
 
@@ -116,6 +117,15 @@ public class FinnhubProvider(HttpClient http, IConfiguration config, ILogger<Fin
             logger.LogWarning(ex, "Finnhub: Failed to fetch insider activity for {Ticker}", ticker);
             return null;
         }
+    }
+
+    private async Task<T?> Fetch<T>(string url, CancellationToken ct) where T : class
+    {
+        return await HttpRetry.WithBackoffAsync(
+            token => http.GetFromJsonAsync<T>(url, token),
+            logger,
+            "Finnhub fetch",
+            ct: ct);
     }
 
     /// <summary>

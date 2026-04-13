@@ -14,8 +14,14 @@ public class DataIngestionService(
     IMarketDataProvider marketProvider,
     IFundamentalsProvider fundamentalsProvider,
     INewsProvider newsProvider,
+    IServiceScopeFactory scopeFactory,
     ILogger<DataIngestionService> logger)
 {
+    /// <summary>Default parallelism for the bulk ingestion run. Tuned to be friendly to free-tier
+    /// rate limits (Polygon = 5/min on free, FMP = 250/day on free) while still extracting
+    /// throughput on paid tiers. Override via the maxParallel param on the controller endpoint.</summary>
+    private const int DefaultMaxParallel = 6;
+
     public record IngestionResult(
         int StocksProcessed,
         int BarsIngested,
@@ -25,61 +31,79 @@ public class DataIngestionService(
         int DurationMs
     );
 
-    /// <summary>Run full ingestion for all tracked stocks.</summary>
-    public async Task<IngestionResult> IngestAllAsync(CancellationToken ct = default)
+    public record StockIngestCounts(int Bars, int Fundamentals, int News);
+
+    /// <summary>Run full ingestion for all tracked stocks. Parallelism is bounded by
+    /// <paramref name="maxParallel"/>; each parallel slot creates its own DI scope so it gets
+    /// a fresh DbContext (DbContext is not thread-safe).</summary>
+    public async Task<IngestionResult> IngestAllAsync(int maxParallel = DefaultMaxParallel, CancellationToken ct = default)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var stocks = await db.Stocks.Where(s => s.Active).ToListAsync(ct);
 
-        logger.LogInformation("Starting ingestion for {Count} stocks", stocks.Count);
+        // Read the ticker list once using the constructor-injected db (this scope)
+        var tickers = await db.Stocks
+            .Where(s => s.Active)
+            .OrderBy(s => s.Ticker)
+            .Select(s => s.Ticker)
+            .ToListAsync(ct);
+
+        logger.LogInformation(
+            "Starting parallel ingestion for {Count} stocks (degree={Degree})",
+            tickers.Count, maxParallel);
 
         int totalBars = 0, totalFundamentals = 0, totalNews = 0, errors = 0;
 
-        foreach (var stock in stocks)
-        {
-            try
+        await Parallel.ForEachAsync(
+            tickers,
+            new ParallelOptions { MaxDegreeOfParallelism = maxParallel, CancellationToken = ct },
+            async (ticker, token) =>
             {
-                var bars = await IngestMarketDataAsync(stock, ct);
-                totalBars += bars;
+                try
+                {
+                    // Each parallel slot needs its own scope → its own DbContext + provider
+                    // instances, since DbContext is not thread-safe.
+                    using var scope = scopeFactory.CreateScope();
+                    var svc = scope.ServiceProvider.GetRequiredService<DataIngestionService>();
+                    var counts = await svc.IngestStockAsync(ticker, token);
 
-                var funds = await IngestFundamentalsAsync(stock, ct);
-                totalFundamentals += funds;
+                    Interlocked.Add(ref totalBars, counts.Bars);
+                    Interlocked.Add(ref totalFundamentals, counts.Fundamentals);
+                    Interlocked.Add(ref totalNews, counts.News);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Ingestion failed for {Ticker}", ticker);
+                    Interlocked.Increment(ref errors);
+                }
+            });
 
-                var news = await IngestNewsAsync(stock, ct);
-                totalNews += news;
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Ingestion failed for {Ticker}", stock.Ticker);
-                errors++;
-            }
-        }
-
-        await db.SaveChangesAsync(ct);
         sw.Stop();
 
         logger.LogInformation(
-            "Ingestion complete: {Stocks} stocks, {Bars} bars, {Funds} fundamentals, {News} news in {Ms}ms",
-            stocks.Count, totalBars, totalFundamentals, totalNews, sw.ElapsedMilliseconds);
+            "Parallel ingestion complete: {Stocks} stocks, {Bars} bars, {Funds} fundamentals, {News} news in {Ms}ms ({Errors} errors)",
+            tickers.Count, totalBars, totalFundamentals, totalNews, sw.ElapsedMilliseconds, errors);
 
-        return new IngestionResult(stocks.Count, totalBars, totalFundamentals, totalNews, errors, (int)sw.ElapsedMilliseconds);
+        return new IngestionResult(tickers.Count, totalBars, totalFundamentals, totalNews, errors, (int)sw.ElapsedMilliseconds);
     }
 
-    /// <summary>Ingest a single stock (for on-demand refresh).</summary>
-    public async Task IngestStockAsync(string ticker, CancellationToken ct = default)
+    /// <summary>Ingest a single stock (for on-demand refresh). Returns per-source counts
+    /// so the bulk runner can aggregate telemetry.</summary>
+    public async Task<StockIngestCounts> IngestStockAsync(string ticker, CancellationToken ct = default)
     {
         var stock = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker.ToUpper() == ticker.ToUpper(), ct);
         if (stock is null)
         {
             // New stock — fetch details and create record
             stock = await CreateStockFromProviderAsync(ticker, ct);
-            if (stock is null) return;
+            if (stock is null) return new StockIngestCounts(0, 0, 0);
         }
 
-        await IngestMarketDataAsync(stock, ct);
-        await IngestFundamentalsAsync(stock, ct);
-        await IngestNewsAsync(stock, ct);
+        var bars = await IngestMarketDataAsync(stock, ct);
+        var funds = await IngestFundamentalsAsync(stock, ct);
+        var news = await IngestNewsAsync(stock, ct);
         await db.SaveChangesAsync(ct);
+
+        return new StockIngestCounts(bars, funds, news);
     }
 
     /// <summary>Sync the stock universe from provider (add new tickers, update details).</summary>
@@ -188,11 +212,21 @@ public class DataIngestionService(
             });
         }
 
-        // Update metrics on stock record
-        var metrics = await fundamentalsProvider.GetMetricsAsync(stock.Ticker, ct);
-        if (metrics is not null)
+        // Pull slow-changing TTM/profile metrics (Beta, analyst target, forward ratios, ROE/ROA, etc.)
+        // and stamp them onto the Stock row. Idempotent — safe to call every ingestion run.
+        var profile = await fundamentalsProvider.GetStockProfileAsync(stock.Ticker, ct);
+        if (profile is not null)
         {
-            stock.MarketCap = stock.MarketCap; // Keep existing unless provider updates
+            if (profile.Beta.HasValue) stock.Beta = profile.Beta;
+            if (profile.AnalystTargetPrice.HasValue) stock.AnalystTargetPrice = profile.AnalystTargetPrice;
+            if (profile.NextEarningsDate.HasValue) stock.NextEarningsDate = profile.NextEarningsDate;
+            if (profile.ForwardPe.HasValue) stock.ForwardPe = profile.ForwardPe;
+            if (profile.PegRatio.HasValue) stock.PegRatio = profile.PegRatio;
+            if (profile.PriceToBook.HasValue) stock.PriceToBook = profile.PriceToBook;
+            if (profile.ReturnOnEquity.HasValue) stock.ReturnOnEquity = profile.ReturnOnEquity;
+            if (profile.ReturnOnAssets.HasValue) stock.ReturnOnAssets = profile.ReturnOnAssets;
+            if (profile.OperatingMargin.HasValue) stock.OperatingMargin = profile.OperatingMargin;
+            stock.MetricsUpdatedAt = DateTime.UtcNow;
         }
 
         return newEarnings.Count;

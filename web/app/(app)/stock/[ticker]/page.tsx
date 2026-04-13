@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -16,12 +17,13 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
-import { useStock, useStockSignals, useStockNews, useStockChart, useWatchlists, useAddWatchlistItem, useCreateWatchlist } from "@/lib/hooks";
+import { useStock, useStockSignals, useStockNews, useStockChart, useStockSnapshot, useWatchlists, useAddWatchlistItem, useCreateWatchlist } from "@/lib/hooks";
 import { Button } from "@/components/ui/button";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { FactorRadar } from "@/components/charts/factor-radar";
 import { PriceChart } from "@/components/charts/price-chart";
 import { FactorGauges } from "@/components/charts/factor-gauges";
+import { StockSnapshot } from "@/components/stock/stock-snapshot";
 
 interface StockDetailPageProps {
   params: Promise<{ ticker: string }>;
@@ -45,6 +47,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { data: signalsData } = useStockSignals(ticker);
   const { data: news } = useStockNews(ticker);
   const { data: chartData } = useStockChart(ticker, chartRange);
+  const { data: snapshot } = useStockSnapshot(ticker);
   const { data: watchlists } = useWatchlists();
   const addToWatchlist = useAddWatchlistItem();
   const createWatchlist = useCreateWatchlist();
@@ -165,14 +168,17 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
 
       {/* Score ring + Radar + Key metrics row */}
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Score ring */}
+        {/* Score ring — tap to open full score breakdown (screen 21) */}
         <motion.div
           custom={0}
           initial="hidden"
           animate="visible"
           variants={fadeIn}
-          className="rounded-2xl border border-border bg-card p-6 flex flex-col items-center justify-center"
         >
+          <Link
+            href={`/stock/${ticker}/score`}
+            className="block h-full rounded-2xl border border-border bg-card p-6 flex flex-col items-center justify-center hover:border-primary/40 transition-colors"
+          >
           {latestSignal ? (
             <ScoreRing score={latestSignal.scoreTotal} size={180} />
           ) : (
@@ -202,6 +208,10 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
               </p>
             </div>
           </div>
+          <p className="mt-3 text-[10px] text-muted-foreground uppercase tracking-widest">
+            Tap for full breakdown →
+          </p>
+          </Link>
         </motion.div>
 
         {/* Radar chart */}
@@ -296,6 +306,9 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         </motion.div>
       </div>
 
+      {/* Finviz-style snapshot */}
+      {snapshot && <StockSnapshot snapshot={snapshot} />}
+
       {/* Price Chart */}
       <motion.div
         custom={3}
@@ -308,20 +321,28 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           <h2 className="font-[var(--font-heading)] text-lg font-semibold">
             Price Chart
           </h2>
-          <div className="flex gap-1">
-            {["1m", "3m", "6m", "1y"].map((range) => (
-              <button
-                key={range}
-                onClick={() => setChartRange(range)}
-                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
-                  chartRange === range
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                {range.toUpperCase()}
-              </button>
-            ))}
+          <div className="flex items-center gap-3">
+            <div className="flex gap-1">
+              {["1m", "3m", "6m", "1y"].map((range) => (
+                <button
+                  key={range}
+                  onClick={() => setChartRange(range)}
+                  className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                    chartRange === range
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {range.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <Link
+              href={`/stock/${ticker}/chart`}
+              className="text-xs text-primary hover:underline whitespace-nowrap"
+            >
+              Full chart →
+            </Link>
           </div>
         </div>
         <PriceChart data={chartData ?? []} height={350} />
