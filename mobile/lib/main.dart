@@ -8,10 +8,11 @@ import 'core/network/api_service.dart';
 import 'models/signal.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
-import 'screens/home/home_screen.dart';
+import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/picks/picks_screen.dart';
-import 'screens/watchlist/watchlist_screen.dart';
-import 'screens/settings/settings_screen.dart';
+import 'screens/athena/athena_screen.dart';
+import 'screens/portfolio/portfolio_screen.dart';
+import 'screens/alerts/alerts_screen.dart';
 import 'screens/stock_detail/stock_detail_screen.dart';
 
 void main() async {
@@ -146,9 +147,8 @@ class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
   late final ApiService _api;
 
-  // Loaded from API
+  // Signals passed down to Signals tab
   List<Signal> _topSignals = [];
-  List<Signal> _watchlistSignals = [];
   bool _loading = true;
 
   @override
@@ -161,29 +161,14 @@ class _MainShellState extends State<MainShell> {
   Future<void> _loadData() async {
     try {
       final picks = await _api.getTopPicks(limit: 20);
-      // Try to load watchlist signals (may fail if not authenticated)
-      List<Signal> wlSignals = [];
-      try {
-        final watchlists = await _api.getWatchlists();
-        if (watchlists.isNotEmpty) {
-          final items = watchlists[0]['items'] as List? ?? [];
-          final tickers = items.map((i) => i['ticker'] as String).toSet();
-          wlSignals = picks.where((s) => tickers.contains(s.ticker)).toList();
-        }
-      } catch (_) {
-        // Not authenticated — use top 3 as placeholder
-        wlSignals = picks.take(3).toList();
-      }
-
       if (mounted) {
         setState(() {
           _topSignals = picks;
-          _watchlistSignals = wlSignals;
           _loading = false;
         });
       }
     } catch (e) {
-      debugPrint('Failed to load data: $e');
+      debugPrint('Failed to load top picks: $e');
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -198,27 +183,19 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final userEmail = widget.user?.email;
-    final userName = widget.user?.userMetadata?['full_name'] as String?;
-
     if (_loading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(child: CircularProgressIndicator(color: AppColors.emerald)),
       );
     }
 
+    // 5 tabs: Home (Dashboard), Signals (Picks), Athena, Portfolio, Alerts
     final screens = [
-      HomeScreen(topSignals: _topSignals, onSignalTap: _navigateToStock),
+      DashboardScreen(onSignalTap: _navigateToStock),
       PicksScreen(signals: _topSignals, onSignalTap: _navigateToStock),
-      WatchlistScreen(
-          watchlistSignals: _watchlistSignals,
-          onSignalTap: _navigateToStock),
-      SettingsScreen(
-        userEmail: userEmail,
-        userName: userName,
-        plan: 'Free',
-        onLogout: widget.onLogout,
-      ),
+      const AthenaScreen(),
+      const PortfolioScreen(),
+      const AlertsScreen(),
     ];
 
     return Scaffold(
@@ -239,15 +216,19 @@ class _MainShellState extends State<MainShell> {
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.trending_up_rounded),
-              label: 'Picks',
+              label: 'Signals',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.star_rounded),
-              label: 'Watchlist',
+              icon: Icon(Icons.auto_awesome),
+              label: 'Athena',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.settings_rounded),
-              label: 'Settings',
+              icon: Icon(Icons.account_balance_wallet_rounded),
+              label: 'Portfolio',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.notifications_rounded),
+              label: 'Alerts',
             ),
           ],
         ),
