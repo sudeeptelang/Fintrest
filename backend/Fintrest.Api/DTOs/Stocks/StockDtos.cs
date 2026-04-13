@@ -35,6 +35,25 @@ public record NewsResponse(
     DateTime? PublishedAt
 );
 
+public record TrendingStockResponse(
+    string Ticker,
+    string Name,
+    string? Sector,
+    double Price,
+    double ChangePct,
+    long Volume,
+    double? RelVolume,
+    double? SignalScore
+);
+
+public record EarningsCalendarItem(
+    string Ticker,
+    string Name,
+    DateTime EarningsDate,
+    double? Price,
+    double? SignalScore
+);
+
 public record SectorPerformanceResponse(
     string Sector,
     int StockCount,

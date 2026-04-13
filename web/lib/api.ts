@@ -121,6 +121,25 @@ export interface SectorPerformance {
   signalCount: number;
 }
 
+export interface TrendingStock {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  price: number;
+  changePct: number;
+  volume: number;
+  relVolume: number | null;
+  signalScore: number | null;
+}
+
+export interface EarningsCalendarItem {
+  ticker: string;
+  name: string;
+  earningsDate: string;
+  price: number | null;
+  signalScore: number | null;
+}
+
 export interface MarketIndex {
   ticker: string;
   label: string;
@@ -240,6 +259,9 @@ export const api = {
   marketSummary: () => fetchApi<MarketSummary>("/market/summary"),
   marketSectors: () => fetchApi<SectorPerformance[]>("/market/sectors"),
   marketIndices: () => fetchApi<MarketIndex[]>("/market/indices"),
+  marketTrending: (limit = 10) => fetchApi<TrendingStock[]>(`/market/trending?limit=${limit}`),
+  marketMostActive: (limit = 10) => fetchApi<TrendingStock[]>(`/market/most-active?limit=${limit}`),
+  marketEarningsCalendar: (days = 14) => fetchApi<EarningsCalendarItem[]>(`/market/earnings-calendar?days=${days}`),
   topPicks: (limit = 12) => fetchApi<SignalListResponse>(`/picks/top-today?limit=${limit}`),
   swingWeek: () => fetchApi<SignalListResponse>("/picks/swing-week"),
 

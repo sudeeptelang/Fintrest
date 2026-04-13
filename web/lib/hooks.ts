@@ -15,6 +15,18 @@ export function useMarketIndices() {
   return useQuery({ queryKey: ["market-indices"], queryFn: api.marketIndices });
 }
 
+export function useMarketTrending(limit = 10) {
+  return useQuery({ queryKey: ["market-trending", limit], queryFn: () => api.marketTrending(limit) });
+}
+
+export function useMarketMostActive(limit = 10) {
+  return useQuery({ queryKey: ["market-most-active", limit], queryFn: () => api.marketMostActive(limit) });
+}
+
+export function useMarketEarningsCalendar(days = 14) {
+  return useQuery({ queryKey: ["market-earnings-calendar", days], queryFn: () => api.marketEarningsCalendar(days) });
+}
+
 export function useTopPicks(limit = 12) {
   return useQuery({ queryKey: ["top-picks", limit], queryFn: () => api.topPicks(limit) });
 }

@@ -31,6 +31,129 @@ public class MarketController(AppDbContext db) : ControllerBase
         });
     }
 
+    /// <summary>Top movers by day change % — the "Trending" widget.</summary>
+    [HttpGet("market/trending")]
+    public async Task<ActionResult<List<TrendingStockResponse>>> Trending([FromQuery] int limit = 10)
+    {
+        var cutoff = DateTime.UtcNow.AddDays(-7);
+        var bars = await db.MarketData
+            .Include(m => m.Stock)
+            .Where(m => m.Ts >= cutoff && m.Stock.Active && m.PrevClose > 0)
+            .OrderByDescending(m => m.Ts)
+            .ToListAsync();
+
+        var latestPerStock = bars
+            .GroupBy(m => m.StockId)
+            .Select(g => g.OrderByDescending(m => m.Ts).First())
+            .ToList();
+
+        // Get latest signal scores
+        var latestScan = await db.ScanRuns.Where(s => s.Status == "COMPLETED")
+            .OrderByDescending(s => s.CompletedAt).FirstOrDefaultAsync();
+        var signalScores = latestScan is not null
+            ? await db.Signals.Where(s => s.ScanRunId == latestScan.Id)
+                .ToDictionaryAsync(s => s.StockId, s => s.ScoreTotal)
+            : new Dictionary<long, double>();
+
+        var trending = latestPerStock
+            .Select(m => new
+            {
+                m.Stock,
+                m.Close,
+                ChangePct = (m.Close - m.PrevClose!.Value) / m.PrevClose.Value * 100,
+                m.Volume,
+                RelVolume = m.AvgVolume is > 0 ? m.Volume / m.AvgVolume.Value : (double?)null,
+            })
+            .OrderByDescending(x => Math.Abs(x.ChangePct))
+            .Take(limit)
+            .Select(x => new TrendingStockResponse(
+                x.Stock.Ticker, x.Stock.Name, x.Stock.Sector,
+                Math.Round(x.Close, 2), Math.Round(x.ChangePct, 2),
+                x.Volume, x.RelVolume.HasValue ? Math.Round(x.RelVolume.Value, 2) : null,
+                signalScores.GetValueOrDefault(x.Stock.Id, 0)
+            ))
+            .ToList();
+
+        return Ok(trending);
+    }
+
+    /// <summary>Highest volume stocks today — the "Most Active" widget.</summary>
+    [HttpGet("market/most-active")]
+    public async Task<ActionResult<List<TrendingStockResponse>>> MostActive([FromQuery] int limit = 10)
+    {
+        var cutoff = DateTime.UtcNow.AddDays(-7);
+        var bars = await db.MarketData
+            .Include(m => m.Stock)
+            .Where(m => m.Ts >= cutoff && m.Stock.Active)
+            .OrderByDescending(m => m.Ts)
+            .ToListAsync();
+
+        var latestPerStock = bars
+            .GroupBy(m => m.StockId)
+            .Select(g => g.OrderByDescending(m => m.Ts).First())
+            .ToList();
+
+        var latestScan = await db.ScanRuns.Where(s => s.Status == "COMPLETED")
+            .OrderByDescending(s => s.CompletedAt).FirstOrDefaultAsync();
+        var signalScores = latestScan is not null
+            ? await db.Signals.Where(s => s.ScanRunId == latestScan.Id)
+                .ToDictionaryAsync(s => s.StockId, s => s.ScoreTotal)
+            : new Dictionary<long, double>();
+
+        var active = latestPerStock
+            .OrderByDescending(m => m.Volume)
+            .Take(limit)
+            .Select(m => new TrendingStockResponse(
+                m.Stock.Ticker, m.Stock.Name, m.Stock.Sector,
+                Math.Round(m.Close, 2),
+                m.PrevClose is > 0 ? Math.Round((m.Close - m.PrevClose.Value) / m.PrevClose.Value * 100, 2) : 0,
+                m.Volume,
+                m.AvgVolume is > 0 ? Math.Round(m.Volume / m.AvgVolume.Value, 2) : null,
+                signalScores.GetValueOrDefault(m.StockId, 0)
+            ))
+            .ToList();
+
+        return Ok(active);
+    }
+
+    /// <summary>Upcoming earnings in the next N days — "Earnings Calendar" widget.</summary>
+    [HttpGet("market/earnings-calendar")]
+    public async Task<ActionResult<List<EarningsCalendarItem>>> EarningsCalendar([FromQuery] int days = 14)
+    {
+        var from = DateTime.UtcNow.Date;
+        var to = from.AddDays(days);
+
+        var stocks = await db.Stocks
+            .Where(s => s.Active && s.NextEarningsDate >= from && s.NextEarningsDate <= to)
+            .OrderBy(s => s.NextEarningsDate)
+            .Take(30)
+            .ToListAsync();
+
+        var stockIds = stocks.Select(s => s.Id).ToList();
+
+        // Latest prices
+        var cutoff = DateTime.UtcNow.AddDays(-7);
+        var prices = await db.MarketData
+            .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
+            .GroupBy(m => m.StockId)
+            .Select(g => new { StockId = g.Key, Close = g.OrderByDescending(m => m.Ts).First().Close })
+            .ToDictionaryAsync(x => x.StockId, x => x.Close);
+
+        // Signal scores
+        var latestScan = await db.ScanRuns.Where(s => s.Status == "COMPLETED")
+            .OrderByDescending(s => s.CompletedAt).FirstOrDefaultAsync();
+        var signalScores = latestScan is not null
+            ? await db.Signals.Where(s => s.ScanRunId == latestScan.Id && stockIds.Contains(s.StockId))
+                .ToDictionaryAsync(s => s.StockId, s => s.ScoreTotal)
+            : new Dictionary<long, double>();
+
+        return Ok(stocks.Select(s => new EarningsCalendarItem(
+            s.Ticker, s.Name, s.NextEarningsDate!.Value,
+            prices.GetValueOrDefault(s.Id),
+            signalScores.GetValueOrDefault(s.Id)
+        )).ToList());
+    }
+
     [HttpGet("market/sectors")]
     public async Task<ActionResult<List<SectorPerformanceResponse>>> SectorPerformance()
     {
