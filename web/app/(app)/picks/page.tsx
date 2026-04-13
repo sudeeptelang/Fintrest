@@ -56,11 +56,21 @@ export default function PicksPage() {
   const { data, isLoading } = useTopPicks(50);
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [horizonFilter, setHorizonFilter] = useState<"all" | "short" | "mid" | "long">("all");
 
   const signals = useMemo(() => {
-    const list = data?.signals ?? [];
+    let list = data?.signals ?? [];
+    // Filter by horizon
+    if (horizonFilter !== "all") {
+      list = list.filter((s) => {
+        const days = s.horizonDays ?? 7;
+        if (horizonFilter === "short") return days <= 5;
+        if (horizonFilter === "mid") return days > 5 && days <= 20;
+        return days > 20;
+      });
+    }
     return [...list].sort((a, b) => compare(a, b, sortKey, sortDir));
-  }, [data, sortKey, sortDir]);
+  }, [data, sortKey, sortDir, horizonFilter]);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -107,6 +117,39 @@ export default function PicksPage() {
           Today&apos;s highest-ranked signals, scored 0–100. Click any column to
           sort.
         </p>
+      </div>
+
+      {/* Horizon filter tabs */}
+      <div className="flex gap-2">
+        {(
+          [
+            { key: "all", label: "All Signals" },
+            { key: "short", label: "Short Term (1-5d)" },
+            { key: "mid", label: "Mid Term (6-20d)" },
+            { key: "long", label: "Long Term (21d+)" },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setHorizonFilter(tab.key)}
+            className={`px-4 py-2 text-xs rounded-full font-medium transition-colors ${
+              horizonFilter === tab.key
+                ? "bg-primary/10 text-primary border border-primary/30"
+                : "bg-muted/30 text-muted-foreground border border-transparent hover:bg-muted/50"
+            }`}
+          >
+            {tab.label}
+            <span className="ml-1.5 text-[10px] opacity-60">
+              {(data?.signals ?? []).filter((s) => {
+                const days = s.horizonDays ?? 7;
+                if (tab.key === "all") return true;
+                if (tab.key === "short") return days <= 5;
+                if (tab.key === "mid") return days > 5 && days <= 20;
+                return days > 20;
+              }).length}
+            </span>
+          </button>
+        ))}
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">

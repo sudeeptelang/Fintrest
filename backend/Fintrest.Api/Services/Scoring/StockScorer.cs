@@ -105,6 +105,7 @@ public static class StockScorer
 
         return new ScoredSignal
         {
+
             StockId = snap.StockId,
             Ticker = snap.Ticker,
             Name = snap.Name,
@@ -116,9 +117,40 @@ public static class StockScorer
             TargetHigh = zone?.TargetHigh,
             RiskRewardRatio = zone?.RiskRewardRatio,
             RiskLevel = riskLevel,
-            HorizonDays = 5, // Default swing trade horizon
+            // Horizon based on signal characteristics:
+            // - Strong momentum + high volume → short-term (1-5 days, day/swing trade)
+            // - Moderate score + catalyst → mid-term (6-20 days, swing trade)
+            // - Fundamentals/value-driven → long-term (21-60 days, position trade)
+            HorizonDays = DetermineHorizon(breakdown, snap),
             Explanation = explanation,
             Provenance = provenance,
         };
+    }
+
+    /// <summary>Determine trade horizon based on signal characteristics.</summary>
+    private static int DetermineHorizon(ScoringEngine.ScoreBreakdown breakdown, StockSnapshot snap)
+    {
+        // High momentum + high volume = short-term momentum play (1-5 days)
+        if (breakdown.Momentum >= 80 && breakdown.Volume >= 70)
+            return 3;
+
+        // Strong catalyst (news) = short-term event trade (2-5 days)
+        if (breakdown.Catalyst >= 75 && snap.HasCatalyst)
+            return 5;
+
+        // Moderate momentum, decent trend = swing trade (7-14 days)
+        if (breakdown.Momentum >= 60 && breakdown.Trend >= 60)
+            return 10;
+
+        // Fundamentals-driven = position trade (14-30 days)
+        if (breakdown.Fundamental >= 70)
+            return 21;
+
+        // Low momentum, value-oriented = longer hold (30-60 days)
+        if (breakdown.Momentum < 50 && breakdown.Fundamental >= 60)
+            return 45;
+
+        // Default swing trade
+        return 7;
     }
 }

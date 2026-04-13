@@ -21,6 +21,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   Map<String, dynamic>? _snapshot;
   Map<String, dynamic>? _analyst;
   List<Map<String, dynamic>>? _earnings;
+  List<Map<String, dynamic>>? _news;
   List<Signal>? _peers;
   bool _loading = true;
 
@@ -40,12 +41,14 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
         _api.getStockAnalyst(signal.ticker).catchError((_) => <String, dynamic>{}),
         _api.getStockEarnings(signal.ticker).catchError((_) => <Map<String, dynamic>>[]),
         _api.getTopPicks(limit: 50).catchError((_) => <Signal>[]),
+        _api.getStockNews(signal.ticker).catchError((_) => <Map<String, dynamic>>[]),
       ]);
 
       final snapshot = results[0] as Map<String, dynamic>;
       final analyst = results[1] as Map<String, dynamic>;
       final earnings = results[2] as List<Map<String, dynamic>>;
       final allSignals = results[3] as List<Signal>;
+      final newsItems = results[4] as List<Map<String, dynamic>>;
 
       // Peers = same sector, excluding self, top 5 by score
       final sector = snapshot['sector'] as String?;
@@ -61,6 +64,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           _snapshot = snapshot.isNotEmpty ? snapshot : null;
           _analyst = analyst.isNotEmpty ? analyst : null;
           _earnings = earnings.isNotEmpty ? earnings : null;
+          _news = newsItems.isNotEmpty ? newsItems : null;
           _peers = peers.isNotEmpty ? peers : null;
           _loading = false;
         });
@@ -123,6 +127,10 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               _buildEarningsHistory(),
             if (_earnings != null && _earnings!.isNotEmpty)
               const SizedBox(height: 20),
+
+            // ─── Recent News ───
+            if (_news != null && _news!.isNotEmpty) _buildNews(),
+            if (_news != null && _news!.isNotEmpty) const SizedBox(height: 20),
 
             // ─── Score Breakdown ───
             if (signal.breakdown != null) _buildScoreBreakdown(),
@@ -544,6 +552,70 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                 ],
               ),
             )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNews() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Recent News', style: GoogleFonts.sora(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            ..._news!.take(6).map((n) {
+              final sentiment = (n['sentimentScore'] as num?)?.toDouble();
+              final dotColor = sentiment != null
+                  ? (sentiment > 0.2 ? AppColors.emerald : sentiment < -0.2 ? Colors.red[400]! : AppColors.amber)
+                  : Colors.grey;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 8, height: 8,
+                      margin: const EdgeInsets.only(top: 5, right: 10),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            n['headline'] ?? '',
+                            style: const TextStyle(fontSize: 13, height: 1.4),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(children: [
+                            if (n['source'] != null)
+                              Text(n['source'], style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                            if (n['catalystType'] != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.emerald.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(n['catalystType'],
+                                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.emerald)),
+                              ),
+                            ],
+                          ]),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),
