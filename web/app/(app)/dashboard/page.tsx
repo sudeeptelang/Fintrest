@@ -144,93 +144,149 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Two-column: Athena Signals + Trending */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Athena Signals (top picks in navy card) */}
-        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-[#0d1a2e] to-[#172640] p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-[var(--font-heading)] text-lg font-semibold flex items-center gap-2">
-              <Brain className="h-5 w-5 text-primary" /> Athena&apos;s Signals
+      {/* Signal of the Day — hero card */}
+      {topSignal && (
+        <Link href={`/stock/${topSignal.ticker}`}>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-primary/20 bg-gradient-to-br from-[#0d1a2e] to-[#172640] p-6 text-white flex flex-col sm:flex-row items-start sm:items-center gap-6 hover:border-primary/40 transition-colors"
+          >
+            <div className="flex items-center gap-4 flex-1">
+              <StockLogo ticker={topSignal.ticker} size={56} className="rounded-2xl" />
+              <div>
+                <div className="flex items-center gap-3">
+                  <p className="font-[var(--font-heading)] text-2xl font-bold">{topSignal.ticker}</p>
+                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                    topSignal.signalType === "BUY_TODAY" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"
+                  }`}>
+                    {topSignal.signalType.replace("_", " ")}
+                  </span>
+                </div>
+                <p className="text-sm text-white/50 mt-0.5">{topSignal.stockName}</p>
+                {topSignal.breakdown?.whyNowSummary && (
+                  <p className="text-xs text-white/60 mt-2 max-w-lg leading-relaxed line-clamp-2">
+                    {topSignal.breakdown.whyNowSummary}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-6 shrink-0">
+              {topSignal.currentPrice && (
+                <div className="text-right">
+                  <p className="font-[var(--font-mono)] text-xl font-bold">${topSignal.currentPrice.toFixed(2)}</p>
+                  {topSignal.changePct !== null && (
+                    <p className={`font-[var(--font-mono)] text-sm font-semibold ${
+                      topSignal.changePct >= 0 ? "text-emerald-400" : "text-red-400"
+                    }`}>
+                      {topSignal.changePct >= 0 ? "+" : ""}{topSignal.changePct.toFixed(2)}%
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="text-center">
+                <p className="font-[var(--font-heading)] text-3xl font-bold text-primary">
+                  {Math.round(topSignal.scoreTotal)}
+                </p>
+                <p className="text-[10px] text-white/40 uppercase tracking-widest">Score</p>
+              </div>
+              {topSignal.entryLow && (
+                <div className="text-right hidden md:block">
+                  <p className="text-[10px] text-white/40 uppercase">Entry</p>
+                  <p className="font-[var(--font-mono)] text-sm font-semibold">
+                    ${topSignal.entryLow.toFixed(0)}–${topSignal.entryHigh?.toFixed(0)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </Link>
+      )}
+
+      {/* Three-column: Athena Signals + Trending + Most Active */}
+      <div className="grid lg:grid-cols-3 gap-5">
+        {/* Athena Signals */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <Brain className="h-4 w-4 text-primary" /> Athena&apos;s Picks
             </h2>
-            <Link
-              href="/picks"
-              className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
-            >
-              View all <ArrowUpRight className="h-3 w-3" />
+            <Link href="/picks" className="text-[10px] text-primary hover:text-primary/80 flex items-center gap-0.5">
+              All <ArrowUpRight className="h-2.5 w-2.5" />
             </Link>
           </div>
-          {signals.length === 0 ? (
-            <p className="text-sm text-white/50 text-center py-6">No signals yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {signals.slice(0, 5).map((s) => (
-                <Link
-                  key={s.id}
-                  href={`/stock/${s.ticker}`}
-                  className="flex items-center justify-between py-2 hover:bg-white/5 rounded-lg px-2 -mx-2 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <StockLogo ticker={s.ticker} size={32} />
-                    <div>
-                      <p className="font-[var(--font-mono)] font-semibold text-sm">{s.ticker}</p>
-                      <p className="text-[10px] text-white/40">{s.stockName}</p>
-                    </div>
+          <div className="space-y-1.5">
+            {signals.slice(1, 8).map((s) => (
+              <Link
+                key={s.id}
+                href={`/stock/${s.ticker}`}
+                className="flex items-center justify-between py-1.5 px-2 -mx-2 rounded-lg hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <StockLogo ticker={s.ticker} size={28} />
+                  <div>
+                    <p className="font-[var(--font-mono)] text-xs font-bold">{s.ticker}</p>
+                    <p className="text-[9px] text-muted-foreground truncate max-w-[80px]">{s.stockName}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-[var(--font-mono)] text-sm font-bold">{Math.round(s.scoreTotal)}</p>
-                    <p className={`text-[10px] font-medium ${
-                      s.signalType === "BUY_TODAY" ? "text-emerald-400" : "text-amber-400"
+                </div>
+                <div className="flex items-center gap-2">
+                  {s.changePct !== null && (
+                    <span className={`font-[var(--font-mono)] text-[10px] font-semibold ${
+                      s.changePct >= 0 ? "text-emerald-500" : "text-red-500"
                     }`}>
-                      {s.signalType.replace("_", " ")}
-                    </p>
-                  </div>
-                </Link>
+                      {s.changePct >= 0 ? "+" : ""}{s.changePct.toFixed(1)}%
+                    </span>
+                  )}
+                  <span className="font-[var(--font-mono)] text-xs font-bold w-7 text-right">
+                    {Math.round(s.scoreTotal)}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Trending */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <Flame className="h-4 w-4 text-amber-500" /> Trending
+            </h2>
+          </div>
+          {!trending || trending.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">No data.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {trending.slice(0, 7).map((s) => (
+                <StockMiniRow key={s.ticker} stock={s} />
               ))}
             </div>
           )}
         </div>
 
-        {/* Trending */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-[var(--font-heading)] text-lg font-semibold flex items-center gap-2">
-              <Flame className="h-5 w-5 text-amber-500" /> Trending
+        {/* Most Active */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <Zap className="h-4 w-4 text-blue-500" /> Most Active
             </h2>
           </div>
-          {!trending || trending.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No data yet.</p>
+          {!mostActive || mostActive.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">No data.</p>
           ) : (
-            <div className="space-y-2">
-              {trending.map((s) => (
-                <StockMiniRow key={s.ticker} stock={s} />
+            <div className="space-y-1.5">
+              {mostActive.slice(0, 7).map((s) => (
+                <StockMiniRow key={s.ticker} stock={s} showVolume />
               ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* Two-column: Most Active + Earnings Calendar */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Most Active */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-[var(--font-heading)] text-lg font-semibold flex items-center gap-2">
-              <Zap className="h-5 w-5 text-blue-500" /> Most Active
-            </h2>
-          </div>
-          {!mostActive || mostActive.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No data yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {mostActive.map((s) => (
-                <StockMiniRow key={s.ticker} stock={s} showVolume />
-              ))}
-            </div>
-          )}
-        </div>
-
+      {/* Earnings Calendar + News side by side */}
+      <div className="grid lg:grid-cols-2 gap-5">
         {/* Earnings Calendar */}
-        <div className="rounded-xl border border-border bg-card p-6">
+        <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-[var(--font-heading)] text-lg font-semibold flex items-center gap-2">
               <Calendar className="h-5 w-5 text-purple-500" /> Earnings Calendar
