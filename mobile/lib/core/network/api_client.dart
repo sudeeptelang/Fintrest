@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../constants/api_constants.dart';
 
@@ -8,9 +8,10 @@ class ApiClient {
   final _storage = const FlutterSecureStorage();
 
   ApiClient() {
-    final baseUrl = Platform.isAndroid
-        ? ApiConstants.baseUrl
-        : ApiConstants.iosBaseUrl;
+    // Web uses localhost directly; Android emulator uses 10.0.2.2; iOS uses localhost
+    final baseUrl = kIsWeb
+        ? ApiConstants.iosBaseUrl  // localhost works for web
+        : ApiConstants.baseUrl;   // 10.0.2.2 for Android emulator
 
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
