@@ -13,12 +13,12 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
     : IFundamentalsProvider
 {
     private readonly string _apiKey = config["Providers:FMP:ApiKey"] ?? "";
-    private readonly string _baseUrl = "https://financialmodelingprep.com/api/v3";
+    private readonly string _baseUrl = "https://financialmodelingprep.com/stable";
 
     public async Task<List<QuarterlyEarnings>> GetQuarterlyEarningsAsync(
         string ticker, int quarters = 4, CancellationToken ct = default)
     {
-        var url = $"{_baseUrl}/income-statement/{ticker}?period=quarter&limit={quarters}&apikey={_apiKey}";
+        var url = $"{_baseUrl}/income-statement?symbol={ticker}&period=quarter&limit={quarters}&apikey={_apiKey}";
 
         try
         {
@@ -59,7 +59,7 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
 
     public async Task<FinancialMetrics?> GetMetricsAsync(string ticker, CancellationToken ct = default)
     {
-        var url = $"{_baseUrl}/ratios-ttm/{ticker}?apikey={_apiKey}";
+        var url = $"{_baseUrl}/ratios-ttm?symbol={ticker}&apikey={_apiKey}";
 
         try
         {
@@ -74,7 +74,7 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
                 PbRatio: r.PriceToBookRatioTTM,
                 DebtToEquity: r.DebtEquityRatioTTM,
                 CurrentRatio: r.CurrentRatioTTM,
-                Roe: r.ReturnOnEquityTTM
+                Roe: null // ROE is now in key-metrics-ttm, fetched by GetStockProfileAsync
             );
         }
         catch (Exception ex)
@@ -87,12 +87,12 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
     public async Task<StockProfile?> GetStockProfileAsync(string ticker, CancellationToken ct = default)
     {
         // Fan out 5 endpoints in parallel — total time ≈ slowest call.
-        var profileTask = TryFetch<List<FmpProfile>>($"{_baseUrl}/profile/{ticker}?apikey={_apiKey}", ct);
-        var keyMetricsTask = TryFetch<List<FmpKeyMetricsTtm>>($"{_baseUrl}/key-metrics-ttm/{ticker}?apikey={_apiKey}", ct);
-        var ratiosTask = TryFetch<List<FmpRatiosFull>>($"{_baseUrl}/ratios-ttm/{ticker}?apikey={_apiKey}", ct);
+        var profileTask = TryFetch<List<FmpProfile>>($"{_baseUrl}/profile?symbol={ticker}&apikey={_apiKey}", ct);
+        var keyMetricsTask = TryFetch<List<FmpKeyMetricsTtm>>($"{_baseUrl}/key-metrics-ttm?symbol={ticker}&apikey={_apiKey}", ct);
+        var ratiosTask = TryFetch<List<FmpRatiosFull>>($"{_baseUrl}/ratios-ttm?symbol={ticker}&apikey={_apiKey}", ct);
         var targetTask = TryFetch<List<FmpPriceTargetConsensus>>($"{_baseUrl}/price-target-consensus?symbol={ticker}&apikey={_apiKey}", ct);
         var today = DateTime.UtcNow.Date;
-        var earningsTask = TryFetch<List<FmpEarningCalendar>>($"{_baseUrl}/earning_calendar?symbol={ticker}&from={today:yyyy-MM-dd}&to={today.AddDays(120):yyyy-MM-dd}&apikey={_apiKey}", ct);
+        var earningsTask = TryFetch<List<FmpEarningCalendar>>($"{_baseUrl}/earning-calendar?symbol={ticker}&from={today:yyyy-MM-dd}&to={today.AddDays(120):yyyy-MM-dd}&apikey={_apiKey}", ct);
 
         await Task.WhenAll(profileTask, keyMetricsTask, ratiosTask, targetTask, earningsTask);
 
@@ -119,11 +119,11 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
             Beta: profile?.Beta,
             AnalystTargetPrice: target?.TargetConsensus,
             NextEarningsDate: nextEarningsDate,
-            ForwardPe: keyMetrics?.ForwardPe ?? keyMetrics?.PeRatioTTM,
-            PegRatio: keyMetrics?.PegRatioTTM,
-            PriceToBook: ratios?.PriceToBookRatioTTM ?? keyMetrics?.PbRatioTTM,
-            ReturnOnEquity: ratios?.ReturnOnEquityTTM ?? keyMetrics?.RoeTTM,
-            ReturnOnAssets: keyMetrics?.RoaTTM ?? ratios?.ReturnOnAssetsTTM,
+            ForwardPe: ratios?.PeRatioTTM, // PE from ratios-ttm
+            PegRatio: ratios?.PegRatioTTM, // PEG from ratios-ttm
+            PriceToBook: ratios?.PriceToBookRatioTTM,
+            ReturnOnEquity: keyMetrics?.RoeTTM,  // ROE from key-metrics-ttm
+            ReturnOnAssets: keyMetrics?.RoaTTM,   // ROA from key-metrics-ttm
             OperatingMargin: ratios?.OperatingProfitMarginTTM
         );
     }
@@ -133,9 +133,9 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         // FMP exposes one endpoint per major index. Free tier covers all three.
         var path = indexKey.ToLowerInvariant() switch
         {
-            "sp500" or "s&p500" or "spx" => "sp500_constituent",
-            "nasdaq" or "nasdaq100" or "ndx" => "nasdaq_constituent",
-            "dow" or "dowjones" or "dji" => "dowjones_constituent",
+            "sp500" or "s&p500" or "spx" => "sp500-constituent",
+            "nasdaq" or "nasdaq100" or "ndx" => "nasdaq-constituent",
+            "dow" or "dowjones" or "dji" => "dowjones-constituent",
             _ => null
         };
 
@@ -201,18 +201,18 @@ file record FmpIncomeStatement(
 );
 
 file record FmpRatios(
-    [property: JsonPropertyName("peRatioTTM")] double? PeRatioTTM,
+    [property: JsonPropertyName("priceToEarningsRatioTTM")] double? PeRatioTTM,
     [property: JsonPropertyName("priceToSalesRatioTTM")] double? PriceToSalesRatioTTM,
     [property: JsonPropertyName("priceToBookRatioTTM")] double? PriceToBookRatioTTM,
-    [property: JsonPropertyName("debtEquityRatioTTM")] double? DebtEquityRatioTTM,
+    [property: JsonPropertyName("debtToEquityRatioTTM")] double? DebtEquityRatioTTM,
     [property: JsonPropertyName("currentRatioTTM")] double? CurrentRatioTTM,
-    [property: JsonPropertyName("returnOnEquityTTM")] double? ReturnOnEquityTTM
+    [property: JsonPropertyName("operatingProfitMarginTTM")] double? OperatingProfitMarginTTM
 );
 
 file record FmpRatiosFull(
     [property: JsonPropertyName("priceToBookRatioTTM")] double? PriceToBookRatioTTM,
-    [property: JsonPropertyName("returnOnEquityTTM")] double? ReturnOnEquityTTM,
-    [property: JsonPropertyName("returnOnAssetsTTM")] double? ReturnOnAssetsTTM,
+    [property: JsonPropertyName("priceToEarningsRatioTTM")] double? PeRatioTTM,
+    [property: JsonPropertyName("priceToEarningsGrowthRatioTTM")] double? PegRatioTTM,
     [property: JsonPropertyName("operatingProfitMarginTTM")] double? OperatingProfitMarginTTM
 );
 
@@ -223,12 +223,10 @@ file record FmpProfile(
 );
 
 file record FmpKeyMetricsTtm(
-    [property: JsonPropertyName("peRatioTTM")] double? PeRatioTTM,
-    [property: JsonPropertyName("forwardPE")] double? ForwardPe,
-    [property: JsonPropertyName("pegRatioTTM")] double? PegRatioTTM,
-    [property: JsonPropertyName("pbRatioTTM")] double? PbRatioTTM,
-    [property: JsonPropertyName("roeTTM")] double? RoeTTM,
-    [property: JsonPropertyName("roaTTM")] double? RoaTTM
+    [property: JsonPropertyName("returnOnEquityTTM")] double? RoeTTM,
+    [property: JsonPropertyName("returnOnAssetsTTM")] double? RoaTTM,
+    [property: JsonPropertyName("returnOnInvestedCapitalTTM")] double? RoicTTM,
+    [property: JsonPropertyName("earningsYieldTTM")] double? EarningsYieldTTM
 );
 
 file record FmpPriceTargetConsensus(
