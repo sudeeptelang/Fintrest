@@ -63,18 +63,53 @@ class SignalCard extends StatelessWidget {
                                 style: GoogleFonts.dmMono(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.grey[400],
+                                ),
+                              ),
+                            ],
+                            if (signal.changeDisplay != null) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: signal.isPositiveChange
+                                      ? AppColors.emerald.withValues(alpha: 0.1)
+                                      : Colors.red.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  signal.changeDisplay!,
+                                  style: GoogleFonts.dmMono(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: signal.isPositiveChange
+                                        ? AppColors.emerald
+                                        : Colors.red[400],
+                                  ),
                                 ),
                               ),
                             ],
                           ],
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          signal.stockName,
-                          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                signal.stockName,
+                                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              signal.horizonCategory,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

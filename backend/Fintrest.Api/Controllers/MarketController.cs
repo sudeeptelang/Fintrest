@@ -557,13 +557,13 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         return Ok(new { article.Slug, article.Title, article.BodyMd, article.PublishedAt });
     }
 
-    /// <summary>Batch-load latest close price for a list of signals' stocks.</summary>
-    private async Task<Dictionary<long, double>> GetLatestPricesAsync(IEnumerable<Signal> signals)
+    /// <summary>Batch-load latest 2 bars per signal stock for price + change %.</summary>
+    private async Task<Dictionary<long, (double Close, double? ChangePct)>> GetLatestPricesAsync(IEnumerable<Signal> signals)
     {
         var stockIds = signals.Select(s => s.StockId).Distinct().ToList();
         if (stockIds.Count == 0) return new();
 
-        var cutoff = DateTime.UtcNow.AddDays(-7);
+        var cutoff = DateTime.UtcNow.AddDays(-14);
         var recentBars = await db.MarketData
             .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
             .Select(m => new { m.StockId, m.Ts, m.Close })
@@ -571,20 +571,34 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
 
         return recentBars
             .GroupBy(m => m.StockId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(m => m.Ts).First().Close);
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var sorted = g.OrderByDescending(m => m.Ts).Take(2).ToList();
+                    var latest = sorted[0].Close;
+                    double? changePct = sorted.Count > 1 && sorted[1].Close > 0
+                        ? Math.Round((latest - sorted[1].Close) / sorted[1].Close * 100, 2)
+                        : null;
+                    return (latest, changePct);
+                });
     }
 
     private async Task<SignalListResponse> ToSignalList(List<Signal> signals)
     {
         var prices = await GetLatestPricesAsync(signals);
         return new SignalListResponse(
-            signals.Select(s => ToDto(s, prices.GetValueOrDefault(s.StockId))).ToList(),
+            signals.Select(s =>
+            {
+                var (close, changePct) = prices.GetValueOrDefault(s.StockId);
+                return ToDto(s, close > 0 ? close : null, changePct);
+            }).ToList(),
             signals.Count);
     }
 
-    private static SignalResponse ToDto(Signal s, double? currentPrice = null) => new(
+    private static SignalResponse ToDto(Signal s, double? currentPrice = null, double? changePct = null) => new(
         s.Id, s.Stock.Ticker, s.Stock.Name, s.SignalType.ToString(), s.ScoreTotal,
-        currentPrice,
+        currentPrice, changePct,
         s.EntryLow, s.EntryHigh, s.StopLoss, s.TargetLow, s.TargetHigh,
         s.RiskLevel, s.HorizonDays,
         s.Breakdown is not null ? new SignalBreakdownDto(

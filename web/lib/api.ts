@@ -38,6 +38,7 @@ export interface Signal {
   signalType: string;
   scoreTotal: number;
   currentPrice: number | null;
+  changePct: number | null;
   entryLow: number | null;
   entryHigh: number | null;
   stopLoss: number | null;

@@ -5,6 +5,7 @@ class Signal {
   final String signalType;
   final double scoreTotal;
   final double? currentPrice;
+  final double? changePct;
   final double? entryLow;
   final double? entryHigh;
   final double? stopLoss;
@@ -22,6 +23,7 @@ class Signal {
     required this.signalType,
     required this.scoreTotal,
     this.currentPrice,
+    this.changePct,
     this.entryLow,
     this.entryHigh,
     this.stopLoss,
@@ -40,6 +42,7 @@ class Signal {
         signalType: json['signalType'] ?? 'WATCH',
         scoreTotal: (json['scoreTotal'] as num?)?.toDouble() ?? 0,
         currentPrice: (json['currentPrice'] as num?)?.toDouble(),
+        changePct: (json['changePct'] as num?)?.toDouble(),
         entryLow: (json['entryLow'] as num?)?.toDouble(),
         entryHigh: (json['entryHigh'] as num?)?.toDouble(),
         stopLoss: (json['stopLoss'] as num?)?.toDouble(),
@@ -78,6 +81,24 @@ class Signal {
 
   String? get priceDisplay =>
       currentPrice != null ? '\$${currentPrice!.toStringAsFixed(2)}' : null;
+
+  String? get changeDisplay {
+    if (changePct == null) return null;
+    final sign = changePct! >= 0 ? '+' : '';
+    return '$sign${changePct!.toStringAsFixed(2)}%';
+  }
+
+  bool get isPositiveChange => (changePct ?? 0) >= 0;
+
+  /// Horizon-based category: Short (1-5d), Mid (6-20d), Long (21+d)
+  String get horizonCategory => switch (horizonDays ?? 5) {
+        <= 5 => 'Short Term',
+        <= 20 => 'Mid Term',
+        _ => 'Long Term',
+      };
+
+  String get horizonLabel =>
+      horizonDays != null ? '${horizonDays}d · $horizonCategory' : horizonCategory;
 }
 
 class SignalBreakdown {

@@ -7,6 +7,7 @@ public record SignalResponse(
     string SignalType,
     double ScoreTotal,
     double? CurrentPrice,
+    double? ChangePct,
     double? EntryLow,
     double? EntryHigh,
     double? StopLoss,
