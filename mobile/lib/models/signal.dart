@@ -1,12 +1,17 @@
 class Signal {
-  final String id;
+  final int id;
   final String ticker;
   final String stockName;
   final String signalType;
   final double scoreTotal;
-  final double? entryPrice;
-  final double? stopPrice;
-  final double? targetPrice;
+  final double? currentPrice;
+  final double? entryLow;
+  final double? entryHigh;
+  final double? stopLoss;
+  final double? targetLow;
+  final double? targetHigh;
+  final String? riskLevel;
+  final int? horizonDays;
   final SignalBreakdown? breakdown;
   final DateTime createdAt;
 
@@ -16,38 +21,63 @@ class Signal {
     required this.stockName,
     required this.signalType,
     required this.scoreTotal,
-    this.entryPrice,
-    this.stopPrice,
-    this.targetPrice,
+    this.currentPrice,
+    this.entryLow,
+    this.entryHigh,
+    this.stopLoss,
+    this.targetLow,
+    this.targetHigh,
+    this.riskLevel,
+    this.horizonDays,
     this.breakdown,
     required this.createdAt,
   });
 
   factory Signal.fromJson(Map<String, dynamic> json) => Signal(
-        id: json['id'],
-        ticker: json['ticker'],
-        stockName: json['stockName'],
-        signalType: json['signalType'],
-        scoreTotal: (json['scoreTotal'] as num).toDouble(),
-        entryPrice: json['entryPrice']?.toDouble(),
-        stopPrice: json['stopPrice']?.toDouble(),
-        targetPrice: json['targetPrice']?.toDouble(),
+        id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+        ticker: json['ticker'] ?? '',
+        stockName: json['stockName'] ?? '',
+        signalType: json['signalType'] ?? 'WATCH',
+        scoreTotal: (json['scoreTotal'] as num?)?.toDouble() ?? 0,
+        currentPrice: (json['currentPrice'] as num?)?.toDouble(),
+        entryLow: (json['entryLow'] as num?)?.toDouble(),
+        entryHigh: (json['entryHigh'] as num?)?.toDouble(),
+        stopLoss: (json['stopLoss'] as num?)?.toDouble(),
+        targetLow: (json['targetLow'] as num?)?.toDouble(),
+        targetHigh: (json['targetHigh'] as num?)?.toDouble(),
+        riskLevel: json['riskLevel'] as String?,
+        horizonDays: json['horizonDays'] as int?,
         breakdown: json['breakdown'] != null
             ? SignalBreakdown.fromJson(json['breakdown'])
             : null,
-        createdAt: DateTime.parse(json['createdAt']),
+        createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       );
 
   String get signalTypeDisplay => switch (signalType) {
-        'BuyToday' => 'BUY TODAY',
-        'Watch' => 'WATCH',
-        'Avoid' => 'AVOID',
-        'TakeProfit' => 'TAKE PROFIT',
-        'HighRisk' => 'HIGH RISK',
-        _ => signalType,
+        'BUY_TODAY' => 'BUY TODAY',
+        'WATCH' => 'WATCH',
+        'AVOID' => 'AVOID',
+        'HIGH_RISK' => 'HIGH RISK',
+        _ => signalType.replaceAll('_', ' '),
       };
 
-  bool get isBuy => signalType == 'BuyToday';
+  bool get isBuy => signalType == 'BUY_TODAY';
+
+  String? get entryRange {
+    if (entryLow == null || entryHigh == null) return null;
+    return '\$${entryLow!.toStringAsFixed(0)}–\$${entryHigh!.toStringAsFixed(0)}';
+  }
+
+  String? get targetRange {
+    if (targetLow == null || targetHigh == null) return null;
+    return '\$${targetLow!.toStringAsFixed(0)}–\$${targetHigh!.toStringAsFixed(0)}';
+  }
+
+  String? get stopDisplay =>
+      stopLoss != null ? '\$${stopLoss!.toStringAsFixed(0)}' : null;
+
+  String? get priceDisplay =>
+      currentPrice != null ? '\$${currentPrice!.toStringAsFixed(2)}' : null;
 }
 
 class SignalBreakdown {
@@ -58,6 +88,8 @@ class SignalBreakdown {
   final double sentiment;
   final double trend;
   final double risk;
+  final String? explanationJson;
+  final String? whyNowSummary;
 
   SignalBreakdown({
     required this.momentum,
@@ -67,16 +99,20 @@ class SignalBreakdown {
     required this.sentiment,
     required this.trend,
     required this.risk,
+    this.explanationJson,
+    this.whyNowSummary,
   });
 
   factory SignalBreakdown.fromJson(Map<String, dynamic> json) =>
       SignalBreakdown(
-        momentum: (json['momentumScore'] as num).toDouble(),
-        volume: (json['volumeScore'] as num).toDouble(),
-        catalyst: (json['catalystScore'] as num).toDouble(),
-        fundamental: (json['fundamentalScore'] as num).toDouble(),
-        sentiment: (json['sentimentScore'] as num).toDouble(),
-        trend: (json['trendScore'] as num).toDouble(),
-        risk: (json['riskScore'] as num).toDouble(),
+        momentum: (json['momentumScore'] as num?)?.toDouble() ?? 50,
+        volume: (json['relVolumeScore'] as num?)?.toDouble() ?? 50,
+        catalyst: (json['newsScore'] as num?)?.toDouble() ?? 50,
+        fundamental: (json['fundamentalsScore'] as num?)?.toDouble() ?? 50,
+        sentiment: (json['sentimentScore'] as num?)?.toDouble() ?? 50,
+        trend: (json['trendScore'] as num?)?.toDouble() ?? 50,
+        risk: (json['riskScore'] as num?)?.toDouble() ?? 50,
+        explanationJson: json['explanationJson'] as String?,
+        whyNowSummary: json['whyNowSummary'] as String?,
       );
 }

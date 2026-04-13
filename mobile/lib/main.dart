@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/supabase_config.dart';
 import 'core/theme/app_theme.dart';
+import 'core/network/api_client.dart';
+import 'core/network/api_service.dart';
 import 'models/signal.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
@@ -53,7 +55,6 @@ class _AuthGateState extends State<AuthGate> {
   bool _demoMode = false;
 
   Future<void> _handleLogin(String email, String password) async {
-    // Demo mode: skip Supabase auth for preview
     if (email == 'demo' || SupabaseConfig.supabaseAnonKey.contains('YOUR_')) {
       setState(() => _demoMode = true);
       return;
@@ -97,7 +98,6 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    // Demo mode — skip auth entirely
     if (_demoMode) {
       return MainShell(
         onLogout: () => setState(() => _demoMode = false),
@@ -133,46 +133,6 @@ class _AuthGateState extends State<AuthGate> {
   }
 }
 
-// Mock data for development
-final _mockSignals = [
-  Signal(
-    id: '1', ticker: 'NVDA', stockName: 'NVIDIA Corp', signalType: 'BuyToday',
-    scoreTotal: 92, entryPrice: 892, stopPrice: 865, targetPrice: 945,
-    createdAt: DateTime.now(),
-    breakdown: SignalBreakdown(momentum: 95, volume: 88, catalyst: 92, fundamental: 85, sentiment: 78, trend: 90, risk: 72),
-  ),
-  Signal(
-    id: '2', ticker: 'AAPL', stockName: 'Apple Inc', signalType: 'BuyToday',
-    scoreTotal: 87, entryPrice: 198, stopPrice: 190, targetPrice: 215,
-    createdAt: DateTime.now(),
-    breakdown: SignalBreakdown(momentum: 88, volume: 80, catalyst: 75, fundamental: 90, sentiment: 82, trend: 85, risk: 78),
-  ),
-  Signal(
-    id: '3', ticker: 'MSFT', stockName: 'Microsoft Corp', signalType: 'Watch',
-    scoreTotal: 84, entryPrice: 425, stopPrice: 410, targetPrice: 450,
-    createdAt: DateTime.now(),
-    breakdown: SignalBreakdown(momentum: 82, volume: 75, catalyst: 80, fundamental: 92, sentiment: 76, trend: 88, risk: 80),
-  ),
-  Signal(
-    id: '4', ticker: 'TSLA', stockName: 'Tesla Inc', signalType: 'Watch',
-    scoreTotal: 78, entryPrice: 175, stopPrice: 165, targetPrice: 195,
-    createdAt: DateTime.now(),
-    breakdown: SignalBreakdown(momentum: 80, volume: 85, catalyst: 70, fundamental: 65, sentiment: 72, trend: 78, risk: 60),
-  ),
-  Signal(
-    id: '5', ticker: 'META', stockName: 'Meta Platforms', signalType: 'Watch',
-    scoreTotal: 71, entryPrice: 510, stopPrice: 490, targetPrice: 540,
-    createdAt: DateTime.now(),
-    breakdown: SignalBreakdown(momentum: 72, volume: 68, catalyst: 65, fundamental: 78, sentiment: 70, trend: 74, risk: 75),
-  ),
-  Signal(
-    id: '6', ticker: 'AMZN', stockName: 'Amazon.com', signalType: 'Watch',
-    scoreTotal: 81, entryPrice: 186, stopPrice: 178, targetPrice: 200,
-    createdAt: DateTime.now(),
-    breakdown: SignalBreakdown(momentum: 78, volume: 82, catalyst: 76, fundamental: 86, sentiment: 74, trend: 80, risk: 82),
-  ),
-];
-
 class MainShell extends StatefulWidget {
   final VoidCallback onLogout;
   final User? user;
@@ -184,6 +144,49 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  late final ApiService _api;
+
+  // Loaded from API
+  List<Signal> _topSignals = [];
+  List<Signal> _watchlistSignals = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _api = ApiService(ApiClient());
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final picks = await _api.getTopPicks(limit: 20);
+      // Try to load watchlist signals (may fail if not authenticated)
+      List<Signal> wlSignals = [];
+      try {
+        final watchlists = await _api.getWatchlists();
+        if (watchlists.isNotEmpty) {
+          final items = watchlists[0]['items'] as List? ?? [];
+          final tickers = items.map((i) => i['ticker'] as String).toSet();
+          wlSignals = picks.where((s) => tickers.contains(s.ticker)).toList();
+        }
+      } catch (_) {
+        // Not authenticated — use top 3 as placeholder
+        wlSignals = picks.take(3).toList();
+      }
+
+      if (mounted) {
+        setState(() {
+          _topSignals = picks;
+          _watchlistSignals = wlSignals;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load data: $e');
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   void _navigateToStock(Signal signal) {
     Navigator.of(context).push(
@@ -198,11 +201,17 @@ class _MainShellState extends State<MainShell> {
     final userEmail = widget.user?.email;
     final userName = widget.user?.userMetadata?['full_name'] as String?;
 
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final screens = [
-      HomeScreen(topSignals: _mockSignals, onSignalTap: _navigateToStock),
-      PicksScreen(signals: _mockSignals, onSignalTap: _navigateToStock),
+      HomeScreen(topSignals: _topSignals, onSignalTap: _navigateToStock),
+      PicksScreen(signals: _topSignals, onSignalTap: _navigateToStock),
       WatchlistScreen(
-          watchlistSignals: _mockSignals.take(3).toList(),
+          watchlistSignals: _watchlistSignals,
           onSignalTap: _navigateToStock),
       SettingsScreen(
         userEmail: userEmail,
