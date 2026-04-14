@@ -48,6 +48,7 @@ builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.RiskAnalytics>();
 builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.PortfolioImporter>();
 builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.ClaudeFinancialAdvisor>();
 builder.Services.AddScoped<Fintrest.Api.Services.AthenaService>();
+builder.Services.AddSingleton<Fintrest.Api.Services.Email.EmailService>();
 
 // Background Jobs
 builder.Services.AddHostedService<Fintrest.Api.Services.Pipeline.DailyCronJob>();
