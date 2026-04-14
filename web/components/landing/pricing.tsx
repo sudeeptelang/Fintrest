@@ -1,11 +1,50 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PLANS } from "@/lib/constants";
+import { api } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 
 export function Pricing() {
+  const router = useRouter();
+  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handlePlanClick(planName: string) {
+    setError(null);
+
+    if (planName === "Free") {
+      router.push("/auth/signup");
+      return;
+    }
+
+    // Check auth state — unauthenticated users go to signup with plan in query
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.push(`/auth/signup?plan=${planName.toLowerCase()}`);
+      return;
+    }
+
+    setPendingPlan(planName);
+    try {
+      const { url } = await api.createCheckout(planName.toLowerCase());
+      if (url) {
+        window.location.href = url;
+      } else {
+        setError("Checkout unavailable. Stripe may not be configured yet.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Checkout failed");
+    } finally {
+      setPendingPlan(null);
+    }
+  }
+
   return (
     <section id="pricing" className="relative py-24 sm:py-32 bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -81,6 +120,8 @@ export function Pricing() {
               </ul>
 
               <Button
+                onClick={() => handlePlanClick(plan.name)}
+                disabled={pendingPlan !== null}
                 className={`w-full ${
                   plan.popular
                     ? "bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20"
@@ -88,11 +129,19 @@ export function Pricing() {
                 }`}
                 variant={plan.popular ? "default" : "outline"}
               >
+                {pendingPlan === plan.name && (
+                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                )}
                 {plan.cta}
               </Button>
             </motion.div>
           ))}
         </div>
+        {error && (
+          <div className="mt-6 mx-auto max-w-md rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-500 text-center">
+            {error}
+          </div>
+        )}
       </div>
     </section>
   );

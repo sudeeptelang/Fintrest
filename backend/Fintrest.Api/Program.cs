@@ -50,6 +50,7 @@ builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.PortfolioImporter>();
 builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.ClaudeFinancialAdvisor>();
 builder.Services.AddScoped<Fintrest.Api.Services.AthenaService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Email.EmailService>();
+builder.Services.AddSingleton<Fintrest.Api.Services.Billing.StripeService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Email.AlertDispatcher>();
 builder.Services.AddHostedService<Fintrest.Api.Services.Email.MorningBriefingJob>();
 

@@ -352,6 +352,13 @@ export const api = {
 
   // Subscription (authenticated)
   subscription: () => authFetchApi<SubscriptionResponse>("/subscription"),
+  createCheckout: (plan: string) =>
+    authFetchApi<{ url: string; sessionId: string }>("/subscription/checkout", {
+      method: "POST",
+      body: JSON.stringify({ plan }),
+    }),
+  openBillingPortal: () =>
+    authFetchApi<{ url: string }>("/subscription/portal", { method: "POST" }),
 
   // Watchlists (authenticated)
   watchlists: () => authFetchApi<WatchlistResponse[]>("/watchlists"),
