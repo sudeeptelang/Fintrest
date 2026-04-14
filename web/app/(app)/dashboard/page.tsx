@@ -113,36 +113,45 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Index ticker tape — horizontal scroll */}
+      {/* Index ticker — key global markets only (full 20 on /markets page) */}
       {indices && indices.length > 0 && (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="flex items-center overflow-x-auto no-scrollbar">
-            {indices.map((idx, i) => {
-              const positive = (idx.changePct ?? 0) >= 0;
-              return (
-                <div
-                  key={idx.ticker}
-                  className={`flex items-center gap-2.5 px-4 py-3 whitespace-nowrap shrink-0 ${
-                    i < indices.length - 1 ? "border-r border-border" : ""
-                  }`}
-                >
-                  <span className="font-[var(--font-mono)] text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {idx.label}
-                  </span>
-                  <span className="font-[var(--font-mono)] text-sm font-bold">
-                    {idx.price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
-                  </span>
-                  <span
-                    className={`font-[var(--font-mono)] text-xs font-semibold flex items-center gap-0.5 ${
-                      positive ? "text-emerald-500" : "text-red-500"
-                    }`}
+          <div className="grid grid-cols-4 md:grid-cols-8">
+            {indices
+              // Pick 8 diverse key indices across categories
+              .filter((idx) => ["SPY","QQQ","DIA","IWM","GLD","TLT","IBIT","VWO"].includes(idx.ticker))
+              .map((idx, i, arr) => {
+                const positive = (idx.changePct ?? 0) >= 0;
+                return (
+                  <div
+                    key={idx.ticker}
+                    className={`flex flex-col gap-0.5 px-3 py-2.5 ${
+                      i < arr.length - 1 ? "md:border-r border-border" : ""
+                    } ${i < 4 ? "border-b md:border-b-0 border-border" : ""}`}
                   >
-                    {positive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-                    {idx.changePct === null ? "—" : `${positive ? "+" : ""}${idx.changePct.toFixed(2)}%`}
-                  </span>
-                </div>
-              );
-            })}
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground truncate">
+                      {idx.label}
+                    </span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-[var(--font-mono)] text-xs font-bold">
+                        {idx.price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
+                      </span>
+                      <span
+                        className={`font-[var(--font-mono)] text-[10px] font-semibold ${
+                          positive ? "text-emerald-500" : "text-red-500"
+                        }`}
+                      >
+                        {idx.changePct === null ? "—" : `${positive ? "+" : ""}${idx.changePct.toFixed(2)}%`}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+          <div className="border-t border-border px-3 py-1.5 text-right">
+            <Link href="/markets" className="text-[10px] text-primary hover:underline">
+              View all markets →
+            </Link>
           </div>
         </div>
       )}
