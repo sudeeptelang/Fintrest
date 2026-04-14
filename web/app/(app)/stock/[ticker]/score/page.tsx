@@ -219,7 +219,7 @@ export default function ScoreBreakdownPage({ params }: PageProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="rounded-2xl border border-primary/20 bg-gradient-to-br from-[#0a1f17] to-[#14352a] p-6 text-white/90"
+              className="rounded-2xl border border-primary/20 bg-gradient-to-br from-[#1E1B4B] to-[#2D2A6B] p-6 text-white/90"
             >
               <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-3 flex items-center gap-2">
                 <Brain className="h-4.5 w-4.5 text-primary" /> Athena's Rationale

@@ -130,7 +130,7 @@ class _AthenaScreenState extends State<AthenaScreen> {
               height: 30,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF0a1f17), Color(0xFF14352a)],
+                  colors: [Color(0xFF1E1B4B), Color(0xFF2D2A6B)],
                 ),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.emerald.withValues(alpha: 0.4)),
@@ -325,7 +325,7 @@ class _MessageBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12, right: 40),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF0a1f17), Color(0xFF14352a)],
+            colors: [Color(0xFF1E1B4B), Color(0xFF2D2A6B)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -381,7 +381,7 @@ class _TypingIndicator extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF0a1f17), Color(0xFF14352a)],
+            colors: [Color(0xFF1E1B4B), Color(0xFF2D2A6B)],
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.emerald.withValues(alpha: 0.2)),

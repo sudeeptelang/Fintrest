@@ -108,7 +108,7 @@ export default function RebalancePage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl border border-primary/20 bg-gradient-to-br from-[#0a1f17] to-[#14352a] p-6 text-white"
+                className="rounded-2xl border border-primary/20 bg-gradient-to-br from-[#1E1B4B] to-[#2D2A6B] p-6 text-white"
               >
                 <div className="flex items-center justify-between">
                   <div>

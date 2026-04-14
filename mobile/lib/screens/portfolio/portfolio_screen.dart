@@ -151,7 +151,7 @@ class _SummaryBanner extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0a1f17), Color(0xFF14352a)],
+          colors: [Color(0xFF1E1B4B), Color(0xFF2D2A6B)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
