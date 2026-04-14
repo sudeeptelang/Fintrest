@@ -4,7 +4,6 @@ using CsvHelper.Configuration;
 using Fintrest.Api.Data;
 using Fintrest.Api.Models;
 using Fintrest.Api.Services.Ingestion;
-using Fintrest.Api.Services.Providers.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fintrest.Api.Services.Portfolio;
@@ -20,7 +19,6 @@ namespace Fintrest.Api.Services.Portfolio;
 /// </summary>
 public class PortfolioImporter(
     AppDbContext db,
-    IMarketDataProvider marketProvider,
     DataIngestionService ingestion,
     ILogger<PortfolioImporter> logger)
 {
