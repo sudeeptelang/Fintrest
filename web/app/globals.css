@@ -179,6 +179,15 @@ html {
   opacity: 1;
 }
 
+/* Hide scrollbar utility (for ticker tapes) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Grid pattern background */
 .bg-grid {
   background-image:

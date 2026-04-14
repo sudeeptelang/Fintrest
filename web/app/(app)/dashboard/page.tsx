@@ -113,35 +113,37 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Index strip */}
+      {/* Index ticker tape — horizontal scroll */}
       {indices && indices.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {indices.map((idx) => {
-            const positive = (idx.changePct ?? 0) >= 0;
-            return (
-              <div
-                key={idx.ticker}
-                className="rounded-xl border border-border bg-card px-4 py-3 flex items-center justify-between"
-              >
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    {idx.label}
-                  </p>
-                  <p className="font-[var(--font-mono)] font-bold mt-0.5">
-                    {idx.price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
-                  </p>
-                </div>
-                <span
-                  className={`font-[var(--font-mono)] text-sm font-semibold flex items-center gap-0.5 ${
-                    positive ? "text-emerald-500" : "text-red-500"
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="flex items-center overflow-x-auto no-scrollbar">
+            {indices.map((idx, i) => {
+              const positive = (idx.changePct ?? 0) >= 0;
+              return (
+                <div
+                  key={idx.ticker}
+                  className={`flex items-center gap-2.5 px-4 py-3 whitespace-nowrap shrink-0 ${
+                    i < indices.length - 1 ? "border-r border-border" : ""
                   }`}
                 >
-                  {positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                  {idx.changePct === null ? "—" : `${positive ? "+" : ""}${idx.changePct.toFixed(2)}%`}
-                </span>
-              </div>
-            );
-          })}
+                  <span className="font-[var(--font-mono)] text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {idx.label}
+                  </span>
+                  <span className="font-[var(--font-mono)] text-sm font-bold">
+                    {idx.price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
+                  </span>
+                  <span
+                    className={`font-[var(--font-mono)] text-xs font-semibold flex items-center gap-0.5 ${
+                      positive ? "text-emerald-500" : "text-red-500"
+                    }`}
+                  >
+                    {positive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+                    {idx.changePct === null ? "—" : `${positive ? "+" : ""}${idx.changePct.toFixed(2)}%`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
