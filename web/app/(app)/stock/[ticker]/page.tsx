@@ -28,6 +28,7 @@ import { StockLogo } from "@/components/stock/stock-logo";
 import { AnalystConsensusWidget } from "@/components/stock/analyst-consensus";
 import { TechnicalAnalysis } from "@/components/stock/technical-analysis";
 import { EarningsHistory } from "@/components/stock/earnings-history";
+import { ValuationSection } from "@/components/stock/valuation-section";
 import { EarningsChart } from "@/components/charts/earnings-chart";
 import { PerformanceChart } from "@/components/charts/performance-chart";
 import { FactorBarChart } from "@/components/charts/factor-bar-chart";
@@ -382,6 +383,16 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           </h2>
           <FactorGauges breakdown={breakdown} />
         </motion.div>
+      )}
+
+      {/* Valuation Section — Alva-style SOTP/comparables analysis */}
+      {snapshot && latestSignal && (
+        <ValuationSection
+          ticker={ticker}
+          signal={latestSignal}
+          snapshot={snapshot}
+          earnings={earningsData}
+        />
       )}
 
       {/* Performance + Factor Score Charts */}
