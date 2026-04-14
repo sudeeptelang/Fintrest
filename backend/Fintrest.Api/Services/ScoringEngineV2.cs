@@ -74,8 +74,19 @@ public static class ScoringEngineV2
         var roc20 = ROC(closes, 20);
         var roc60 = ROC(closes, 60);
 
-        // Short-term momentum
-        sub.Add(roc5 switch { > 5 => 90, > 2 => 75, > 0 => 60, > -2 => 45, > -5 => 30, _ => 15 });
+        // Short-term momentum — but penalize parabolic moves (exhaustion/climax tops)
+        sub.Add(roc5 switch
+        {
+            > 25 => 35, // Parabolic — exhaustion risk, likely to reverse
+            > 15 => 55, // Very hot — take caution
+            > 8 => 85,  // Strong but sustainable
+            > 5 => 80,
+            > 2 => 70,
+            > 0 => 58,
+            > -2 => 45,
+            > -5 => 30,
+            _ => 15
+        });
         // Medium-term momentum
         sub.Add(roc20 switch { > 10 => 90, > 5 => 75, > 0 => 60, > -5 => 40, _ => 20 });
         // Long-term momentum (if enough data)
@@ -137,10 +148,12 @@ public static class ScoringEngineV2
                 // Mid-to-upper range is bullish; near bottom is risky; near top is overbought
                 sub.Add(rangePct switch
                 {
-                    > 90 => 45, // Near 52W high — less upside
-                    > 70 => 75, // Upper range — strong
-                    > 40 => 65, // Mid range — neutral
-                    > 20 => 55, // Lower range — could be value or trouble
+                    > 98 => 20, // At 52W high — exhaustion, reversion likely
+                    > 92 => 35, // Very near high — low upside
+                    > 80 => 70, // Upper range — strong
+                    > 60 => 68,
+                    > 40 => 60, // Mid range — neutral
+                    > 20 => 50, // Lower range — could be value or trouble
                     _ => 40,    // Near 52W low — risky
                 });
             }
