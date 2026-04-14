@@ -122,6 +122,40 @@ export interface SectorPerformance {
   signalCount: number;
 }
 
+export interface ScreenerRow {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  price: number | null;
+  changePct: number | null;
+  volume: number | null;
+  relVolume: number | null;
+  marketCap: number | null;
+  peRatio: number | null;
+  forwardPe: number | null;
+  pegRatio: number | null;
+  priceToBook: number | null;
+  beta: number | null;
+  returnOnEquity: number | null;
+  operatingMargin: number | null;
+  revenueGrowth: number | null;
+  epsGrowth: number | null;
+  dividendYield: number | null;
+  perfWeek: number | null;
+  perfMonth: number | null;
+  perfQuarter: number | null;
+  perfYtd: number | null;
+  perfYear: number | null;
+  week52High: number | null;
+  week52Low: number | null;
+  week52RangePct: number | null;
+  rsi: number | null;
+  analystTargetPrice: number | null;
+  nextEarningsDate: string | null;
+  signalScore: number | null;
+  signalType: string | null;
+}
+
 export interface TrendingStock {
   ticker: string;
   name: string;
@@ -290,6 +324,7 @@ export const api = {
   marketMostActive: (limit = 10) => fetchApi<TrendingStock[]>(`/market/most-active?limit=${limit}`),
   marketEarningsCalendar: (days = 14) => fetchApi<EarningsCalendarItem[]>(`/market/earnings-calendar?days=${days}`),
   marketNews: (limit = 10) => fetchApi<NewsItem[]>(`/market/news?limit=${limit}`),
+  marketScreener: (limit = 50) => fetchApi<ScreenerRow[]>(`/market/screener?limit=${limit}`),
   topPicks: (limit = 12) => fetchApi<SignalListResponse>(`/picks/top-today?limit=${limit}`),
   swingWeek: () => fetchApi<SignalListResponse>("/picks/swing-week"),
 

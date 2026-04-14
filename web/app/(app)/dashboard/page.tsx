@@ -26,6 +26,7 @@ import {
 import { SignalRow } from "@/components/signals/signal-row";
 import type { TrendingStock, EarningsCalendarItem, Signal, NewsItem } from "@/lib/api";
 import { StockLogo } from "@/components/stock/stock-logo";
+import { ScreenerTable } from "@/components/dashboard/screener-table";
 
 export default function DashboardPage() {
   const { data: summary } = useMarketSummary();
@@ -202,6 +203,9 @@ export default function DashboardPage() {
           </motion.div>
         </Link>
       )}
+
+      {/* Main Screener Table — tabbed data-dense view */}
+      <ScreenerTable />
 
       {/* Three-column: Athena Signals + Trending + Most Active */}
       <div className="grid lg:grid-cols-3 gap-5">

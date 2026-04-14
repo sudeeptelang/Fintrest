@@ -31,6 +31,10 @@ export function useMarketNews(limit = 10) {
   return useQuery({ queryKey: ["market-news", limit], queryFn: () => api.marketNews(limit) });
 }
 
+export function useMarketScreener(limit = 50) {
+  return useQuery({ queryKey: ["market-screener", limit], queryFn: () => api.marketScreener(limit) });
+}
+
 export function useTopPicks(limit = 12) {
   return useQuery({ queryKey: ["top-picks", limit], queryFn: () => api.topPicks(limit) });
 }

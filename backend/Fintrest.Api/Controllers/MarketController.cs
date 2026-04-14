@@ -179,6 +179,123 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         return Ok(news);
     }
 
+    /// <summary>Dashboard screener table — batch of stocks with full snapshot + signal data.</summary>
+    [HttpGet("market/screener")]
+    public async Task<ActionResult<List<ScreenerRowResponse>>> Screener([FromQuery] int limit = 50)
+    {
+        // Get latest scan's signals (for score + signal type)
+        var latestScan = await db.ScanRuns.Where(s => s.Status == "COMPLETED")
+            .OrderByDescending(s => s.CompletedAt).FirstOrDefaultAsync();
+
+        var signalsByStock = latestScan is not null
+            ? await db.Signals
+                .Where(s => s.ScanRunId == latestScan.Id)
+                .OrderByDescending(s => s.ScoreTotal)
+                .Take(limit)
+                .ToDictionaryAsync(s => s.StockId, s => new { s.ScoreTotal, s.SignalType })
+            : new();
+
+        if (signalsByStock.Count == 0) return Ok(new List<ScreenerRowResponse>());
+
+        var stockIds = signalsByStock.Keys.ToList();
+
+        // Load stocks (has TTM metrics: Beta, Forward P/E, PEG, ROE, ROA, analyst target, next earnings)
+        var stocks = await db.Stocks
+            .Where(s => stockIds.Contains(s.Id))
+            .ToListAsync();
+
+        // Load latest fundamental per stock (has EPS growth, revenue growth, gross/net margin)
+        var funds = await db.Fundamentals
+            .Where(f => stockIds.Contains(f.StockId))
+            .GroupBy(f => f.StockId)
+            .Select(g => g.OrderByDescending(x => x.ReportDate).First())
+            .ToListAsync();
+        var fundByStock = funds.ToDictionary(f => f.StockId);
+
+        // Load bars for each stock (last year for performance calcs)
+        var cutoff = DateTime.UtcNow.AddDays(-400);
+        var allBars = await db.MarketData
+            .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
+            .Select(m => new { m.StockId, m.Ts, m.Close, m.High, m.Low, m.Volume })
+            .ToListAsync();
+        var barsByStock = allBars
+            .GroupBy(m => m.StockId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(m => m.Ts).ToList());
+
+        var rows = new List<ScreenerRowResponse>();
+
+        foreach (var stock in stocks)
+        {
+            if (!barsByStock.TryGetValue(stock.Id, out var bars) || bars.Count == 0) continue;
+
+            var latest = bars[0];
+            var prev = bars.Count > 1 ? bars[1] : null;
+
+            double? price = latest.Close;
+            double? changePct = prev is not null && prev.Close > 0
+                ? Math.Round((latest.Close - prev.Close) / prev.Close * 100, 2)
+                : null;
+
+            double? avgVol30 = bars.Count >= 30
+                ? bars.Take(30).Average(b => (double)b.Volume)
+                : null;
+            double? relVol = avgVol30 is > 0 ? Math.Round(latest.Volume / avgVol30.Value, 2) : null;
+
+            double? PerfN(int n) => bars.Count > n && bars[n].Close > 0
+                ? Math.Round((latest.Close - bars[n].Close) / bars[n].Close * 100, 2) : null;
+
+            var w52High = bars.Max(b => b.High);
+            var w52Low = bars.Min(b => b.Low);
+            double? w52RangePct = w52High > w52Low
+                ? Math.Round((latest.Close - w52Low) / (w52High - w52Low) * 100, 1) : null;
+
+            double? perfYtd = null;
+            var ytdAnchor = bars.LastOrDefault(b => b.Ts.Year == latest.Ts.Year);
+            if (ytdAnchor is not null && ytdAnchor.Close > 0 && ytdAnchor != latest)
+                perfYtd = Math.Round((latest.Close - ytdAnchor.Close) / ytdAnchor.Close * 100, 2);
+
+            fundByStock.TryGetValue(stock.Id, out var fund);
+            signalsByStock.TryGetValue(stock.Id, out var signal);
+
+            rows.Add(new ScreenerRowResponse(
+                Ticker: stock.Ticker,
+                Name: stock.Name,
+                Sector: stock.Sector,
+                Price: price,
+                ChangePct: changePct,
+                Volume: latest.Volume,
+                RelVolume: relVol,
+                MarketCap: stock.MarketCap,
+                PeRatio: fund?.PeRatio,
+                ForwardPe: stock.ForwardPe,
+                PegRatio: stock.PegRatio,
+                PriceToBook: stock.PriceToBook,
+                Beta: stock.Beta,
+                ReturnOnEquity: stock.ReturnOnEquity,
+                OperatingMargin: stock.OperatingMargin,
+                RevenueGrowth: fund?.RevenueGrowth,
+                EpsGrowth: fund?.EpsGrowth,
+                DividendYield: null, // TODO: add dividend field
+                PerfWeek: PerfN(5),
+                PerfMonth: PerfN(22),
+                PerfQuarter: PerfN(66),
+                PerfYtd: perfYtd,
+                PerfYear: PerfN(252),
+                Week52High: Math.Round(w52High, 2),
+                Week52Low: Math.Round(w52Low, 2),
+                Week52RangePct: w52RangePct,
+                Rsi: null, // RSI not stored per bar, computed at scan time
+                AnalystTargetPrice: stock.AnalystTargetPrice,
+                NextEarningsDate: stock.NextEarningsDate,
+                SignalScore: signal?.ScoreTotal,
+                SignalType: signal?.SignalType.ToString()
+            ));
+        }
+
+        // Return in signal-score order (top picks first)
+        return Ok(rows.OrderByDescending(r => r.SignalScore ?? 0).ToList());
+    }
+
     [HttpGet("market/sectors")]
     public async Task<ActionResult<List<SectorPerformanceResponse>>> SectorPerformance()
     {

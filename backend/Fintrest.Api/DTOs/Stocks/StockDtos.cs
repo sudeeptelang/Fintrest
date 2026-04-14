@@ -61,6 +61,47 @@ public record EarningsHistoryItem(
     double? OperatingMargin
 );
 
+/// <summary>Combined row for the screener/dashboard table: snapshot + signal data.</summary>
+public record ScreenerRowResponse(
+    string Ticker,
+    string Name,
+    string? Sector,
+    // Quote
+    double? Price,
+    double? ChangePct,
+    long? Volume,
+    double? RelVolume,
+    double? MarketCap,
+    // Valuation
+    double? PeRatio,
+    double? ForwardPe,
+    double? PegRatio,
+    double? PriceToBook,
+    double? Beta,
+    // Fundamentals
+    double? ReturnOnEquity,
+    double? OperatingMargin,
+    double? RevenueGrowth,
+    double? EpsGrowth,
+    double? DividendYield,
+    // Performance
+    double? PerfWeek,
+    double? PerfMonth,
+    double? PerfQuarter,
+    double? PerfYtd,
+    double? PerfYear,
+    double? Week52High,
+    double? Week52Low,
+    double? Week52RangePct,
+    // Technical
+    double? Rsi,
+    double? AnalystTargetPrice,
+    DateTime? NextEarningsDate,
+    // Signal (from latest scan)
+    double? SignalScore,
+    string? SignalType
+);
+
 public record TrendingStockResponse(
     string Ticker,
     string Name,
