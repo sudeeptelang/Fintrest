@@ -430,7 +430,8 @@ function SensitivityTable({
   snapshot: StockSnapshot;
   currentPrice: number;
 }) {
-  const pe = snapshot.peRatio;
+  // Fall back to forward P/E if TTM P/E is null (negative earnings period)
+  const pe = snapshot.peRatio ?? snapshot.forwardPe;
   if (!pe || pe <= 0) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 flex items-center justify-center min-h-[280px]">

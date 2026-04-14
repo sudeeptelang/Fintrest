@@ -45,6 +45,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${dmSans.variable} ${dmMono.variable} ${sora.variable} h-full antialiased`}
       suppressHydrationWarning
     >
