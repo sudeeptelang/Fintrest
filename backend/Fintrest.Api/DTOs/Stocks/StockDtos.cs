@@ -131,6 +131,7 @@ public record SectorPerformanceResponse(
 public record MarketIndexResponse(
     string Ticker,
     string Label,
+    string Category,
     double? Price,
     double? PrevClose,
     double? ChangePct

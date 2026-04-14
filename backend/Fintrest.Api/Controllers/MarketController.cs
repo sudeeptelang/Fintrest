@@ -380,14 +380,48 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     [HttpGet("market/indices")]
     public async Task<ActionResult<List<MarketIndexResponse>>> Indices()
     {
-        // Index ETF proxies. Order matters — we use it for display order.
-        var tickers = new[] { "SPY", "QQQ", "DIA", "IWM" };
+        // ETF proxies for global markets. Order = display order.
+        // US indices → International → Commodities → Bonds → Crypto
+        var tickers = new[]
+        {
+            // US equity indices
+            "SPY", "QQQ", "DIA", "IWM",
+            // International equities
+            "EFA", "VWO", "FXI", "EWJ", "EWG", "EWU",
+            // Commodities
+            "GLD", "SLV", "USO", "UNG",
+            // Bonds
+            "TLT", "IEF", "SHY", "HYG",
+            // Crypto
+            "IBIT", "ETHA",
+        };
         var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
+            // US
             ["SPY"] = "S&P 500",
-            ["QQQ"] = "Nasdaq",
-            ["DIA"] = "Dow",
+            ["QQQ"] = "Nasdaq 100",
+            ["DIA"] = "Dow Jones",
             ["IWM"] = "Russell 2000",
+            // International
+            ["EFA"] = "EAFE (Developed)",
+            ["VWO"] = "Emerging Mkts",
+            ["FXI"] = "China 50",
+            ["EWJ"] = "Japan (Nikkei)",
+            ["EWG"] = "Germany (DAX)",
+            ["EWU"] = "UK (FTSE)",
+            // Commodities
+            ["GLD"] = "Gold",
+            ["SLV"] = "Silver",
+            ["USO"] = "Crude Oil",
+            ["UNG"] = "Natural Gas",
+            // Bonds
+            ["TLT"] = "20Y Treasury",
+            ["IEF"] = "10Y Treasury",
+            ["SHY"] = "1-3Y Treasury",
+            ["HYG"] = "High-Yield Bonds",
+            // Crypto
+            ["IBIT"] = "Bitcoin ETF",
+            ["ETHA"] = "Ethereum ETF",
         };
 
         var stocks = await db.Stocks
@@ -407,6 +441,17 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             .GroupBy(m => m.StockId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(m => m.Ts).First());
 
+        var categories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["SPY"] = "US", ["QQQ"] = "US", ["DIA"] = "US", ["IWM"] = "US",
+            ["EFA"] = "International", ["VWO"] = "International", ["FXI"] = "International",
+            ["EWJ"] = "International", ["EWG"] = "International", ["EWU"] = "International",
+            ["GLD"] = "Commodities", ["SLV"] = "Commodities",
+            ["USO"] = "Commodities", ["UNG"] = "Commodities",
+            ["TLT"] = "Bonds", ["IEF"] = "Bonds", ["SHY"] = "Bonds", ["HYG"] = "Bonds",
+            ["IBIT"] = "Crypto", ["ETHA"] = "Crypto",
+        };
+
         var result = stocks
             .Select(s =>
             {
@@ -417,6 +462,7 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 return new MarketIndexResponse(
                     Ticker: s.Ticker,
                     Label: labels.GetValueOrDefault(s.Ticker, s.Name),
+                    Category: categories.GetValueOrDefault(s.Ticker, "Other"),
                     Price: bar?.Close,
                     PrevClose: bar?.PrevClose,
                     ChangePct: changePct

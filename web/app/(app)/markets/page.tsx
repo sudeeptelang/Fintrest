@@ -11,7 +11,7 @@ import {
   useMarketIndices,
   useMarketScreener,
 } from "@/lib/hooks";
-import type { ScreenerRow } from "@/lib/api";
+import type { ScreenerRow, MarketIndex } from "@/lib/api";
 import { StockLogo } from "@/components/stock/stock-logo";
 
 type MoverTab = "gainers" | "losers" | "active" | "all";
@@ -113,54 +113,11 @@ export default function MarketsPage() {
         </span>
       </div>
 
-      {/* Market Pulse + Indices row */}
-      <div className="grid lg:grid-cols-3 gap-5">
+      {/* Market Pulse + Global Indices grid */}
+      <div className="grid lg:grid-cols-4 gap-5">
         <MarketPulse pulse={pulseData} />
-        <div className="lg:col-span-2 grid grid-cols-2 gap-3">
-          {indexList.map((idx, i) => {
-            const positive = (idx.changePct ?? 0) >= 0;
-            return (
-              <motion.div
-                key={idx.ticker}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="rounded-xl border border-border bg-card p-4"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                      {idx.label}
-                    </p>
-                    <p className="font-[var(--font-mono)] text-xl font-bold mt-1">
-                      {idx.price !== null
-                        ? idx.price.toLocaleString("en-US", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })
-                        : "—"}
-                    </p>
-                  </div>
-                  <span
-                    className={`font-[var(--font-mono)] text-sm font-bold flex items-center gap-0.5 px-2 py-1 rounded-md ${
-                      positive
-                        ? "bg-emerald-500/10 text-emerald-500"
-                        : "bg-red-500/10 text-red-500"
-                    }`}
-                  >
-                    {positive ? (
-                      <TrendingUp className="h-3 w-3" />
-                    ) : (
-                      <TrendingDown className="h-3 w-3" />
-                    )}
-                    {idx.changePct === null
-                      ? "—"
-                      : `${positive ? "+" : ""}${idx.changePct.toFixed(2)}%`}
-                  </span>
-                </div>
-              </motion.div>
-            );
-          })}
+        <div className="lg:col-span-3">
+          <GlobalIndicesGrid indices={indexList} />
         </div>
       </div>
 
@@ -311,6 +268,112 @@ export default function MarketsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// Global Indices Grid — grouped by category with tabs
+// ════════════════════════════════════════════════════════════════
+
+const CATEGORY_ORDER = ["US", "International", "Commodities", "Bonds", "Crypto"] as const;
+const CATEGORY_ICONS: Record<string, string> = {
+  US: "🇺🇸",
+  International: "🌍",
+  Commodities: "🛢️",
+  Bonds: "🏦",
+  Crypto: "₿",
+};
+
+function GlobalIndicesGrid({ indices }: { indices: MarketIndex[] }) {
+  const [activeCategory, setActiveCategory] = useState<string>("US");
+
+  const grouped = useMemo(() => {
+    const map: Record<string, MarketIndex[]> = {};
+    indices.forEach((idx) => {
+      const cat = idx.category || "Other";
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(idx);
+    });
+    return map;
+  }, [indices]);
+
+  const activeIndices = grouped[activeCategory] ?? [];
+  const categories = CATEGORY_ORDER.filter((c) => (grouped[c]?.length ?? 0) > 0);
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 h-full">
+      {/* Category tabs */}
+      <div className="flex gap-1 mb-3 overflow-x-auto">
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md font-medium whitespace-nowrap transition-colors ${
+              activeCategory === cat
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted/50"
+            }`}
+          >
+            <span>{CATEGORY_ICONS[cat]}</span>
+            <span>{cat}</span>
+            <span className="text-[10px] opacity-60">{grouped[cat]?.length ?? 0}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Indices for active category */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        {activeIndices.map((idx, i) => {
+          const positive = (idx.changePct ?? 0) >= 0;
+          return (
+            <motion.div
+              key={idx.ticker}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.03 }}
+              className="rounded-lg border border-border bg-background/50 p-3"
+            >
+              <div className="flex items-start justify-between">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate">
+                    {idx.label}
+                  </p>
+                  <p className="font-[var(--font-mono)] text-base font-bold mt-0.5">
+                    {idx.price !== null
+                      ? idx.price.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })
+                      : "—"}
+                  </p>
+                </div>
+                <span
+                  className={`font-[var(--font-mono)] text-[10px] font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded shrink-0 ${
+                    positive
+                      ? "bg-emerald-500/10 text-emerald-500"
+                      : "bg-red-500/10 text-red-500"
+                  }`}
+                >
+                  {positive ? (
+                    <TrendingUp className="h-2.5 w-2.5" />
+                  ) : (
+                    <TrendingDown className="h-2.5 w-2.5" />
+                  )}
+                  {idx.changePct === null
+                    ? "—"
+                    : `${positive ? "+" : ""}${idx.changePct.toFixed(2)}%`}
+                </span>
+              </div>
+            </motion.div>
+          );
+        })}
+        {activeIndices.length === 0 && (
+          <p className="col-span-full text-xs text-muted-foreground text-center py-6">
+            No data yet. Run /seed/ingest for these tickers.
+          </p>
+        )}
       </div>
     </div>
   );

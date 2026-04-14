@@ -178,6 +178,7 @@ export interface EarningsCalendarItem {
 export interface MarketIndex {
   ticker: string;
   label: string;
+  category: string;
   price: number | null;
   prevClose: number | null;
   changePct: number | null;
