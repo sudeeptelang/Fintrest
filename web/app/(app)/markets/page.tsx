@@ -25,17 +25,9 @@ export default function MarketsPage() {
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [moverTab, setMoverTab] = useState<MoverTab>("gainers");
 
-  if (summaryLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   const indexList = indices ?? [];
   const sectorList = sectors ?? [];
-  const stocks = screener ?? [];
+  const stocks = useMemo(() => screener ?? [], [screener]);
 
   // ─── Market Pulse: compute breadth score from screener data
   const pulseData = useMemo(() => {
@@ -92,6 +84,15 @@ export default function MarketsPage() {
           .slice(0, 20);
     }
   }, [filteredStocks, moverTab]);
+
+  // Loading check AFTER all hooks (Rules of Hooks)
+  if (summaryLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
