@@ -9,7 +9,7 @@ namespace Fintrest.Api.Services.Providers.FMP;
 /// Financial Modeling Prep — fundamentals and earnings data.
 /// Docs: https://financialmodelingprep.com/developer/docs
 /// </summary>
-public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProvider> logger)
+public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProvider> logger, FmpRateLimiter rateLimiter)
     : IFundamentalsProvider
 {
     private readonly string _apiKey = config["Providers:FMP:ApiKey"] ?? "";
@@ -165,6 +165,8 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
 
     private async Task<T?> TryFetch<T>(string url, CancellationToken ct) where T : class
     {
+        // Throttle through the shared rate limiter (250/min leaves headroom under FMP Starter 300/min)
+        await rateLimiter.WaitAsync(ct);
         try
         {
             return await HttpRetry.WithBackoffAsync(

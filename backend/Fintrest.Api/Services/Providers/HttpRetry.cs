@@ -32,7 +32,13 @@ public static class HttpRetry
             }
             catch (Exception ex) when (attempt < maxAttempts && IsTransient(ex))
             {
-                var delayMs = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                // Rate limit (429) needs LONG backoff — 1 min window typically.
+                // Other transient errors (5xx, timeouts) can retry quickly.
+                var isRateLimit = ex is HttpRequestException hre
+                    && hre.StatusCode == HttpStatusCode.TooManyRequests;
+                var delayMs = isRateLimit
+                    ? 15000 * attempt  // 15s, 30s, 45s for rate limits
+                    : baseDelayMs * (int)Math.Pow(2, attempt - 1); // 500ms, 1s, 2s
                 logger.LogDebug(
                     "{Op}: attempt {Attempt}/{Max} failed ({Reason}), retrying in {Delay}ms",
                     operationName, attempt, maxAttempts, ex.GetType().Name, delayMs);

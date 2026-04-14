@@ -32,6 +32,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 // Data Providers
+builder.Services.AddSingleton<Fintrest.Api.Services.Providers.FmpRateLimiter>();
 builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.IMarketDataProvider,
     Fintrest.Api.Services.Providers.Polygon.PolygonProvider>();
 builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.IFundamentalsProvider,
