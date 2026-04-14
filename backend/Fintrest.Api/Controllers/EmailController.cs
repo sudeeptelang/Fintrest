@@ -12,7 +12,7 @@ namespace Fintrest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/email")]
-public class EmailController(AppDbContext db, EmailService emailService) : ControllerBase
+public class EmailController(AppDbContext db, EmailService emailService, AlertDispatcher dispatcher) : ControllerBase
 {
     [HttpGet("status")]
     public IActionResult Status() => Ok(new
@@ -109,6 +109,32 @@ public class EmailController(AppDbContext db, EmailService emailService) : Contr
             messageId = result.MessageId,
             error = result.Error,
         });
+    }
+
+    /// <summary>Manually trigger signal-alert dispatch across all users.</summary>
+    [HttpPost("dispatch/alerts")]
+    public async Task<IActionResult> DispatchAlerts(CancellationToken ct)
+    {
+        var result = await dispatcher.DispatchAlertsAsync(ct);
+        return Ok(result);
+    }
+
+    /// <summary>Manually trigger morning briefing dispatch to all opted-in users.</summary>
+    [HttpPost("dispatch/morning")]
+    public async Task<IActionResult> DispatchMorning(CancellationToken ct)
+    {
+        var result = await dispatcher.DispatchMorningBriefingsAsync(ct);
+        return Ok(result);
+    }
+
+    /// <summary>Manually trigger weekly newsletter dispatch.</summary>
+    [HttpPost("dispatch/weekly")]
+    public async Task<IActionResult> DispatchWeekly([FromQuery] string? summary, CancellationToken ct)
+    {
+        var marketSummary = summary ?? "Markets closed the week mixed. Fintrest's V2 scoring " +
+            "engine surfaced strong signals across AI and growth names. Review the top picks below.";
+        var result = await dispatcher.DispatchWeeklyNewsletterAsync(marketSummary, ct);
+        return Ok(result);
     }
 
     private async Task<List<Signal>> LoadTopSignalsAsync(int limit)

@@ -26,6 +26,11 @@ public class User
     [MaxLength(255)]
     public string? FullName { get; set; }
 
+    // Email preferences
+    public bool ReceiveMorningBriefing { get; set; } = true;
+    public bool ReceiveSignalAlerts { get; set; } = true;
+    public bool ReceiveWeeklyNewsletter { get; set; } = true;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
