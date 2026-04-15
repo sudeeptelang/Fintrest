@@ -1,0 +1,11 @@
+# Keep the Docker build context small + keep dev-only files out of the image.
+bin/
+obj/
+.vs/
+*.user
+appsettings.Development.json
+appsettings.*.Local.json
+.git/
+.github/
+README.md
+Migrations/

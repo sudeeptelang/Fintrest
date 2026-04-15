@@ -1,0 +1,41 @@
+# Build + publish the API in one image. Multi-stage so the final image doesn't
+# carry the SDK (smaller, faster cold starts, cleaner attack surface).
+#
+# This Dockerfile is resolved from `backend/Fintrest.Api` as build context, which
+# is what Render's Root Directory setting points at. Make sure Render's build
+# setting is "Dockerfile" (not "Render Native") so Render picks this up.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1 — build + publish
+# ─────────────────────────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Restore first — lets Docker cache the NuGet layer when only source changes.
+COPY *.csproj ./
+RUN dotnet restore
+
+# Bring in the rest of the source.
+COPY . ./
+
+# Publish a trimmed, self-contained output into /app. Release config = optimized.
+RUN dotnet publish -c Release -o /app --no-restore
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2 — runtime
+# ─────────────────────────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app ./
+
+# Render injects $PORT and expects the app to bind there. Map Kestrel to it.
+# (ASPNETCORE_URLS supports `http://+:$PORT` which binds to all interfaces.)
+ENV ASPNETCORE_URLS=http://+:${PORT:-8080}
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+# Render's health check ($PORT/) will get the Kestrel 404 root — that's fine,
+# it just needs the service to respond on the port. Health check URL can be
+# overridden in Render settings to /api/v1/market/pulse if you want stricter.
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "Fintrest.Api.dll"]
