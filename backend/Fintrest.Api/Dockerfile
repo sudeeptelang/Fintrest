@@ -28,9 +28,11 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app ./
 
-# Render injects $PORT and expects the app to bind there. Map Kestrel to it.
-# (ASPNETCORE_URLS supports `http://+:$PORT` which binds to all interfaces.)
-ENV ASPNETCORE_URLS=http://+:${PORT:-8080}
+# Kestrel binds to port 8080 on all interfaces. Fly's fly.toml points
+# internal_port=8080 at this, and Render's auto-injected $PORT defaults to 8080
+# if you use the Render Docker environment. Docker ENV doesn't do runtime shell
+# expansion, so we hard-code the port here — simpler than a shell-form entrypoint.
+ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 # Render's health check ($PORT/) will get the Kestrel 404 root — that's fine,
