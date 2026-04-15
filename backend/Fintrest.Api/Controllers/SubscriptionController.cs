@@ -27,12 +27,50 @@ public class SubscriptionController(AppDbContext db, StripeService stripe, ILogg
         var user = await db.Users.Include(u => u.Subscription).FirstOrDefaultAsync(u => u.Id == userId);
         if (user is null) return NotFound();
 
+        // Self-heal: if we have a Stripe Subscription ID, pull the latest state from Stripe
+        // and reconcile our DB. This closes the gap when webhooks missed an update (e.g. SDK API
+        // version mismatch, transient error, local dev without stripe listen running earlier).
+        if (stripe.IsConfigured && user.Subscription?.StripeSubscriptionId is string subId)
+        {
+            try
+            {
+                var svc = new Stripe.SubscriptionService();
+                var stripeSub = await svc.GetAsync(subId);
+                if (stripeSub is not null)
+                {
+                    user.Subscription.Status = stripeSub.Status?.Trim().ToLowerInvariant() switch
+                    {
+                        "active" => SubscriptionStatus.Active,
+                        "trialing" => SubscriptionStatus.Trialing,
+                        "past_due" => SubscriptionStatus.PastDue,
+                        "canceled" or "cancelled" => SubscriptionStatus.Canceled,
+                        _ => SubscriptionStatus.Inactive,
+                    };
+                    var periodEnd = ResolveCurrentPeriodEnd(stripeSub);
+                    if (periodEnd.HasValue) user.Subscription.CurrentPeriodEnd = periodEnd;
+                    if (stripeSub.Metadata.TryGetValue("plan", out var planStr)
+                        && Enum.TryParse<PlanType>(planStr, ignoreCase: true, out var plan))
+                    {
+                        user.Subscription.Plan = plan;
+                        user.Plan = plan;
+                    }
+                    user.Subscription.UpdatedAt = DateTime.UtcNow;
+                    await db.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Stripe self-heal sync failed for user {UserId}", userId);
+            }
+        }
+
         var sub = user.Subscription;
         return Ok(new
         {
             Plan = user.Plan.ToString(),
             Status = sub?.Status.ToString() ?? "Inactive",
             StripeCustomerId = sub?.StripeCustomerId,
+            StripeSubscriptionId = sub?.StripeSubscriptionId,
             CurrentPeriodEnd = sub?.CurrentPeriodEnd,
             StripeConfigured = stripe.IsConfigured,
         });
@@ -142,17 +180,22 @@ public class SubscriptionController(AppDbContext db, StripeService stripe, ILogg
             .FirstOrDefaultAsync(s => s.StripeSubscriptionId == stripeSub.Id);
         if (sub is null) return;
 
-        sub.Status = stripeSub.Status switch
+        // Stripe statuses: active, trialing, past_due, canceled, unpaid, incomplete,
+        // incomplete_expired, paused. Anything not explicitly mapped falls through to Inactive,
+        // but we case-insensitive-match since Stripe occasionally ships uppercase/spaced values.
+        sub.Status = stripeSub.Status?.Trim().ToLowerInvariant() switch
         {
             "active" => SubscriptionStatus.Active,
             "trialing" => SubscriptionStatus.Trialing,
             "past_due" => SubscriptionStatus.PastDue,
-            "canceled" => SubscriptionStatus.Canceled,
+            "canceled" or "cancelled" => SubscriptionStatus.Canceled,
             _ => SubscriptionStatus.Inactive,
         };
-        // Deserialize the CurrentPeriodEnd from StripeSubscription (properties differ by API version)
-        var periodEnd = stripeSub.GetType().GetProperty("CurrentPeriodEnd")?.GetValue(stripeSub) as DateTime?;
-        if (periodEnd.HasValue) sub.CurrentPeriodEnd = periodEnd;
+        // CurrentPeriodEnd — in API version 2025-02-24+ (dahlia), it moved from the Subscription
+        // top-level onto each SubscriptionItem. Older versions had it on the top level. Try both.
+        var periodEnd = ResolveCurrentPeriodEnd(stripeSub);
+        if (periodEnd.HasValue && periodEnd.Value.Year > 2000)
+            sub.CurrentPeriodEnd = periodEnd;
 
         // Map Stripe price/product to our plan enum if metadata present
         if (stripeSub.Metadata.TryGetValue("plan", out var planStr)
@@ -182,6 +225,29 @@ public class SubscriptionController(AppDbContext db, StripeService stripe, ILogg
         sub.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         logger.LogInformation("Subscription {Id} canceled for user {UserId}", stripeSub.Id, sub.UserId);
+    }
+}
+
+    /// <summary>
+    /// Extract CurrentPeriodEnd from a Stripe Subscription across API versions.
+    ///   - Legacy (pre-dahlia): Subscription.CurrentPeriodEnd is a DateTime on the object.
+    ///   - Dahlia+: lives on each SubscriptionItem as Items.Data[i].CurrentPeriodEnd.
+    /// Falls back to reflection so this tolerates future SDK moves too.
+    /// </summary>
+    private static DateTime? ResolveCurrentPeriodEnd(Stripe.Subscription stripeSub)
+    {
+        // Try the new items-level location first.
+        if (stripeSub.Items?.Data is { Count: > 0 } items)
+        {
+            var itemProp = items[0].GetType().GetProperty("CurrentPeriodEnd");
+            if (itemProp?.GetValue(items[0]) is DateTime itemEnd && itemEnd.Year > 2000)
+                return itemEnd;
+        }
+        // Fall back to the legacy top-level property.
+        var topProp = stripeSub.GetType().GetProperty("CurrentPeriodEnd");
+        if (topProp?.GetValue(stripeSub) is DateTime topEnd && topEnd.Year > 2000)
+            return topEnd;
+        return null;
     }
 }
 

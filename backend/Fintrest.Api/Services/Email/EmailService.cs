@@ -1,51 +1,43 @@
-using Amazon;
-using Amazon.Runtime;
-using Amazon.SimpleEmailV2;
-using Amazon.SimpleEmailV2.Model;
+using Azure;
+using Azure.Communication.Email;
 
 namespace Fintrest.Api.Services.Email;
 
 /// <summary>
-/// Wraps AWS SES for transactional + marketing emails.
-/// Gracefully no-ops when credentials are missing (dev).
+/// Wraps Azure Communication Services (ACS) Email for transactional + marketing emails.
+/// Gracefully no-ops when the connection string is missing (dev).
 /// </summary>
 public class EmailService
 {
-    private readonly IConfiguration _config;
     private readonly ILogger<EmailService> _logger;
-    private readonly AmazonSimpleEmailServiceV2Client? _client;
+    private readonly EmailClient? _client;
     private readonly string _fromEmail;
     private readonly string _fromName;
     private readonly string? _replyTo;
 
     public EmailService(IConfiguration config, ILogger<EmailService> logger)
     {
-        _config = config;
         _logger = logger;
-        _fromEmail = config["Aws:Ses:FromEmail"] ?? "signals@fintrest.ai";
-        _fromName = config["Aws:Ses:FromName"] ?? "Fintrest Signals";
-        _replyTo = config["Aws:Ses:ReplyTo"];
+        _fromEmail = config["Acs:Email:FromEmail"] ?? "";
+        _fromName = config["Acs:Email:FromName"] ?? "Fintrest Signals";
+        _replyTo = config["Acs:Email:ReplyTo"];
 
-        var accessKey = config["Aws:AccessKey"];
-        var secretKey = config["Aws:SecretKey"];
-        var regionName = config["Aws:Region"] ?? "us-east-1";
+        var connectionString = config["Acs:ConnectionString"];
 
-        if (string.IsNullOrEmpty(accessKey) || string.IsNullOrEmpty(secretKey))
+        if (string.IsNullOrEmpty(connectionString) || string.IsNullOrEmpty(_fromEmail))
         {
-            _logger.LogWarning("AWS credentials not configured — EmailService will log-only (no emails sent)");
+            _logger.LogWarning("Azure ACS not configured — EmailService will log-only (no emails sent)");
             _client = null;
         }
         else
         {
-            var credentials = new BasicAWSCredentials(accessKey, secretKey);
-            _client = new AmazonSimpleEmailServiceV2Client(
-                credentials, RegionEndpoint.GetBySystemName(regionName));
+            _client = new EmailClient(connectionString);
         }
     }
 
     public bool IsConfigured => _client is not null;
 
-    /// <summary>Send a transactional email. No-ops if AWS creds missing.</summary>
+    /// <summary>Send a transactional email. No-ops if ACS config missing.</summary>
     public async Task<SendResult> SendAsync(
         string toEmail,
         string subject,
@@ -56,39 +48,41 @@ public class EmailService
         if (_client is null)
         {
             _logger.LogInformation(
-                "[EMAIL STUB] To={To} Subject=\"{Subject}\" (AWS SES not configured — would have sent)",
+                "[EMAIL STUB] To={To} Subject=\"{Subject}\" (ACS not configured — would have sent)",
                 toEmail, subject);
-            return new SendResult(false, null, "AWS SES not configured");
+            return new SendResult(false, null, "ACS Email not configured");
         }
 
         try
         {
-            var request = new SendEmailRequest
+            var content = new EmailContent(subject)
             {
-                FromEmailAddress = $"{_fromName} <{_fromEmail}>",
-                Destination = new Destination { ToAddresses = [toEmail] },
-                Content = new EmailContent
-                {
-                    Simple = new Message
-                    {
-                        Subject = new Content { Data = subject, Charset = "UTF-8" },
-                        Body = new Body
-                        {
-                            Html = new Content { Data = htmlBody, Charset = "UTF-8" },
-                            Text = new Content
-                            {
-                                Data = textBody ?? StripHtml(htmlBody),
-                                Charset = "UTF-8"
-                            },
-                        },
-                    },
-                },
-                ReplyToAddresses = _replyTo is null ? null : [_replyTo],
+                Html = htmlBody,
+                PlainText = textBody ?? StripHtml(htmlBody),
             };
 
-            var response = await _client.SendEmailAsync(request, ct);
-            _logger.LogInformation("Email sent to {To} — MessageId={MessageId}", toEmail, response.MessageId);
-            return new SendResult(true, response.MessageId, null);
+            var recipients = new EmailRecipients([new EmailAddress(toEmail)]);
+
+            // ACS requires a bare email address for senderAddress. Display name is
+            // configured on the MailFrom address itself in the Azure portal.
+            var message = new EmailMessage(
+                senderAddress: _fromEmail,
+                content: content,
+                recipients: recipients);
+
+            if (!string.IsNullOrEmpty(_replyTo))
+            {
+                message.ReplyTo.Add(new EmailAddress(_replyTo));
+            }
+
+            var operation = await _client.SendAsync(
+                wait: WaitUntil.Completed,
+                message: message,
+                cancellationToken: ct);
+
+            var messageId = operation.Id;
+            _logger.LogInformation("Email sent to {To} — MessageId={MessageId}", toEmail, messageId);
+            return new SendResult(true, messageId, null);
         }
         catch (Exception ex)
         {
@@ -97,7 +91,8 @@ public class EmailService
         }
     }
 
-    /// <summary>Bulk send (up to 50 per call per SES limits). Iterates with single-send for simplicity.</summary>
+    /// <summary>Bulk send — iterates with single-send. ACS supports multi-recipient per message,
+    /// but per-user personalization requires distinct calls.</summary>
     public async Task<BulkResult> SendBulkAsync(
         IEnumerable<(string email, string subject, string html)> messages,
         CancellationToken ct = default)

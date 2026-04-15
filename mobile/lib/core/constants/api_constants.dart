@@ -28,6 +28,11 @@ class ApiConstants {
   static String stockSnapshot(String ticker) => '/stocks/$ticker/snapshot';
   static String stockAnalyst(String ticker) => '/stocks/$ticker/analyst';
   static String stockEarnings(String ticker) => '/stocks/$ticker/earnings';
+  static String stockOwnership(String ticker) => '/stocks/$ticker/ownership';
+
+  // Insiders & Congress (global feeds)
+  static const insidersLatest = '/market/insiders/latest';
+  static const congressLatest = '/market/congress/latest';
 
   // Authenticated
   static const watchlists = '/watchlists';

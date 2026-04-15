@@ -60,4 +60,10 @@ public record StockSnapshot
 
     // Market regime (set by ScanOrchestrator before scoring)
     public int SpyTrendDirection { get; init; }
+
+    /// <summary>Full market regime snapshot — SPY moves, VIX, sector RS.</summary>
+    public MarketRegime Regime { get; init; } = MarketRegime.Neutral;
+
+    /// <summary>Stock's own 5-session % return, used for relative strength vs SPY.</summary>
+    public double? StockReturn5d { get; init; }
 }

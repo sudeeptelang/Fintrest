@@ -3,7 +3,14 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Fintrest.Api.Models;
 
-public enum PlanType { Free, Starter, Pro, Premium }
+/// <summary>
+/// Subscription tier. Matches the DB constraint (lowercase enum values via the
+/// converter in AppDbContext). Keep this list in sync with:
+///   - the <c>users_plan_check</c> CHECK constraint on the <c>users</c> table
+///   - the PLANS constant in <c>web/lib/constants.ts</c>
+///   - the Stripe Prices map in <c>appsettings.json</c>
+/// </summary>
+public enum PlanType { Free, Pro, Elite }
 public enum SubscriptionStatus { Active, Canceled, PastDue, Trialing, Inactive }
 
 [Table("users")]

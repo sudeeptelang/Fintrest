@@ -1,18 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Activity,
-  BarChart3,
-  TrendingUp,
-  TrendingDown,
   ArrowUpRight,
   Flame,
   Zap,
   Calendar,
-  Brain,
-  Clock,
+  Sparkles,
 } from "lucide-react";
 import {
   useMarketSummary,
@@ -23,10 +20,12 @@ import {
   useMarketIndices,
   useMarketNews,
 } from "@/lib/hooks";
-import { SignalRow } from "@/components/signals/signal-row";
-import type { TrendingStock, EarningsCalendarItem, Signal, NewsItem } from "@/lib/api";
+import type { TrendingStock, NewsItem } from "@/lib/api";
+import { NewsReaderDrawer } from "@/components/news/news-reader-drawer";
 import { StockLogo } from "@/components/stock/stock-logo";
-import { ScreenerTable } from "@/components/dashboard/screener-table";
+import { SetupLensTiles } from "@/components/dashboard/setup-lens-tiles";
+import { HeroSignalCard } from "@/components/dashboard/hero-signal-card";
+import { AthenaPulse } from "@/components/dashboard/athena-pulse";
 
 export default function DashboardPage() {
   const { data: summary } = useMarketSummary();
@@ -42,109 +41,53 @@ export default function DashboardPage() {
   const watchCount = signals.filter((s) => s.signalType === "WATCH").length;
   const topSignal = signals[0];
 
+  const [readerItem, setReaderItem] = useState<NewsItem | null>(null);
+
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="font-[var(--font-heading)] text-2xl font-bold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {summary?.latestScanAt
-            ? `Last scan: ${new Date(summary.latestScanAt).toLocaleString()}`
-            : "Good morning. Here's your market overview."}
-        </p>
-      </div>
+      {/* Athena's Pulse — regime + narrative + top picks. Replaces static KPI strip. */}
+      <AthenaPulse />
 
-      {/* Summary strip — compact, data-dense */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-primary/20 bg-primary/5 p-4"
-        >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Top Signal</p>
-          <p className="font-[var(--font-mono)] text-xl font-bold mt-1">{topSignal?.ticker ?? "—"}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {topSignal ? `Score ${Math.round(topSignal.scoreTotal)} · ${topSignal.signalType.replace("_"," ")}` : "Run a scan"}
-          </p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.03 }}
-          className="rounded-xl border border-border bg-card p-4"
-        >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Signals Today</p>
-          <p className="font-[var(--font-heading)] text-xl font-bold mt-1">{summary?.signalsToday ?? 0}</p>
-          <p className="text-xs mt-0.5">
-            <span className="text-emerald-500 font-semibold">{buyCount} buy</span>
-            <span className="text-muted-foreground"> · </span>
-            <span className="text-amber-500 font-semibold">{watchCount} watch</span>
-          </p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.06 }}
-          className="rounded-xl border border-border bg-card p-4"
-        >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Market</p>
-          <p className="font-[var(--font-heading)] text-xl font-bold mt-1 capitalize">
-            {summary?.marketStatus?.replace("_", " ") ?? "—"}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {summary?.latestScanAt
-              ? new Date(summary.latestScanAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-              : "No scan yet"}
-          </p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.09 }}
-          className="rounded-xl border border-border bg-card p-4"
-        >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Avg Score</p>
-          <p className="font-[var(--font-heading)] text-xl font-bold mt-1">
-            {signals.length > 0
-              ? Math.round(signals.reduce((sum, s) => sum + s.scoreTotal, 0) / signals.length)
-              : "—"}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">{signals.length} stocks scanned</p>
-        </motion.div>
-      </div>
-
-      {/* Index ticker — key global markets only (full 20 on /markets page) */}
+      {/* Index ticker strip — clickable, shows ticker + % change + price. Each cell links to /markets. */}
       {indices && indices.length > 0 && (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="grid grid-cols-4 md:grid-cols-8">
             {indices
-              // Pick 8 diverse key indices across categories
               .filter((idx) => ["SPY","QQQ","DIA","IWM","GLD","TLT","IBIT","VWO"].includes(idx.ticker))
               .map((idx, i, arr) => {
                 const positive = (idx.changePct ?? 0) >= 0;
+                const change = idx.changePct === null
+                  ? null
+                  : `${positive ? "+" : ""}${idx.changePct.toFixed(2)}%`;
                 return (
-                  <div
+                  <Link
                     key={idx.ticker}
-                    className={`flex flex-col gap-0.5 px-3 py-2.5 ${
+                    href="/markets"
+                    className={`group flex flex-col gap-0.5 px-3 py-2.5 transition-colors hover:bg-muted/40 ${
                       i < arr.length - 1 ? "md:border-r border-border" : ""
                     } ${i < 4 ? "border-b md:border-b-0 border-border" : ""}`}
                   >
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground truncate">
-                      {idx.label}
-                    </span>
                     <div className="flex items-baseline gap-1.5">
-                      <span className="font-[var(--font-mono)] text-xs font-bold">
-                        {idx.price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
+                      <span className="font-[var(--font-mono)] text-xs font-bold group-hover:text-primary transition-colors">
+                        {idx.ticker}
                       </span>
                       <span
                         className={`font-[var(--font-mono)] text-[10px] font-semibold ${
                           positive ? "text-emerald-500" : "text-red-500"
                         }`}
                       >
-                        {idx.changePct === null ? "—" : `${positive ? "+" : ""}${idx.changePct.toFixed(2)}%`}
+                        {change ?? "—"}
                       </span>
                     </div>
-                  </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                        {idx.label}
+                      </span>
+                      <span className="font-[var(--font-mono)] text-[10px] text-muted-foreground">
+                        {idx.price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
+                      </span>
+                    </div>
+                  </Link>
                 );
               })}
           </div>
@@ -156,112 +99,33 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Signal of the Day — hero card */}
-      {topSignal && (
-        <Link href={`/stock/${topSignal.ticker}`}>
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-primary/20 bg-gradient-to-br from-[#1E1B4B] to-[#2D2A6B] p-6 text-white flex flex-col sm:flex-row items-start sm:items-center gap-6 hover:border-primary/40 transition-colors"
-          >
-            <div className="flex items-center gap-4 flex-1">
-              <StockLogo ticker={topSignal.ticker} size={56} className="rounded-2xl" />
-              <div>
-                <div className="flex items-center gap-3">
-                  <p className="font-[var(--font-heading)] text-2xl font-bold">{topSignal.ticker}</p>
-                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                    topSignal.signalType === "BUY_TODAY" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"
-                  }`}>
-                    {topSignal.signalType.replace("_", " ")}
-                  </span>
-                </div>
-                <p className="text-sm text-white/50 mt-0.5">{topSignal.stockName}</p>
-                {topSignal.breakdown?.whyNowSummary && (
-                  <p className="text-xs text-white/60 mt-2 max-w-lg leading-relaxed line-clamp-2">
-                    {topSignal.breakdown.whyNowSummary}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-6 shrink-0">
-              {topSignal.currentPrice && (
-                <div className="text-right">
-                  <p className="font-[var(--font-mono)] text-xl font-bold">${topSignal.currentPrice.toFixed(2)}</p>
-                  {topSignal.changePct !== null && (
-                    <p className={`font-[var(--font-mono)] text-sm font-semibold ${
-                      topSignal.changePct >= 0 ? "text-emerald-400" : "text-red-400"
-                    }`}>
-                      {topSignal.changePct >= 0 ? "+" : ""}{topSignal.changePct.toFixed(2)}%
-                    </p>
-                  )}
-                </div>
-              )}
-              <div className="text-center">
-                <p className="font-[var(--font-heading)] text-3xl font-bold text-primary">
-                  {Math.round(topSignal.scoreTotal)}
-                </p>
-                <p className="text-[10px] text-white/40 uppercase tracking-widest">Score</p>
-              </div>
-              {topSignal.entryLow && (
-                <div className="text-right hidden md:block">
-                  <p className="text-[10px] text-white/40 uppercase">Entry</p>
-                  <p className="font-[var(--font-mono)] text-sm font-semibold">
-                    ${topSignal.entryLow.toFixed(0)}–${topSignal.entryHigh?.toFixed(0)}
-                  </p>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        </Link>
-      )}
-
-      {/* Main Screener Table — tabbed data-dense view */}
-      <ScreenerTable />
-
-      {/* Three-column: Athena Signals + Trending + Most Active */}
-      <div className="grid lg:grid-cols-3 gap-5">
-        {/* Athena Signals */}
-        <div className="rounded-xl border border-border bg-card p-5">
+      {/* Today's Top Signals — balanced 3-up strip, no single hero */}
+      {signals.length > 0 && (
+        <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <Brain className="h-4 w-4 text-primary" /> Athena&apos;s Picks
-            </h2>
-            <Link href="/picks" className="text-[10px] text-primary hover:text-primary/80 flex items-center gap-0.5">
-              All <ArrowUpRight className="h-2.5 w-2.5" />
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-primary" />
+              <h2 className="font-[var(--font-heading)] text-sm font-semibold uppercase tracking-wider">
+                Today&apos;s Top Signals
+              </h2>
+            </div>
+            <Link href="/picks" className="text-xs text-primary hover:underline flex items-center gap-1">
+              View all <ArrowUpRight className="h-3 w-3" />
             </Link>
           </div>
-          <div className="space-y-1.5">
-            {signals.slice(1, 8).map((s) => (
-              <Link
-                key={s.id}
-                href={`/stock/${s.ticker}`}
-                className="flex items-center justify-between py-1.5 px-2 -mx-2 rounded-lg hover:bg-muted/30 transition-colors"
-              >
-                <div className="flex items-center gap-2.5">
-                  <StockLogo ticker={s.ticker} size={28} />
-                  <div>
-                    <p className="font-[var(--font-mono)] text-xs font-bold">{s.ticker}</p>
-                    <p className="text-[9px] text-muted-foreground truncate max-w-[80px]">{s.stockName}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {s.changePct !== null && (
-                    <span className={`font-[var(--font-mono)] text-[10px] font-semibold ${
-                      s.changePct >= 0 ? "text-emerald-500" : "text-red-500"
-                    }`}>
-                      {s.changePct >= 0 ? "+" : ""}{s.changePct.toFixed(1)}%
-                    </span>
-                  )}
-                  <span className="font-[var(--font-mono)] text-xs font-bold w-7 text-right">
-                    {Math.round(s.scoreTotal)}
-                  </span>
-                </div>
-              </Link>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {signals.slice(0, 3).map((s, i) => (
+              <HeroSignalCard key={s.id} signal={s} rank={i + 1} />
             ))}
           </div>
         </div>
+      )}
 
-        {/* Trending */}
+      {/* Today's Setups — compact lens-tile strip. Each tile deep-links to /picks?lens=... */}
+      <SetupLensTiles />
+
+      {/* Market Pulse — Trending + Most Active (different data, not redundant with signals) */}
+      <div className="grid lg:grid-cols-2 gap-5">
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold flex items-center gap-2">
@@ -279,7 +143,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Most Active */}
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold flex items-center gap-2">
@@ -354,9 +217,10 @@ export default function DashboardPage() {
           </h2>
           <div className="grid md:grid-cols-2 gap-3">
             {marketNews.map((item, i) => (
-              <div
+              <button
                 key={i}
-                className="flex items-start gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/20 transition-colors"
+                onClick={() => setReaderItem(item)}
+                className="group flex items-start gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors text-left"
               >
                 <div
                   className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${
@@ -368,7 +232,7 @@ export default function DashboardPage() {
                   }`}
                 />
                 <div className="min-w-0">
-                  <p className="text-sm leading-snug line-clamp-2">{item.headline}</p>
+                  <p className="text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">{item.headline}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[10px] text-muted-foreground">{item.source}</span>
                     {item.publishedAt && (
@@ -384,35 +248,16 @@ export default function DashboardPage() {
                         {item.catalystType}
                       </span>
                     )}
+                    <Sparkles className="h-3 w-3 text-muted-foreground/40 group-hover:text-[#00b87c] transition-colors" />
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* In Case You Missed — yesterday's signals that are still relevant */}
-      {signals.length > 5 && (
-        <div className="rounded-xl border border-border bg-card">
-          <div className="flex items-center justify-between p-5 border-b border-border">
-            <h2 className="font-[var(--font-heading)] text-lg font-semibold flex items-center gap-2">
-              <Clock className="h-5 w-5 text-muted-foreground" /> In Case You Missed
-            </h2>
-            <Link
-              href="/picks"
-              className="text-sm text-primary font-medium hover:text-primary/80 flex items-center gap-1"
-            >
-              View all <ArrowUpRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <div className="divide-y divide-border">
-            {signals.slice(5, 12).map((s) => (
-              <SignalRow key={s.id} signal={s} />
-            ))}
-          </div>
-        </div>
-      )}
+      <NewsReaderDrawer item={readerItem} onClose={() => setReaderItem(null)} />
     </div>
   );
 }

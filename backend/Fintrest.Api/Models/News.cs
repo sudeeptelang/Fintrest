@@ -32,6 +32,15 @@ public class NewsItem
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>
+    /// Athena's 2-3 sentence editorial take on this headline, tied to the ticker's context.
+    /// Generated on-demand the first time a user opens the news reader, then cached here
+    /// forever — headlines don't change, so one LLM call per article per lifetime.
+    /// </summary>
+    public string? AthenaSummary { get; set; }
+
+    public DateTime? AthenaSummaryAt { get; set; }
+
     [ForeignKey(nameof(StockId))]
     public Stock Stock { get; set; } = null!;
 }

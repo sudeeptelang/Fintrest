@@ -221,32 +221,54 @@ public class PortfolioImporter(
     {
         var holdings = new List<ParsedHolding>();
 
-        using var reader = new StreamReader(stream);
-        using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+        // Load everything up-front so we can scan for the real header row. Fidelity, Schwab, and
+        // Vanguard all export preamble lines (account name, date, disclaimers) before the actual
+        // table; naïve CSV parsing treats the first row as headers and fails.
+        using var initialReader = new StreamReader(stream);
+        var allLines = new List<string>();
+        while (initialReader.ReadLine() is { } line)
+            allLines.Add(line);
+
+        if (allLines.Count == 0) return holdings;
+
+        var headerRow = FindHeaderRow(allLines);
+        if (headerRow < 0)
+        {
+            logger.LogWarning("No ticker/quantity header found in CSV — tried first 30 rows.");
+            return holdings;
+        }
+
+        // Re-stream from the detected header row onward.
+        var relevant = string.Join('\n', allLines.Skip(headerRow));
+        var brokerGuess = GuessBroker(allLines.Take(headerRow + 1).ToList());
+        logger.LogInformation("CSV detected format: {Broker} (header at line {Row})", brokerGuess, headerRow + 1);
+
+        using var textReader = new StringReader(relevant);
+        using var csv = new CsvReader(textReader, new CsvConfiguration(CultureInfo.InvariantCulture)
         {
             HasHeaderRecord = true,
             MissingFieldFound = null,
             HeaderValidated = null,
             PrepareHeaderForMatch = args => args.Header.ToLower().Trim(),
+            BadDataFound = null, // broker exports have quoting weirdness — don't throw
         });
 
         csv.Read();
         csv.ReadHeader();
         var headers = csv.HeaderRecord?.Select(h => h.ToLower().Trim()).ToArray() ?? [];
 
-        // Auto-detect column mapping
-        var tickerCol = FindColumn(headers, "ticker", "symbol", "stock", "name", "security");
+        var tickerCol = FindColumn(headers, "ticker", "symbol", "stock", "security");
         var qtyCol = FindColumn(headers, "quantity", "shares", "qty", "amount", "units");
-        // Prefer per-share cost columns over total cost basis
         var costCol = FindColumnExact(headers, "average cost basis")
                       ?? FindColumnExact(headers, "cost basis per share")
                       ?? FindColumnExact(headers, "avg cost")
                       ?? FindColumnExact(headers, "average cost")
-                      ?? FindColumn(headers, "avgcost", "purchase price", "price");
+                      ?? FindColumnExact(headers, "share price")    // Vanguard
+                      ?? FindColumn(headers, "avgcost", "purchase price", "price per share", "price");
 
         if (tickerCol is null || qtyCol is null)
         {
-            logger.LogWarning("Could not detect ticker or quantity columns. Headers: {Headers}", string.Join(", ", headers));
+            logger.LogWarning("Could not detect ticker/quantity columns. Headers: {Headers}", string.Join(", ", headers));
             return holdings;
         }
 
@@ -321,5 +343,42 @@ public class PortfolioImporter(
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Scan the first 30 rows looking for the real header line — the one with both a
+    /// ticker/symbol column AND a quantity/shares column. Brokers export preambles
+    /// (account name, date, blank lines) that must be skipped.
+    /// </summary>
+    private static int FindHeaderRow(List<string> lines)
+    {
+        var tickerWords = new[] { "symbol", "ticker", "security", "stock" };
+        var qtyWords    = new[] { "quantity", "shares", "qty", "units" };
+
+        for (int i = 0; i < Math.Min(30, lines.Count); i++)
+        {
+            var lower = lines[i].ToLowerInvariant();
+            var hasTicker = tickerWords.Any(w => lower.Contains(w));
+            var hasQty    = qtyWords.Any(w => lower.Contains(w));
+            if (hasTicker && hasQty) return i;
+        }
+        // Fall back to row 0 so single-row exports still work.
+        return lines.Count > 0 ? 0 : -1;
+    }
+
+    /// <summary>Best-effort broker identification from the preamble/header — purely for logs.</summary>
+    private static string GuessBroker(List<string> preamble)
+    {
+        var joined = string.Join(" ", preamble).ToLowerInvariant();
+        if (joined.Contains("fidelity") || joined.Contains("spaxx")) return "Fidelity";
+        if (joined.Contains("charles schwab") || joined.Contains("cost basis")) return "Schwab";
+        if (joined.Contains("vanguard") || joined.Contains("investment name")) return "Vanguard";
+        if (joined.Contains("robinhood")) return "Robinhood";
+        if (joined.Contains("e*trade") || joined.Contains("etrade")) return "E*Trade";
+        if (joined.Contains("interactive brokers") || joined.Contains("ibkr")) return "IBKR";
+        if (joined.Contains("merrill")) return "Merrill";
+        if (joined.Contains("webull")) return "Webull";
+        if (joined.Contains("m1")) return "M1";
+        return "Generic CSV";
     }
 }

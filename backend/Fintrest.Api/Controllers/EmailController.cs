@@ -19,8 +19,8 @@ public class EmailController(AppDbContext db, EmailService emailService, AlertDi
     {
         configured = emailService.IsConfigured,
         message = emailService.IsConfigured
-            ? "AWS SES is wired. Emails will be sent to real recipients."
-            : "AWS credentials missing — emails log only, none sent. Set Aws:AccessKey and Aws:SecretKey in appsettings.",
+            ? "Azure Communication Services Email is wired. Emails will be sent to real recipients."
+            : "ACS connection string missing — emails log only, none sent. Set Acs:ConnectionString and Acs:Email:FromEmail in appsettings.",
     });
 
     /// <summary>Preview the morning briefing template in your browser (HTML only).</summary>

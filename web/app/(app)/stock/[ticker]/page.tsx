@@ -17,7 +17,7 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
-import { useStock, useStockSignals, useStockNews, useStockChart, useStockSnapshot, useStockAnalyst, useStockEarnings, useWatchlists, useAddWatchlistItem, useCreateWatchlist } from "@/lib/hooks";
+import { useStock, useStockSignals, useStockNews, useStockChart, useStockSnapshot, useStockAnalyst, useStockEarnings, useStockOwnership, useWatchlists, useAddWatchlistItem, useCreateWatchlist } from "@/lib/hooks";
 import { Button } from "@/components/ui/button";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { FactorRadar } from "@/components/charts/factor-radar";
@@ -32,6 +32,10 @@ import { ValuationSection } from "@/components/stock/valuation-section";
 import { EarningsChart } from "@/components/charts/earnings-chart";
 import { PerformanceChart } from "@/components/charts/performance-chart";
 import { FactorBarChart } from "@/components/charts/factor-bar-chart";
+import { AthenaSnowflake } from "@/components/stock/athena-snowflake";
+import { AthenaThesisCard } from "@/components/stock/athena-thesis-card";
+import { RewardsRisks } from "@/components/stock/rewards-risks";
+import { OwnershipStrip } from "@/components/stock/ownership-strip";
 
 interface StockDetailPageProps {
   params: Promise<{ ticker: string }>;
@@ -58,6 +62,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { data: snapshot } = useStockSnapshot(ticker);
   const { data: analystData } = useStockAnalyst(ticker);
   const { data: earningsData } = useStockEarnings(ticker);
+  const { data: ownership } = useStockOwnership(ticker);
   const { data: watchlists } = useWatchlists();
   const addToWatchlist = useAddWatchlistItem();
   const createWatchlist = useCreateWatchlist();
@@ -328,8 +333,29 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         </motion.div>
       </div>
 
+      {/* Athena Snowflake + Rewards/Risks (Simply Wall St-style) */}
+      {snapshot && (
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <AthenaSnowflake
+              snapshot={snapshot}
+              breakdown={breakdown}
+              dividendYield={null}
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <RewardsRisks snapshot={snapshot} signal={latestSignal} />
+          </div>
+        </div>
+      )}
+
       {/* Finviz-style snapshot */}
       {snapshot && <StockSnapshot snapshot={snapshot} />}
+
+      {/* Athena's Take — full thesis (why/when/what). Placed first, before the chart. */}
+      <motion.div custom={2.5} initial="hidden" animate="visible" variants={fadeIn}>
+        <AthenaThesisCard ticker={ticker.toUpperCase()} />
+      </motion.div>
 
       {/* Price Chart */}
       <motion.div
@@ -408,6 +434,9 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         )}
         {snapshot && <TechnicalAnalysis snapshot={snapshot} />}
       </div>
+
+      {/* Ownership & Insider Activity */}
+      {ownership && <OwnershipStrip data={ownership} />}
 
       {/* Earnings History + Charts */}
       {earningsData && earningsData.length > 0 && (

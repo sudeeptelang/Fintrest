@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Star, Trash2, Loader2, List, Search } from "lucide-react";
+import { Plus, Star, Trash2, Loader2, List, TrendingUp, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWatchlists, useCreateWatchlist, useRemoveWatchlistItem, useAddWatchlistItem } from "@/lib/hooks";
-import { api } from "@/lib/api";
+import { TickerSearch } from "@/components/stock/ticker-search";
+import { StockLogo } from "@/components/stock/stock-logo";
 import Link from "next/link";
+import type { StockSearchResult, WatchlistItemResponse } from "@/lib/api";
 
 export default function WatchlistPage() {
   const { data: watchlists, isLoading, error } = useWatchlists();
@@ -17,22 +19,15 @@ export default function WatchlistPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
-  const [tickerInput, setTickerInput] = useState("");
-  const [addingStock, setAddingStock] = useState(false);
   const [addError, setAddError] = useState("");
 
-  async function handleAddStock() {
-    if (!tickerInput.trim() || !activeWatchlist) return;
-    setAddingStock(true);
+  async function handleAddStock(stock: StockSearchResult) {
+    if (!activeWatchlist) return;
     setAddError("");
     try {
-      const stock = await api.stock(tickerInput.trim().toUpperCase());
       await addItem.mutateAsync({ watchlistId: activeWatchlist.id, stockId: stock.id });
-      setTickerInput("");
     } catch {
-      setAddError(`"${tickerInput.toUpperCase()}" not found in our stock universe.`);
-    } finally {
-      setAddingStock(false);
+      setAddError(`Failed to add ${stock.ticker}. It may already be in this list.`);
     }
   }
 
@@ -153,30 +148,10 @@ export default function WatchlistPage() {
         ))}
       </div>
 
-      {/* Add stock */}
+      {/* Add stock — typeahead resolves tickers AND company names in real time */}
       {activeWatchlist && (
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Add ticker (e.g. AAPL, NVDA)..."
-                value={tickerInput}
-                onChange={(e) => { setTickerInput(e.target.value); setAddError(""); }}
-                onKeyDown={(e) => e.key === "Enter" && handleAddStock()}
-                className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-card text-sm font-[var(--font-mono)]"
-              />
-            </div>
-            <Button
-              size="sm"
-              className="bg-primary hover:bg-primary/90 text-white"
-              onClick={handleAddStock}
-              disabled={addingStock || !tickerInput.trim()}
-            >
-              {addingStock ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Plus className="h-3.5 w-3.5 mr-1" />Add</>}
-            </Button>
-          </div>
+          <TickerSearch onSelect={handleAddStock} />
           {addError && <p className="text-xs text-red-500">{addError}</p>}
         </div>
       )}
@@ -191,41 +166,143 @@ export default function WatchlistPage() {
       ) : (
         <div className="grid gap-3">
           {activeWatchlist?.items.map((item, i) => (
-            <motion.div
+            <WatchlistRow
               key={item.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 hover:border-primary/20 transition-colors"
-            >
-              <Link href={`/stock/${item.ticker}`} className="flex items-center gap-4 flex-1 min-w-0">
-                <Star className="h-4 w-4 fill-primary text-primary flex-shrink-0" />
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="font-[var(--font-mono)] text-xs font-bold text-primary">
-                    {item.ticker.slice(0, 2)}
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <p className="font-[var(--font-mono)] font-semibold text-sm">{item.ticker}</p>
-                  <p className="text-xs text-muted-foreground truncate">{item.stockName}</p>
-                </div>
-              </Link>
-
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-red-500 flex-shrink-0"
-                onClick={() =>
-                  removeItem.mutate({ watchlistId: activeWatchlist.id, itemId: item.id })
-                }
-                disabled={removeItem.isPending}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </motion.div>
+              item={item}
+              index={i}
+              onRemove={() =>
+                removeItem.mutate({ watchlistId: activeWatchlist.id, itemId: item.id })
+              }
+              removing={removeItem.isPending}
+            />
           ))}
         </div>
       )}
     </div>
   );
+}
+
+/** Watchlist item row — ticker + price + today's move + signal score/verdict + trade zone. */
+function WatchlistRow({
+  item,
+  index,
+  onRemove,
+  removing,
+}: {
+  item: WatchlistItemResponse;
+  index: number;
+  onRemove: () => void;
+  removing: boolean;
+}) {
+  const hasSignal = item.signalScore !== null;
+  const priceColor =
+    item.changePct === null ? "text-muted-foreground"
+    : item.changePct >= 0 ? "text-emerald-500" : "text-red-500";
+
+  const verdictMeta = item.verdict ? verdictStyle(item.verdict) : null;
+  const signalBadge = item.signalType === "BUY_TODAY"
+    ? "bg-emerald-500/10 text-emerald-600"
+    : item.signalType === "WATCH" ? "bg-amber-500/10 text-amber-600"
+    : "bg-muted/40 text-muted-foreground";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.04 }}
+      className="rounded-xl border border-border bg-card px-4 py-3 hover:border-primary/30 transition-colors"
+    >
+      <div className="flex items-start gap-3">
+        <Star className="h-4 w-4 fill-primary text-primary flex-shrink-0 mt-1" />
+
+        <Link href={`/stock/${item.ticker}`} className="flex items-center gap-3 flex-1 min-w-0">
+          <StockLogo ticker={item.ticker} size={36} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-[var(--font-mono)] text-sm font-bold">{item.ticker}</span>
+              {item.signalType && (
+                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${signalBadge}`}>
+                  {item.signalType === "BUY_TODAY" ? "BUY" : item.signalType}
+                </span>
+              )}
+              {verdictMeta && (
+                <span
+                  className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                  style={{ backgroundColor: `${verdictMeta.color}18`, color: verdictMeta.color }}
+                >
+                  {item.verdict}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{item.stockName}</p>
+          </div>
+        </Link>
+
+        {/* Price + change */}
+        <div className="text-right shrink-0">
+          <p className="font-[var(--font-mono)] text-sm font-semibold">
+            {item.currentPrice !== null ? `$${item.currentPrice.toFixed(2)}` : "—"}
+          </p>
+          <p className={`font-[var(--font-mono)] text-[11px] font-semibold ${priceColor} flex items-center justify-end gap-1`}>
+            {item.changePct !== null && (item.changePct >= 0
+              ? <TrendingUp className="h-2.5 w-2.5" />
+              : <TrendingDown className="h-2.5 w-2.5" />)}
+            {item.changePct !== null ? `${item.changePct >= 0 ? "+" : ""}${item.changePct.toFixed(2)}%` : "—"}
+          </p>
+        </div>
+
+        {/* Score */}
+        <div className="text-right shrink-0 min-w-[36px]">
+          <p className="font-[var(--font-heading)] text-lg font-bold leading-none">
+            {hasSignal ? Math.round(item.signalScore!) : "—"}
+          </p>
+          <p className="text-[8px] text-muted-foreground uppercase tracking-wider mt-0.5">Score</p>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground hover:text-red-500 flex-shrink-0"
+          onClick={onRemove}
+          disabled={removing}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      {/* Trade zone row — only when we have a valid signal with stops/targets */}
+      {hasSignal && item.entryLow !== null && item.stopLoss !== null && item.targetLow !== null && (
+        <div className="mt-2 pt-2 border-t border-border/60 grid grid-cols-4 gap-2 text-[10px]">
+          <TradeStat label="Entry" value={`$${item.entryLow.toFixed(2)}-${item.entryHigh?.toFixed(2) ?? ""}`} />
+          <TradeStat label="Stop"   value={`$${item.stopLoss.toFixed(2)}`} color="#ef4444" />
+          <TradeStat label="Target" value={`$${item.targetHigh?.toFixed(2) ?? item.targetLow.toFixed(2)}`} color="#10b981" />
+          <TradeStat label="R:R"    value={item.riskReward !== null ? `${item.riskReward.toFixed(1)}:1` : "—"} />
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+function TradeStat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div>
+      <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className="font-[var(--font-mono)] font-semibold" style={color ? { color } : undefined}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function verdictStyle(v: string): { color: string } {
+  switch (v) {
+    case "Buy the Dip":     return { color: "#00b87c" };
+    case "Breakout Setup":  return { color: "#3b6fd4" };
+    case "Momentum Run":    return { color: "#00b87c" };
+    case "Value Setup":     return { color: "#7c5fd4" };
+    case "Event-Driven":    return { color: "#c084fc" };
+    case "Defensive Hold":  return { color: "#64748b" };
+    case "Quality Setup":   return { color: "#00b87c" };
+    default:                return { color: "#94a3b8" };
+  }
 }

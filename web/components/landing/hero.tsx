@@ -1,7 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Play, TrendingUp, Shield, Zap } from "lucide-react";
+import {
+  ArrowRight, Play, Shield, Zap, Sparkles,
+  Radar, Target, Brain, Landmark, Users, Activity, Database, TrendingUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const fadeUp = {
@@ -17,14 +21,6 @@ const fadeUp = {
   }),
 };
 
-const mockSignals = [
-  { ticker: "NVDA", score: 92, type: "BUY TODAY", change: "+3.2%" },
-  { ticker: "AAPL", score: 87, type: "BUY TODAY", change: "+1.8%" },
-  { ticker: "MSFT", score: 84, type: "WATCH", change: "+0.9%" },
-  { ticker: "TSLA", score: 78, type: "WATCH", change: "+2.4%" },
-  { ticker: "META", score: 71, type: "WATCH", change: "+1.1%" },
-];
-
 export function Hero() {
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden">
@@ -34,7 +30,7 @@ export function Hero() {
       <div className="absolute top-1/4 -left-32 w-96 h-96 rounded-full bg-primary/10 blur-[120px]" />
       <div className="absolute bottom-1/4 -right-32 w-96 h-96 rounded-full bg-primary/5 blur-[120px]" />
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-32 w-full">
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-24 lg:py-28 w-full">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left — copy */}
           <div>
@@ -84,21 +80,25 @@ export function Hero() {
               variants={fadeUp}
               className="mt-8 flex flex-col sm:flex-row gap-4"
             >
-              <Button
-                size="lg"
-                className="bg-primary hover:bg-primary/90 text-white h-12 px-8 text-base font-semibold shadow-lg shadow-primary/25"
-              >
-                Start Free Today
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="border-white/20 text-white hover:bg-white/10 h-12 px-8 text-base"
-              >
-                <Play className="mr-2 h-4 w-4" />
-                Watch Demo
-              </Button>
+              <Link href="/auth/signup">
+                <Button
+                  size="lg"
+                  className="bg-primary hover:bg-primary/90 text-white h-12 px-8 text-base font-semibold shadow-lg shadow-primary/25"
+                >
+                  Start Free Today
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+              <Link href="#how-it-works">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="border-white/20 text-white hover:bg-white/10 h-12 px-8 text-base"
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  How it works
+                </Button>
+              </Link>
             </motion.div>
 
             <motion.div
@@ -119,89 +119,137 @@ export function Hero() {
             </motion.div>
           </div>
 
-          {/* Right — live signal preview */}
-          <motion.div
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="relative"
-          >
-            <div className="absolute -inset-4 rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-primary/5 blur-xl" />
-            <div className="relative rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm p-6 shadow-2xl">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="font-[var(--font-heading)] text-sm font-semibold text-white">
-                    Today&apos;s Top Signals
-                  </h3>
-                  <p className="text-xs text-white/40 mt-0.5 font-[var(--font-mono)]">
-                    Apr 8, 2026 &middot; Pre-Market
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 text-primary text-xs font-medium">
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  5 signals
-                </div>
-              </div>
-
-              {/* Signal list */}
-              <div className="space-y-2">
-                {mockSignals.map((signal, i) => (
-                  <motion.div
-                    key={signal.ticker}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 + i * 0.08 }}
-                    className="flex items-center justify-between rounded-xl bg-white/[0.04] border border-white/[0.06] px-4 py-3 hover:bg-white/[0.07] transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <span className="font-[var(--font-heading)] text-xs font-bold text-primary">
-                          {signal.ticker.slice(0, 2)}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-white font-[var(--font-mono)]">
-                          {signal.ticker}
-                        </p>
-                        <p className="text-xs text-white/40">{signal.type}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 rounded-full bg-white/10 overflow-hidden">
-                          <motion.div
-                            className="h-full rounded-full bg-primary"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${signal.score}%` }}
-                            transition={{ delay: 0.8 + i * 0.08, duration: 0.6 }}
-                          />
-                        </div>
-                        <span className="text-sm font-bold text-white font-[var(--font-mono)] w-7 text-right">
-                          {signal.score}
-                        </span>
-                      </div>
-                      <p className="text-xs text-emerald-400 mt-0.5 font-[var(--font-mono)]">
-                        {signal.change}
-                      </p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* Footer */}
-              <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between">
-                <span className="text-xs text-white/30">
-                  Refreshed every trading day at 6:30 AM ET
-                </span>
-                <span className="text-xs text-primary font-medium cursor-pointer hover:text-primary/80 transition-colors">
-                  View all &rarr;
-                </span>
-              </div>
-            </div>
-          </motion.div>
+          {/* Right — capability infographic (the product stack, not a fake signal list) */}
+          <CapabilityInfographic />
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Hero-right infographic showing Fintrest's product stack as four concentric capability rings
+ * around a central Athena orb. Each ring represents a stage: Scan → Score → Narrate → Trade.
+ * No fake tickers or fabricated data — it's an editorial visual of what the platform does.
+ */
+function CapabilityInfographic() {
+  const rings = [
+    {
+      label: "Scan",
+      color: "#00b87c",
+      chips: [
+        { icon: Radar,    text: "500+ stocks scanned daily" },
+        { icon: Database, text: "Prices · fundamentals · news" },
+        { icon: Activity, text: "Regime-aware · intraday drift" },
+      ],
+    },
+    {
+      label: "Score",
+      color: "#3b6fd4",
+      chips: [
+        { icon: TrendingUp, text: "7-factor quant scoring" },
+        { icon: Target,     text: "Cross-sectional percentile rank" },
+        { icon: Shield,     text: "Bull / Bear weight sets" },
+      ],
+    },
+    {
+      label: "Narrate",
+      color: "#00b87c",
+      chips: [
+        { icon: Brain,     text: "Athena thesis · plain English" },
+        { icon: Sparkles,  text: "Setup type · Buy the Dip · Breakout" },
+        { icon: Landmark,  text: "Congress · Insider · Ownership" },
+      ],
+    },
+    {
+      label: "Trade",
+      color: "#00b87c",
+      chips: [
+        { icon: Target,  text: "Entry · Stop · Target · R:R" },
+        { icon: Zap,     text: "Real-time alerts" },
+        { icon: Users,   text: "Portfolio factor profile" },
+      ],
+    },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 40 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.4, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+      className="relative"
+    >
+      <div className="absolute -inset-4 rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-primary/5 blur-xl" />
+      <div className="relative rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm p-8 shadow-2xl overflow-hidden">
+        {/* Orbiting decorative rings */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full border border-white/5" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full border border-white/5" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] rounded-full border border-white/[0.03]" />
+        </div>
+
+        {/* Center Athena orb */}
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.6, duration: 0.6 }}
+          className="relative flex flex-col items-center mb-6"
+        >
+          <div className="relative flex items-center justify-center h-20 w-20 rounded-full bg-[#0d1a2e] border border-[#00b87c]/30 shadow-[0_0_40px_rgba(0,184,124,0.25)]">
+            <span className="absolute inset-0 rounded-full bg-[#00b87c]/10 animate-ping [animation-duration:3s]" />
+            <Sparkles className="h-9 w-9 text-[#00b87c]" />
+          </div>
+          <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[#00b87c]">
+            Athena AI
+          </p>
+          <p className="text-[11px] text-white/50 mt-0.5">
+            The editorial brain at the center
+          </p>
+        </motion.div>
+
+        {/* Four capability rings, stacked */}
+        <div className="space-y-3 relative">
+          {rings.map((ring, i) => (
+            <motion.div
+              key={ring.label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 + i * 0.12, duration: 0.5 }}
+              className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span
+                  className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: `${ring.color}22`, color: ring.color }}
+                >
+                  {i + 1}. {ring.label}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {ring.chips.map((chip) => {
+                  const Icon = chip.icon;
+                  return (
+                    <div
+                      key={chip.text}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] border border-white/[0.05] px-2.5 py-1 text-[10.5px] text-white/80"
+                    >
+                      <Icon className="h-3 w-3" style={{ color: ring.color }} />
+                      {chip.text}
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="mt-5 pt-4 border-t border-white/[0.06] text-center">
+          <p className="text-[10px] text-white/40">
+            Know what to do — not just what&apos;s happening.
+          </p>
+        </div>
+      </div>
+    </motion.div>
   );
 }

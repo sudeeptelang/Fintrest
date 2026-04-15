@@ -28,6 +28,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     // Chat
     public DbSet<ChatSession> ChatSessions => Set<ChatSession>();
 
+    // Athena AI thesis per (scan_run, stock)
+    public DbSet<AthenaThesis> AthenaTheses => Set<AthenaThesis>();
+
     // Portfolio
     public DbSet<Portfolio> Portfolios => Set<Portfolio>();
     public DbSet<PortfolioHolding> PortfolioHoldings => Set<PortfolioHolding>();
@@ -40,19 +43,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     {
         base.OnModelCreating(modelBuilder);
 
-        // User
+        // User — Plan is stored as lowercase text to match the DB's
+        // `users_plan_check` constraint (free / starter / pro / premium).
         modelBuilder.Entity<User>(e =>
         {
             e.HasIndex(u => u.Email).IsUnique();
-            e.Property(u => u.Plan).HasConversion<string>();
+            e.Property(u => u.Plan).HasConversion(
+                v => v.ToString().ToLowerInvariant(),
+                v => Enum.Parse<PlanType>(v, ignoreCase: true));
         });
 
-        // Subscription
+        // Subscription — both Plan and Status use lowercase text to align with
+        // similar DB check constraints. Case-insensitive parse on read protects
+        // against any legacy PascalCase rows from earlier migrations.
         modelBuilder.Entity<Subscription>(e =>
         {
             e.HasIndex(s => s.UserId).IsUnique();
-            e.Property(s => s.Status).HasConversion<string>();
-            e.Property(s => s.Plan).HasConversion<string>();
+            e.Property(s => s.Status).HasConversion(
+                v => v.ToString().ToLowerInvariant(),
+                v => Enum.Parse<SubscriptionStatus>(v, ignoreCase: true));
+            e.Property(s => s.Plan).HasConversion(
+                v => v.ToString().ToLowerInvariant(),
+                v => Enum.Parse<PlanType>(v, ignoreCase: true));
         });
 
         // Stock

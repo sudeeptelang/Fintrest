@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, Download, X } from "lucide-react";
 import { useMarketScreener } from "@/lib/hooks";
 import type { ScreenerRow } from "@/lib/api";
 import { StockLogo } from "@/components/stock/stock-logo";
@@ -66,18 +66,75 @@ function TickerCell({ row }: { row: ScreenerRow }) {
   );
 }
 
-function SignalBadge({ score, type }: { score: number | null; type: string | null }) {
-  if (score === null || type === null) return <span className="text-muted-foreground text-xs">—</span>;
-  const color =
-    type === "BUY_TODAY" ? "bg-emerald-500/10 text-emerald-500"
-    : type === "WATCH" ? "bg-amber-500/10 text-amber-500"
-    : "bg-muted text-muted-foreground";
+function ScoreBar({ score, type }: { score: number | null; type: string | null }) {
+  if (score === null) return <span className="text-muted-foreground text-xs">—</span>;
+  const rounded = Math.round(score);
+  const typeColor =
+    type === "BUY_TODAY" ? "text-emerald-500"
+    : type === "WATCH" ? "text-amber-500"
+    : "text-muted-foreground";
+  const barColor =
+    rounded >= 75 ? "bg-emerald-500"
+    : rounded >= 60 ? "bg-emerald-400"
+    : rounded >= 45 ? "bg-amber-400"
+    : "bg-red-400";
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${color}`}>
-      <span className="font-[var(--font-mono)] font-bold">{Math.round(score)}</span>
-      <span>{type.replace("_", " ")}</span>
-    </span>
+    <div className="flex items-center gap-2 min-w-[110px] justify-end">
+      <div className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden max-w-[60px]">
+        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${rounded}%` }} />
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <span className="font-[var(--font-mono)] text-xs font-bold w-7 text-right">{rounded}</span>
+        {type && (
+          <span className={`text-[9px] font-bold uppercase tracking-wider ${typeColor}`}>
+            {type === "BUY_TODAY" ? "BUY" : type === "WATCH" ? "WATCH" : ""}
+          </span>
+        )}
+      </div>
+    </div>
   );
+}
+
+// Market cap tiers
+type McTier = "all" | "mega" | "large" | "mid" | "small";
+const MC_TIERS: { key: McTier; label: string; min?: number; max?: number }[] = [
+  { key: "all", label: "All Sizes" },
+  { key: "mega", label: "Mega ($200B+)", min: 200e9 },
+  { key: "large", label: "Large ($10B-$200B)", min: 10e9, max: 200e9 },
+  { key: "mid", label: "Mid ($2B-$10B)", min: 2e9, max: 10e9 },
+  { key: "small", label: "Small (<$2B)", max: 2e9 },
+];
+
+// CSV export
+function exportCsv(rows: ScreenerRow[], tab: TabKey) {
+  const headers = {
+    overview: ["Ticker", "Name", "Sector", "Price", "Change %", "Volume", "Rel Vol", "Market Cap", "Signal Score", "Signal Type"],
+    performance: ["Ticker", "Name", "Price", "1W", "1M", "3M", "YTD", "1Y", "52W High", "52W Low", "Signal Score"],
+    valuation: ["Ticker", "Name", "Market Cap", "P/E", "Fwd P/E", "PEG", "P/B", "Beta", "Target Price", "Signal Score"],
+    fundamentals: ["Ticker", "Name", "ROE", "Op Margin", "Rev Growth", "EPS Growth", "Next Earnings", "Signal Score"],
+  }[tab];
+
+  const rowFor = (r: ScreenerRow) => {
+    switch (tab) {
+      case "overview": return [r.ticker, r.name, r.sector ?? "", r.price ?? "", r.changePct ?? "", r.volume ?? "", r.relVolume ?? "", r.marketCap ?? "", r.signalScore ?? "", r.signalType ?? ""];
+      case "performance": return [r.ticker, r.name, r.price ?? "", r.perfWeek ?? "", r.perfMonth ?? "", r.perfQuarter ?? "", r.perfYtd ?? "", r.perfYear ?? "", r.week52High ?? "", r.week52Low ?? "", r.signalScore ?? ""];
+      case "valuation": return [r.ticker, r.name, r.marketCap ?? "", r.peRatio ?? "", r.forwardPe ?? "", r.pegRatio ?? "", r.priceToBook ?? "", r.beta ?? "", r.analystTargetPrice ?? "", r.signalScore ?? ""];
+      case "fundamentals": return [r.ticker, r.name, r.returnOnEquity ?? "", r.operatingMargin ?? "", r.revenueGrowth ?? "", r.epsGrowth ?? "", r.nextEarningsDate ?? "", r.signalScore ?? ""];
+    }
+  };
+
+  const csv = [
+    headers.join(","),
+    ...rows.map((r) => rowFor(r).map((v) => (typeof v === "string" && v.includes(",") ? `"${v}"` : v)).join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `fintrest-screener-${tab}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Column definitions ───
@@ -112,7 +169,7 @@ function getColumns(tab: TabKey): Column[] {
     label: "Signal",
     sortField: "signalScore",
     align: "center",
-    render: (r) => <SignalBadge score={r.signalScore} type={r.signalType} />,
+    render: (r) => <ScoreBar score={r.signalScore} type={r.signalType} />,
   };
 
   if (tab === "overview") {
@@ -221,12 +278,34 @@ export function ScreenerTable() {
   const [tab, setTab] = useState<TabKey>("overview");
   const [sortField, setSortField] = useState<keyof ScreenerRow>("signalScore");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sectorFilter, setSectorFilter] = useState<string>("all");
+  const [mcTierFilter, setMcTierFilter] = useState<McTier>("all");
+  const [signalFilter, setSignalFilter] = useState<string>("all");
 
   const columns = getColumns(tab);
 
+  const sectors = useMemo(() => {
+    const set = new Set<string>();
+    (data ?? []).forEach((r) => r.sector && set.add(r.sector));
+    return Array.from(set).sort();
+  }, [data]);
+
+  const hasFilters = sectorFilter !== "all" || mcTierFilter !== "all" || signalFilter !== "all";
+
   const rows = useMemo(() => {
     const list = data ?? [];
-    return [...list].sort((a, b) => {
+    const mcTier = MC_TIERS.find((t) => t.key === mcTierFilter);
+    const filtered = list.filter((r) => {
+      if (sectorFilter !== "all" && r.sector !== sectorFilter) return false;
+      if (signalFilter !== "all" && r.signalType !== signalFilter) return false;
+      if (mcTier && (mcTier.min !== undefined || mcTier.max !== undefined)) {
+        const mc = r.marketCap ?? 0;
+        if (mcTier.min !== undefined && mc < mcTier.min) return false;
+        if (mcTier.max !== undefined && mc >= mcTier.max) return false;
+      }
+      return true;
+    });
+    return [...filtered].sort((a, b) => {
       const av = a[sortField];
       const bv = b[sortField];
       if (av === null && bv === null) return 0;
@@ -238,7 +317,7 @@ export function ScreenerTable() {
       const diff = Number(av) - Number(bv);
       return sortDir === "asc" ? diff : -diff;
     });
-  }, [data, sortField, sortDir]);
+  }, [data, sortField, sortDir, sectorFilter, mcTierFilter, signalFilter]);
 
   function handleSort(field: keyof ScreenerRow) {
     if (sortField === field) {
@@ -258,8 +337,8 @@ export function ScreenerTable() {
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
-      {/* Tabs */}
-      <div className="flex items-center gap-1 p-2 border-b border-border">
+      {/* Tabs + filters */}
+      <div className="flex items-center gap-1 p-2 border-b border-border flex-wrap">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -273,8 +352,49 @@ export function ScreenerTable() {
             {t.label}
           </button>
         ))}
-        <div className="ml-auto text-[10px] text-muted-foreground mr-2">
-          {rows.length} stocks
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <select
+            value={sectorFilter}
+            onChange={(e) => setSectorFilter(e.target.value)}
+            className="text-[11px] bg-muted/30 border border-border rounded-md px-2 py-1 outline-none focus:border-primary/50"
+          >
+            <option value="all">All Sectors</option>
+            {sectors.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select
+            value={mcTierFilter}
+            onChange={(e) => setMcTierFilter(e.target.value as McTier)}
+            className="text-[11px] bg-muted/30 border border-border rounded-md px-2 py-1 outline-none focus:border-primary/50"
+          >
+            {MC_TIERS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
+          <select
+            value={signalFilter}
+            onChange={(e) => setSignalFilter(e.target.value)}
+            className="text-[11px] bg-muted/30 border border-border rounded-md px-2 py-1 outline-none focus:border-primary/50"
+          >
+            <option value="all">All Signals</option>
+            <option value="BUY_TODAY">Buy Today</option>
+            <option value="WATCH">Watch</option>
+          </select>
+          {hasFilters && (
+            <button
+              onClick={() => { setSectorFilter("all"); setMcTierFilter("all"); setSignalFilter("all"); }}
+              className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <X className="h-3 w-3" /> Clear
+            </button>
+          )}
+          <button
+            onClick={() => exportCsv(rows, tab)}
+            disabled={rows.length === 0}
+            className="text-[11px] font-medium flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="h-3 w-3" /> CSV
+          </button>
+          <div className="text-[10px] text-muted-foreground mr-1">
+            {rows.length} stocks
+          </div>
         </div>
       </div>
 

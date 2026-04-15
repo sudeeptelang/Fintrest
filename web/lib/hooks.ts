@@ -71,6 +71,50 @@ export function useStockEarnings(ticker: string) {
   return useQuery({ queryKey: ["stock-earnings", ticker], queryFn: () => api.stockEarnings(ticker), enabled: !!ticker });
 }
 
+export function useStockOwnership(ticker: string) {
+  return useQuery({ queryKey: ["stock-ownership", ticker], queryFn: () => api.stockOwnership(ticker), enabled: !!ticker });
+}
+
+/**
+ * Current user's plan. Returns "free" when unauthenticated or loading so callers can
+ * treat "unknown" as "free" safely (they'll see the paywall prompt instead of paid content).
+ */
+export function usePlan(): { plan: "free" | "pro" | "elite"; isLoading: boolean } {
+  const { data, isLoading } = useCurrentUser();
+  const raw = (data?.plan ?? "free").toLowerCase();
+  const plan = raw === "pro" ? "pro" : raw === "elite" ? "elite" : "free";
+  return { plan, isLoading };
+}
+
+/** Ranked plan tiers so "requires Pro" means "Pro or higher". */
+const PLAN_RANK: Record<"free" | "pro" | "elite", number> = { free: 0, pro: 1, elite: 2 };
+export function planMeets(current: "free" | "pro" | "elite", required: "free" | "pro" | "elite"): boolean {
+  return PLAN_RANK[current] >= PLAN_RANK[required];
+}
+
+export function useMarketPulse() {
+  return useQuery({ queryKey: ["market-pulse"], queryFn: api.marketPulse, staleTime: 1000 * 60 });
+}
+
+export function useStockThesis(ticker: string) {
+  return useQuery({
+    queryKey: ["stock-thesis", ticker],
+    queryFn: () => api.stockThesis(ticker),
+    enabled: !!ticker,
+    // Theses are expensive to regenerate — keep fresh for a while.
+    staleTime: 1000 * 60 * 30, // 30 min
+    retry: 1,
+  });
+}
+
+export function useInsidersLatest(limit = 100) {
+  return useQuery({ queryKey: ["market-insiders", limit], queryFn: () => api.marketInsidersLatest(limit) });
+}
+
+export function useCongressLatest(limit = 100) {
+  return useQuery({ queryKey: ["market-congress", limit], queryFn: () => api.marketCongressLatest(limit) });
+}
+
 export function usePerformanceOverview() {
   return useQuery({ queryKey: ["performance"], queryFn: api.performanceOverview });
 }

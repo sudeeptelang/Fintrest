@@ -163,6 +163,107 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         }
     }
 
+    public async Task<OwnershipSnapshot?> GetOwnershipAsync(string ticker, CancellationToken ct = default)
+    {
+        // FMP stable: /institutional-ownership/symbol-ownership for aggregate, /insider-trading for transactions.
+        var summaryTask = TryFetch<List<FmpInstitutionalOwnership>>(
+            $"{_baseUrl}/institutional-ownership/symbol-ownership?symbol={ticker}&apikey={_apiKey}", ct);
+        var insiderTask = TryFetch<List<FmpInsiderTrade>>(
+            $"{_baseUrl}/insider-trading?symbol={ticker}&page=0&apikey={_apiKey}", ct);
+
+        await Task.WhenAll(summaryTask, insiderTask);
+
+        var summary = summaryTask.Result?.OrderByDescending(s => s.Date).FirstOrDefault();
+        var insiderRows = insiderTask.Result ?? [];
+
+        if (summary is null && insiderRows.Count == 0)
+            return null;
+
+        var trades = insiderRows.Take(8).Select(t => new InsiderTransaction(
+            TransactionDate: DateTime.TryParse(t.TransactionDate, out var d) ? d : null,
+            ReportingName: t.ReportingName,
+            Relationship: t.TypeOfOwner,
+            TransactionType: t.TransactionType,
+            SharesTraded: t.SecuritiesTransacted,
+            Price: t.Price,
+            TotalValue: t.SecuritiesTransacted.HasValue && t.Price.HasValue
+                ? t.SecuritiesTransacted * t.Price
+                : null
+        )).ToList();
+
+        return new OwnershipSnapshot(
+            Ticker: ticker.ToUpperInvariant(),
+            InstitutionalPercent: summary?.OwnershipPercent,
+            InvestorsHolding: summary?.InvestorsHolding,
+            InvestorsHoldingChange: summary?.InvestorsHoldingChange,
+            TotalInvested: summary?.TotalInvested,
+            OwnershipPercentChange: summary?.OwnershipPercentChange,
+            RecentInsiderTrades: trades
+        );
+    }
+
+    public async Task<List<InsiderTradeEvent>> GetLatestInsiderTradesAsync(int limit = 50, CancellationToken ct = default)
+    {
+        // FMP stable: /insider-trading/latest returns the firehose (no symbol filter).
+        var url = $"{_baseUrl}/insider-trading/latest?page=0&limit=100&apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpInsiderTradeFull>>(url, ct);
+        if (rows is null) return [];
+
+        return rows
+            .Take(limit)
+            .Select(t => new InsiderTradeEvent(
+                Ticker: (t.Symbol ?? "").ToUpperInvariant(),
+                TransactionDate: DateTime.TryParse(t.TransactionDate, out var td) ? td : null,
+                FilingDate: DateTime.TryParse(t.FilingDate, out var fd) ? fd : null,
+                ReportingName: t.ReportingName,
+                Relationship: t.TypeOfOwner,
+                TransactionType: t.TransactionType,
+                SharesTraded: t.SecuritiesTransacted,
+                Price: t.Price,
+                TotalValue: t.SecuritiesTransacted.HasValue && t.Price.HasValue
+                    ? t.SecuritiesTransacted * t.Price
+                    : null
+            ))
+            .Where(a => !string.IsNullOrEmpty(a.Ticker))
+            .ToList();
+    }
+
+    public async Task<List<CongressTrade>> GetCongressTradesAsync(int limit = 50, CancellationToken ct = default)
+    {
+        // FMP stable: senate + house latest trades (firehose feeds).
+        var senateTask = TryFetch<List<FmpCongressTrade>>(
+            $"{_baseUrl}/senate-latest?page=0&limit=100&apikey={_apiKey}", ct);
+        var houseTask = TryFetch<List<FmpCongressTrade>>(
+            $"{_baseUrl}/house-latest?page=0&limit=100&apikey={_apiKey}", ct);
+
+        await Task.WhenAll(senateTask, houseTask);
+
+        var merged = new List<CongressTrade>();
+        foreach (var row in senateTask.Result ?? [])
+            merged.Add(Map(row, "senate"));
+        foreach (var row in houseTask.Result ?? [])
+            merged.Add(Map(row, "house"));
+
+        return merged
+            .OrderByDescending(t => t.DisclosureDate ?? t.TransactionDate ?? DateTime.MinValue)
+            .Take(limit)
+            .ToList();
+
+        static CongressTrade Map(FmpCongressTrade t, string chamber) => new(
+            Chamber: chamber,
+            Ticker: (t.Symbol ?? "").ToUpperInvariant(),
+            AssetDescription: t.AssetDescription,
+            Representative: t.FirstName != null || t.LastName != null
+                ? $"{t.FirstName} {t.LastName}".Trim()
+                : (t.Office ?? t.Representative),
+            TransactionType: t.Type ?? t.TransactionType,
+            TransactionDate: DateTime.TryParse(t.TransactionDate, out var td) ? td : null,
+            DisclosureDate: DateTime.TryParse(t.DisclosureDate, out var dd) ? dd : null,
+            Amount: t.Amount,
+            SourceUrl: t.Link
+        );
+    }
+
     private async Task<T?> TryFetch<T>(string url, CancellationToken ct) where T : class
     {
         // Throttle through the shared rate limiter (250/min leaves headroom under FMP Starter 300/min)
@@ -250,4 +351,52 @@ file record FmpConstituent(
     [property: JsonPropertyName("symbol")] string? Symbol,
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("sector")] string? Sector
+);
+
+file record FmpInstitutionalOwnership(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("date")] string? Date,
+    [property: JsonPropertyName("investorsHolding")] int? InvestorsHolding,
+    [property: JsonPropertyName("lastInvestorsHolding")] int? LastInvestorsHolding,
+    [property: JsonPropertyName("investorsHoldingChange")] int? InvestorsHoldingChange,
+    [property: JsonPropertyName("numberOf13Fshares")] long? NumberOf13Fshares,
+    [property: JsonPropertyName("totalInvested")] double? TotalInvested,
+    [property: JsonPropertyName("ownershipPercent")] double? OwnershipPercent,
+    [property: JsonPropertyName("ownershipPercentChange")] double? OwnershipPercentChange
+);
+
+file record FmpInsiderTradeFull(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("filingDate")] string? FilingDate,
+    [property: JsonPropertyName("transactionDate")] string? TransactionDate,
+    [property: JsonPropertyName("reportingName")] string? ReportingName,
+    [property: JsonPropertyName("typeOfOwner")] string? TypeOfOwner,
+    [property: JsonPropertyName("transactionType")] string? TransactionType,
+    [property: JsonPropertyName("securitiesTransacted")] double? SecuritiesTransacted,
+    [property: JsonPropertyName("price")] double? Price
+);
+
+file record FmpCongressTrade(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("assetDescription")] string? AssetDescription,
+    [property: JsonPropertyName("disclosureDate")] string? DisclosureDate,
+    [property: JsonPropertyName("transactionDate")] string? TransactionDate,
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("transactionType")] string? TransactionType,
+    [property: JsonPropertyName("amount")] string? Amount,
+    [property: JsonPropertyName("representative")] string? Representative,
+    [property: JsonPropertyName("firstName")] string? FirstName,
+    [property: JsonPropertyName("lastName")] string? LastName,
+    [property: JsonPropertyName("office")] string? Office,
+    [property: JsonPropertyName("link")] string? Link
+);
+
+file record FmpInsiderTrade(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("transactionDate")] string? TransactionDate,
+    [property: JsonPropertyName("reportingName")] string? ReportingName,
+    [property: JsonPropertyName("typeOfOwner")] string? TypeOfOwner,
+    [property: JsonPropertyName("transactionType")] string? TransactionType,
+    [property: JsonPropertyName("securitiesTransacted")] double? SecuritiesTransacted,
+    [property: JsonPropertyName("price")] double? Price
 );

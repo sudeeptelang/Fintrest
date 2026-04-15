@@ -79,6 +79,36 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
         });
     }
 
+    /// <summary>
+    /// Force a drift scan with synthetic SPY/VIX values — lets you verify regime-conditional
+    /// weight flips + tilt shifts without waiting for real market movement.
+    /// Query params (all optional): spyPct (default -2.0), vixLevel, vixPct.
+    /// </summary>
+    [HttpPost("scan/drift")]
+    public async Task<IActionResult> SeedDriftScan(
+        [FromQuery] double spyPct = -2.0,
+        [FromQuery] double? vixLevel = null,
+        [FromQuery] double? vixPct = null,
+        CancellationToken ct = default)
+    {
+        var trigger = new DriftTrigger(spyPct, vixLevel, vixPct,
+            $"forced (SPY {spyPct:+0.00;-0.00}%)");
+        var result = await scanner.RunScanAsync("drift", trigger, ct);
+        return Ok(new
+        {
+            Trigger = trigger,
+            result.ScanRunId,
+            result.SignalsGenerated,
+            result.DurationMs,
+            TopPicks = result.TopSignals.Take(6).Select(s => new
+            {
+                s.Ticker,
+                Score = Math.Round(s.ScoreTotal, 1),
+                s.SignalType,
+            }),
+        });
+    }
+
     /// <summary>Run the scoring engine on all ingested data.</summary>
     [HttpPost("scan")]
     public async Task<IActionResult> SeedScan(CancellationToken ct)

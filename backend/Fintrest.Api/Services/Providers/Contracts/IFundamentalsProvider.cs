@@ -20,7 +20,63 @@ public interface IFundamentalsProvider
     /// <summary>Fetch constituent ticker list for a major index. Supported keys: "sp500", "nasdaq", "dowjones".
     /// Used by the seed/preset endpoints to expand the scan universe without hardcoding lists.</summary>
     Task<List<string>> GetIndexConstituentsAsync(string indexKey, CancellationToken ct = default);
+
+    /// <summary>Get ownership breakdown: institutional %, insider %, and recent insider transactions.
+    /// Used by the Simply Wall St-style ownership strip on stock detail pages.</summary>
+    Task<OwnershipSnapshot?> GetOwnershipAsync(string ticker, CancellationToken ct = default);
+
+    /// <summary>Global fire-hose of recent insider transactions across all US equities.
+    /// Used by the /insiders activity page.</summary>
+    Task<List<InsiderTradeEvent>> GetLatestInsiderTradesAsync(int limit = 50, CancellationToken ct = default);
+
+    /// <summary>Merged Senate + House trading disclosures, most recent first.
+    /// Used by the /congress tracker page.</summary>
+    Task<List<CongressTrade>> GetCongressTradesAsync(int limit = 50, CancellationToken ct = default);
 }
+
+public record InsiderTradeEvent(
+    string Ticker,
+    DateTime? TransactionDate,
+    DateTime? FilingDate,
+    string? ReportingName,
+    string? Relationship,
+    string? TransactionType,
+    double? SharesTraded,
+    double? Price,
+    double? TotalValue
+);
+
+public record CongressTrade(
+    string Chamber,               // "senate" or "house"
+    string Ticker,
+    string? AssetDescription,
+    string? Representative,
+    string? TransactionType,      // "Purchase", "Sale (Partial)", etc.
+    DateTime? TransactionDate,
+    DateTime? DisclosureDate,
+    string? Amount,               // FMP returns ranges like "$1,001 - $15,000"
+    string? SourceUrl
+);
+
+public record OwnershipSnapshot(
+    string Ticker,
+    double? InstitutionalPercent,
+    int? InvestorsHolding,
+    int? InvestorsHoldingChange,
+    double? TotalInvested,
+    double? OwnershipPercentChange,
+    List<InsiderTransaction> RecentInsiderTrades
+);
+
+public record InsiderTransaction(
+    DateTime? TransactionDate,
+    string? ReportingName,
+    string? Relationship,
+    string? TransactionType,   // "P-Purchase", "S-Sale", etc.
+    double? SharesTraded,
+    double? Price,
+    double? TotalValue
+);
 
 public record QuarterlyEarnings(
     string Period,          // "2026-Q1"

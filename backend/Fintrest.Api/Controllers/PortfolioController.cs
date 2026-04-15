@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Fintrest.Api.Controllers;
 
 [Authorize]
+[RequiresPlan(Models.PlanType.Pro)]  // Portfolio features are Pro tier
 [ApiController]
 [Route("api/v1/portfolios")]
 public class PortfolioController(
@@ -23,6 +24,21 @@ public class PortfolioController(
     {
         var id = await User.ResolveUserId(db);
         return id ?? throw new UnauthorizedAccessException();
+    }
+
+    /// <summary>
+    /// Download a canonical CSV template users can fill in by hand. Minimal columns —
+    /// just Symbol, Quantity, AvgCost. Works across every broker; paste holdings + upload.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("/api/v1/portfolio-template.csv")]
+    public IActionResult DownloadTemplate()
+    {
+        const string content = "Symbol,Quantity,AvgCost\nAAPL,10,175.50\nNVDA,5,460.00\nMSFT,8,405.25\n";
+        return File(
+            System.Text.Encoding.UTF8.GetBytes(content),
+            "text/csv",
+            "fintrest-portfolio-template.csv");
     }
 
     /// <summary>List all portfolios for the authenticated user.</summary>

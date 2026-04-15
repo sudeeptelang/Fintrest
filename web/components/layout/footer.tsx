@@ -2,8 +2,7 @@ import Link from "next/link";
 
 const footerLinks = {
   Product: [
-    { label: "Top Picks", href: "/picks" },
-    { label: "Swing Trades", href: "/swing" },
+    { label: "Athena's Picks", href: "/picks" },
     { label: "Sector Heatmap", href: "/heatmap" },
     { label: "Performance", href: "/performance" },
     { label: "Pricing", href: "/pricing" },

@@ -1,7 +1,9 @@
 using Fintrest.Api.Data;
 using Fintrest.Api.DTOs.Signals;
 using Fintrest.Api.DTOs.Stocks;
+using Fintrest.Api.Core;
 using Fintrest.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Fintrest.Api.Services.Providers.Contracts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -171,8 +173,8 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             .OrderByDescending(n => n.PublishedAt)
             .Take(limit)
             .Select(n => new NewsResponse(
-                n.Headline, n.Summary, n.Source, n.Url,
-                n.SentimentScore, n.CatalystType, n.PublishedAt
+                n.Id, n.Headline, n.Summary, n.Source, n.Url,
+                n.SentimentScore, n.CatalystType, n.PublishedAt, n.Stock.Ticker
             ))
             .ToListAsync();
 
@@ -192,7 +194,14 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 .Where(s => s.ScanRunId == latestScan.Id)
                 .OrderByDescending(s => s.ScoreTotal)
                 .Take(limit)
-                .ToDictionaryAsync(s => s.StockId, s => new { s.ScoreTotal, s.SignalType })
+                .ToDictionaryAsync(s => s.StockId, s => new
+                {
+                    s.ScoreTotal,
+                    s.SignalType,
+                    s.EntryLow, s.EntryHigh,
+                    s.StopLoss, s.TargetLow, s.TargetHigh,
+                    s.HorizonDays,
+                })
             : new();
 
         if (signalsByStock.Count == 0) return Ok(new List<ScreenerRowResponse>());
@@ -257,7 +266,16 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             fundByStock.TryGetValue(stock.Id, out var fund);
             signalsByStock.TryGetValue(stock.Id, out var signal);
 
-            rows.Add(new ScreenerRowResponse(
+            // Risk:Reward from stored trade zone — TargetLow-EntryHigh vs EntryHigh-StopLoss.
+            double? riskReward = null;
+            if (signal?.EntryHigh is > 0 && signal.StopLoss is > 0 && signal.TargetLow is > 0)
+            {
+                var reward = (signal.TargetLow ?? 0) - (signal.EntryHigh ?? 0);
+                var risk = (signal.EntryHigh ?? 0) - (signal.StopLoss ?? 0);
+                if (risk > 0) riskReward = Math.Round(reward / risk, 2);
+            }
+
+            var row = new ScreenerRowResponse(
                 Ticker: stock.Ticker,
                 Name: stock.Name,
                 Sector: stock.Sector,
@@ -288,12 +306,67 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 AnalystTargetPrice: stock.AnalystTargetPrice,
                 NextEarningsDate: stock.NextEarningsDate,
                 SignalScore: signal?.ScoreTotal,
-                SignalType: signal?.SignalType.ToString()
-            ));
+                SignalType: signal?.SignalType.ToString(),
+                EntryLow: signal?.EntryLow,
+                EntryHigh: signal?.EntryHigh,
+                StopLoss: signal?.StopLoss,
+                TargetLow: signal?.TargetLow,
+                TargetHigh: signal?.TargetHigh,
+                RiskReward: riskReward,
+                HorizonDays: signal?.HorizonDays,
+                Verdict: ClassifyVerdictLight(stock, fund, bars, signal?.SignalType.ToString(), changePct, PerfN(5), relVol, w52RangePct)
+            );
+            rows.Add(row);
         }
 
         // Return in signal-score order (top picks first)
         return Ok(rows.OrderByDescending(r => r.SignalScore ?? 0).ToList());
+    }
+
+    /// <summary>
+    /// Lightweight verdict classifier operating only on data already loaded by the screener query.
+    /// Not as precise as the full <c>AthenaThesisService.ClassifyVerdict</c> (which sees factor
+    /// percentiles + regime) but good enough to power the dashboard's lens chips.
+    /// </summary>
+    private static string ClassifyVerdictLight(
+        Fintrest.Api.Models.Stock stock,
+        Fintrest.Api.Models.Fundamental? fund,
+        IEnumerable<dynamic> bars,
+        string? signalType,
+        double? changePct,
+        double? perfWeek,
+        double? relVol,
+        double? week52RangePct)
+    {
+        // Earnings within 14 days beats everything.
+        if (stock.NextEarningsDate.HasValue)
+        {
+            var days = (stock.NextEarningsDate.Value - DateTime.UtcNow).TotalDays;
+            if (days is >= 0 and <= 14) return "Event-Driven";
+        }
+
+        var peg = stock.PegRatio;
+
+        // Buy the Dip: today red, week still up or flat, reasonable valuation
+        if (changePct is <= -0.5 && (perfWeek ?? 0) > -1 && (peg is null || peg is > 0 and < 2))
+            return "Buy the Dip";
+
+        // Breakout Setup: elevated volume + near 52W high
+        if ((relVol ?? 1) > 1.5 && (week52RangePct ?? 0) > 85)
+            return "Breakout Setup";
+
+        // Momentum Run: strong recent momentum
+        if ((perfWeek ?? 0) > 3)
+            return "Momentum Run";
+
+        // Value Setup: cheap by PEG and not chasing
+        if (peg is > 0 and < 1.2 && (perfWeek ?? 0) < 2)
+            return "Value Setup";
+
+        // Defensive: low beta name
+        if ((stock.Beta ?? 1.0) < 0.8) return "Defensive Hold";
+
+        return signalType == "BUY_TODAY" ? "Quality Setup" : "Watchlist";
     }
 
     [HttpGet("market/sectors")]
@@ -691,8 +764,265 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             .Take(limit)
             .ToListAsync();
 
-        return Ok(news.Select(n => new NewsResponse(n.Headline, n.Summary, n.Source, n.Url, n.SentimentScore, n.CatalystType, n.PublishedAt)).ToList());
+        return Ok(news.Select(n => new NewsResponse(n.Id, n.Headline, n.Summary, n.Source, n.Url, n.SentimentScore, n.CatalystType, n.PublishedAt, stock.Ticker)).ToList());
     }
+
+    [Authorize]
+    [RequiresPlan(PlanType.Pro)]
+    [HttpGet("market/insiders/latest")]
+    public async Task<ActionResult<List<InsiderActivityItem>>> GetLatestInsiderTrades([FromQuery] int limit = 50)
+    {
+        var trades = await fundamentalsProvider.GetLatestInsiderTradesAsync(Math.Clamp(limit, 1, 200));
+        return Ok(trades.Select(t => new InsiderActivityItem(
+            t.Ticker, t.TransactionDate, t.FilingDate, t.ReportingName, t.Relationship,
+            t.TransactionType, t.SharesTraded, t.Price, t.TotalValue
+        )).ToList());
+    }
+
+    [Authorize]
+    [RequiresPlan(PlanType.Pro)]
+    [HttpGet("market/congress/latest")]
+    public async Task<ActionResult<List<CongressTradeItem>>> GetCongressTrades([FromQuery] int limit = 50)
+    {
+        var trades = await fundamentalsProvider.GetCongressTradesAsync(Math.Clamp(limit, 1, 200));
+        return Ok(trades.Select(t => new CongressTradeItem(
+            t.Chamber, t.Ticker, t.AssetDescription, t.Representative, t.TransactionType,
+            t.TransactionDate, t.DisclosureDate, t.Amount, t.SourceUrl
+        )).ToList());
+    }
+
+    [HttpGet("stocks/{ticker}/ownership")]
+    public async Task<ActionResult<OwnershipResponse>> GetOwnership(string ticker)
+    {
+        var snapshot = await fundamentalsProvider.GetOwnershipAsync(ticker);
+        if (snapshot is null)
+            return Ok(new OwnershipResponse(ticker.ToUpperInvariant(), null, null, null, null, null, []));
+
+        return Ok(new OwnershipResponse(
+            snapshot.Ticker,
+            snapshot.InstitutionalPercent,
+            snapshot.InvestorsHolding,
+            snapshot.InvestorsHoldingChange,
+            snapshot.TotalInvested,
+            snapshot.OwnershipPercentChange,
+            snapshot.RecentInsiderTrades.Select(t => new InsiderTradeDto(
+                t.TransactionDate, t.ReportingName, t.Relationship, t.TransactionType,
+                t.SharesTraded, t.Price, t.TotalValue
+            )).ToList()
+        ));
+    }
+
+    /// <summary>
+    /// Typeahead search over our local stock universe — matches tickers (prefix, cheaper) first,
+    /// then name ILIKE (substring) so users can find stocks by company name. Intentionally
+    /// scoped to the ingested universe so search results are always scorable.
+    /// </summary>
+    [HttpGet("stocks/search")]
+    public async Task<IActionResult> SearchStocks([FromQuery] string q, [FromQuery] int limit = 8)
+    {
+        if (string.IsNullOrWhiteSpace(q) || q.Length < 1)
+            return Ok(Array.Empty<object>());
+
+        var needle = q.Trim().ToUpperInvariant();
+        var clamped = Math.Clamp(limit, 1, 25);
+
+        // Prefix match on ticker ranks first; then substring match on name (case-insensitive).
+        var rows = await db.Stocks
+            .Where(s => s.Active
+                && (EF.Functions.ILike(s.Ticker, needle + "%")
+                    || EF.Functions.ILike(s.Name, "%" + needle + "%")))
+            .OrderBy(s => EF.Functions.ILike(s.Ticker, needle + "%") ? 0 : 1)
+            .ThenBy(s => s.Ticker)
+            .Take(clamped)
+            .Select(s => new
+            {
+                s.Id,
+                s.Ticker,
+                s.Name,
+                s.Sector,
+                s.MarketCap,
+            })
+            .ToListAsync();
+
+        return Ok(rows);
+    }
+
+    [HttpGet("market/pulse")]
+    public async Task<IActionResult> GetMarketPulse(CancellationToken ct)
+    {
+        // Resolve the most recent completed scan — it has the regime + signal counts we need.
+        var latestScan = await db.ScanRuns
+            .Where(s => s.Status == "COMPLETED")
+            .OrderByDescending(s => s.CompletedAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (latestScan is null)
+            return Ok(new { regime = "neutral", spyReturn1d = 0.0, vixLevel = (double?)null, signalsToday = 0, buyCount = 0, watchCount = 0, narrative = (string?)null, scanAt = (DateTime?)null });
+
+        // Signal counts from the latest scan.
+        var scanSignals = await db.Signals
+            .Where(s => s.ScanRunId == latestScan.Id)
+            .Select(s => s.SignalType)
+            .ToListAsync(ct);
+
+        var buyCount = scanSignals.Count(t => t == SignalType.BUY_TODAY);
+        var watchCount = scanSignals.Count(t => t == SignalType.WATCH);
+
+        // SPY today's % move — from the two most recent bars.
+        double? spyReturn1d = null;
+        double? vixLevel = null;
+        var spy = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker == "SPY", ct);
+        if (spy is not null)
+        {
+            var spyBars = await db.MarketData
+                .Where(m => m.StockId == spy.Id)
+                .OrderByDescending(m => m.Ts)
+                .Take(2)
+                .Select(m => m.Close)
+                .ToListAsync(ct);
+            if (spyBars.Count == 2 && spyBars[1] > 0)
+                spyReturn1d = Math.Round((spyBars[0] - spyBars[1]) / spyBars[1] * 100, 2);
+        }
+
+        var vix = await db.Stocks.FirstOrDefaultAsync(
+            s => s.Ticker == "VIX" || s.Ticker == "^VIX" || s.Ticker == "VIXY", ct);
+        if (vix is not null)
+        {
+            var vixBars = await db.MarketData
+                .Where(m => m.StockId == vix.Id)
+                .OrderByDescending(m => m.Ts)
+                .Take(1)
+                .Select(m => m.Close)
+                .ToListAsync(ct);
+            if (vixBars.Count > 0) vixLevel = Math.Round(vixBars[0], 1);
+        }
+
+        // Regime label derived from the same rules the scoring engine uses.
+        string regime;
+        if (vixLevel is > 25) regime = "highvol";
+        else if (spyReturn1d is < -1.5) regime = "bear";
+        else if (spyReturn1d is > 1.0) regime = "bull";
+        else regime = "neutral";
+
+        // Athena daily market narrative. Short-cache at 1h so we don't burn LLM tokens on every page view.
+        var topTickers = await db.Signals
+            .Include(s => s.Stock)
+            .Where(s => s.ScanRunId == latestScan.Id && s.SignalType == SignalType.BUY_TODAY)
+            .OrderByDescending(s => s.ScoreTotal)
+            .Take(3)
+            .Select(s => s.Stock!.Ticker)
+            .ToListAsync(ct);
+
+        return Ok(new
+        {
+            regime,
+            spyReturn1d,
+            vixLevel,
+            signalsToday = scanSignals.Count,
+            buyCount,
+            watchCount,
+            narrative = BuildPulseNarrative(regime, spyReturn1d, vixLevel, buyCount, watchCount, topTickers),
+            scanAt = latestScan.CompletedAt,
+            topTickers,
+        });
+    }
+
+    /// <summary>
+    /// Build a short market-pulse narrative from regime signals + top tickers without calling
+    /// the LLM. Keeps dashboard loads free; the rich narrative lives on per-stock theses.
+    /// </summary>
+    private static string BuildPulseNarrative(
+        string regime, double? spyReturn1d, double? vixLevel,
+        int buyCount, int watchCount, List<string> topTickers)
+    {
+        var spyText = spyReturn1d.HasValue
+            ? $"SPY {(spyReturn1d.Value >= 0 ? "+" : "")}{spyReturn1d.Value:F2}%"
+            : "SPY flat";
+        var vixText = vixLevel.HasValue ? $", VIX {vixLevel.Value:F0}" : "";
+        var countText = buyCount > 0
+            ? $"{buyCount} BUY + {watchCount} WATCH signals"
+            : $"{watchCount} WATCH signals (no BUY_TODAY today)";
+
+        var regimeLabel = regime switch
+        {
+            "bull" => "risk-on — momentum in favor",
+            "bear" => "risk-off — defensive posture",
+            "highvol" => "fear spike — elevated VIX, conviction lower",
+            _ => "neutral — tape is quiet"
+        };
+
+        var topText = topTickers.Count > 0
+            ? $" Top picks: {string.Join(", ", topTickers)}."
+            : "";
+
+        return $"{regimeLabel}. {spyText}{vixText}. {countText}.{topText}";
+    }
+
+    [HttpGet("market/news/{newsId:long}/athena")]
+    public async Task<IActionResult> GetNewsAthenaSummary(
+        long newsId,
+        [FromServices] Services.Scoring.AthenaNewsService newsService,
+        CancellationToken ct)
+    {
+        var item = await newsService.GetOrGenerateAsync(newsId, ct);
+        if (item is null) return NotFound(new { message = "News item not found" });
+
+        return Ok(new
+        {
+            id = item.Id,
+            ticker = item.Stock?.Ticker,
+            headline = item.Headline,
+            source = item.Source,
+            url = item.Url,
+            publishedAt = item.PublishedAt,
+            sentimentScore = item.SentimentScore,
+            catalystType = item.CatalystType,
+            athenaSummary = item.AthenaSummary,
+            generatedAt = item.AthenaSummaryAt,
+        });
+    }
+
+    [HttpGet("stocks/{ticker}/thesis")]
+    public async Task<IActionResult> GetThesis(
+        string ticker,
+        [FromServices] Services.Scoring.AthenaThesisService thesisService,
+        [FromServices] Services.Pipeline.ScanOrchestrator scanner,
+        [FromQuery] bool force = false,
+        CancellationToken ct = default)
+    {
+        var normalized = ticker.ToUpperInvariant();
+
+        if (!force)
+        {
+            var cached = await thesisService.GetOrGenerateAsync(normalized, ct);
+            if (cached is not null)
+                return Ok(ProjectThesis(cached));
+        }
+
+        // On-demand generation: need a fresh snapshot + score for this ticker.
+        var stock = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker == normalized, ct);
+        if (stock is null)
+            return NotFound(new { message = $"Ticker '{normalized}' not in universe." });
+
+        var freshlyGenerated = await scanner.GenerateThesisForTickerAsync(stock, ct);
+        if (freshlyGenerated is null)
+            return StatusCode(503, new { message = "Thesis generation unavailable — check Athena API key + fundamentals freshness." });
+
+        return Ok(ProjectThesis(freshlyGenerated));
+    }
+
+    private static object ProjectThesis(Models.AthenaThesis t) => new
+    {
+        ticker = t.Ticker,
+        verdict = t.Verdict,
+        tier = t.Tier,
+        thesis = t.ThesisMarkdown,
+        catalysts = System.Text.Json.JsonDocument.Parse(t.CatalystsJson).RootElement,
+        risks = System.Text.Json.JsonDocument.Parse(t.RisksJson).RootElement,
+        tradePlan = System.Text.Json.JsonDocument.Parse(t.TradePlanJson).RootElement,
+        generatedAt = t.GeneratedAt,
+        model = t.Model,
+    };
 
     [HttpGet("performance/overview")]
     public async Task<ActionResult<PerformanceOverviewResponse>> PerformanceOverview()

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
+import { AskAthenaFab } from "@/components/layout/ask-athena-fab";
 
 export default function AppLayout({
   children,
@@ -21,6 +22,7 @@ export default function AppLayout({
         <AppHeader onMenuToggle={() => setSidebarOpen(true)} />
         <main className="flex-1 p-4 sm:p-6">{children}</main>
       </div>
+      <AskAthenaFab />
     </div>
   );
 }

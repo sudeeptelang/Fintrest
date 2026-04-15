@@ -99,6 +99,7 @@ export interface MarketDataPoint {
 }
 
 export interface NewsItem {
+  id: number;
   headline: string;
   summary: string | null;
   source: string | null;
@@ -106,6 +107,20 @@ export interface NewsItem {
   sentimentScore: number | null;
   catalystType: string | null;
   publishedAt: string | null;
+  ticker: string | null;
+}
+
+export interface NewsAthenaSummary {
+  id: number;
+  ticker: string | null;
+  headline: string;
+  source: string | null;
+  url: string | null;
+  publishedAt: string | null;
+  sentimentScore: number | null;
+  catalystType: string | null;
+  athenaSummary: string | null;
+  generatedAt: string | null;
 }
 
 export interface PerformanceOverview {
@@ -154,6 +169,56 @@ export interface ScreenerRow {
   nextEarningsDate: string | null;
   signalScore: number | null;
   signalType: string | null;
+  entryLow: number | null;
+  entryHigh: number | null;
+  stopLoss: number | null;
+  targetLow: number | null;
+  targetHigh: number | null;
+  riskReward: number | null;
+  horizonDays: number | null;
+  verdict: string | null;
+}
+
+export interface AthenaTradePlan {
+  entryLow?: number | null;
+  entryHigh?: number | null;
+  stopLoss?: number | null;
+  targetLow?: number | null;
+  targetHigh?: number | null;
+  riskReward?: number | null;
+  narrative: string;
+}
+
+export interface AthenaThesisResponse {
+  ticker: string;
+  verdict: string;
+  tier: string;
+  thesis: string;
+  catalysts: string[];
+  risks: string[];
+  tradePlan: AthenaTradePlan;
+  generatedAt: string;
+  model: string;
+}
+
+export interface StockSearchResult {
+  id: number;
+  ticker: string;
+  name: string;
+  sector: string | null;
+  marketCap: number | null;
+}
+
+export interface MarketPulseResponse {
+  regime: "bull" | "bear" | "highvol" | "neutral";
+  spyReturn1d: number | null;
+  vixLevel: number | null;
+  signalsToday: number;
+  buyCount: number;
+  watchCount: number;
+  narrative: string;
+  scanAt: string | null;
+  topTickers: string[];
 }
 
 export interface TrendingStock {
@@ -208,6 +273,50 @@ export interface EarningsHistoryItem {
   epsSurprise: number | null;
   grossMargin: number | null;
   operatingMargin: number | null;
+}
+
+export interface InsiderActivity {
+  ticker: string;
+  transactionDate: string | null;
+  filingDate: string | null;
+  reportingName: string | null;
+  relationship: string | null;
+  transactionType: string | null;
+  sharesTraded: number | null;
+  price: number | null;
+  totalValue: number | null;
+}
+
+export interface CongressTradeRow {
+  chamber: string;
+  ticker: string;
+  assetDescription: string | null;
+  representative: string | null;
+  transactionType: string | null;
+  transactionDate: string | null;
+  disclosureDate: string | null;
+  amount: string | null;
+  sourceUrl: string | null;
+}
+
+export interface InsiderTrade {
+  transactionDate: string | null;
+  reportingName: string | null;
+  relationship: string | null;
+  transactionType: string | null;
+  sharesTraded: number | null;
+  price: number | null;
+  totalValue: number | null;
+}
+
+export interface OwnershipResponse {
+  ticker: string;
+  institutionalPercent: number | null;
+  investorsHolding: number | null;
+  investorsHoldingChange: number | null;
+  totalInvested: number | null;
+  ownershipPercentChange: number | null;
+  recentInsiderTrades: InsiderTrade[];
 }
 
 export interface StockSnapshot {
@@ -296,6 +405,7 @@ export interface SubscriptionResponse {
   status: string;
   stripeCustomerId: string | null;
   currentPeriodEnd: string | null;
+  stripeConfigured: boolean;
 }
 
 export interface WatchlistItemResponse {
@@ -304,6 +414,17 @@ export interface WatchlistItemResponse {
   ticker: string;
   stockName: string;
   createdAt: string;
+  currentPrice: number | null;
+  changePct: number | null;
+  signalScore: number | null;
+  signalType: string | null;
+  verdict: string | null;
+  entryLow: number | null;
+  entryHigh: number | null;
+  stopLoss: number | null;
+  targetLow: number | null;
+  targetHigh: number | null;
+  riskReward: number | null;
 }
 
 export interface WatchlistResponse {
@@ -336,6 +457,8 @@ export const api = {
   marketEarningsCalendar: (days = 14) => fetchApi<EarningsCalendarItem[]>(`/market/earnings-calendar?days=${days}`),
   marketNews: (limit = 10) => fetchApi<NewsItem[]>(`/market/news?limit=${limit}`),
   marketScreener: (limit = 50) => fetchApi<ScreenerRow[]>(`/market/screener?limit=${limit}`),
+  marketInsidersLatest: (limit = 50) => fetchApi<InsiderActivity[]>(`/market/insiders/latest?limit=${limit}`),
+  marketCongressLatest: (limit = 50) => fetchApi<CongressTradeRow[]>(`/market/congress/latest?limit=${limit}`),
   topPicks: (limit = 12) => fetchApi<SignalListResponse>(`/picks/top-today?limit=${limit}`),
   swingWeek: () => fetchApi<SignalListResponse>("/picks/swing-week"),
 
@@ -353,6 +476,15 @@ export const api = {
     fetchApi<AnalystConsensus>(`/stocks/${ticker}/analyst`),
   stockEarnings: (ticker: string) =>
     fetchApi<EarningsHistoryItem[]>(`/stocks/${ticker}/earnings`),
+  stockOwnership: (ticker: string) =>
+    fetchApi<OwnershipResponse>(`/stocks/${ticker}/ownership`),
+  stockThesis: (ticker: string) =>
+    fetchApi<AthenaThesisResponse>(`/stocks/${ticker}/thesis`),
+  marketPulse: () => fetchApi<MarketPulseResponse>("/market/pulse"),
+  newsAthenaSummary: (newsId: number) =>
+    fetchApi<NewsAthenaSummary>(`/market/news/${newsId}/athena`),
+  searchStocks: (q: string, limit = 8) =>
+    fetchApi<StockSearchResult[]>(`/stocks/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 
   // Performance (public)
   performanceOverview: () => fetchApi<PerformanceOverview>("/performance/overview"),
@@ -513,6 +645,20 @@ export interface AdvisorResult {
   healthScore: number;
   recommendations: Recommendation[];
   alerts: string[];
+  factorProfile: PortfolioFactorProfile | null;
+  verdictMix: Record<string, number> | null;
+  regimeContext: "bull" | "bear" | "highvol" | "neutral" | null;
+}
+
+export interface PortfolioFactorProfile {
+  momentum: number;
+  volume: number;
+  catalyst: number;
+  fundamental: number;
+  sentiment: number;
+  trend: number;
+  risk: number;
+  coverage: number;
 }
 
 export interface Recommendation {

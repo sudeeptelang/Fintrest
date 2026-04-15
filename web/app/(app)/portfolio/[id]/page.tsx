@@ -8,6 +8,7 @@ import { Brain, BarChart3, ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle
 import { Button } from "@/components/ui/button";
 import { api, type Holding } from "@/lib/api";
 import { ScoreRing } from "@/components/charts/score-ring";
+import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-profile";
 
 interface PortfolioDetailPageProps {
   params: Promise<{ id: string }>;
@@ -125,6 +126,9 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
           )}
         </div>
       </div>
+
+      {/* Athena profile — factor radar + verdict mix + regime */}
+      <PortfolioAthenaProfile advisor={advisorData} />
 
       {/* Holdings table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">

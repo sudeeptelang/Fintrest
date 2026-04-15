@@ -94,5 +94,24 @@ public record PortfolioAnalyticsResponse(
 public record AdvisorResponse(
     double HealthScore,
     List<RecommendationResponse> Recommendations,
-    List<string> Alerts
+    List<string> Alerts,
+    PortfolioFactorProfile? FactorProfile = null,
+    Dictionary<string, int>? VerdictMix = null,
+    string? RegimeContext = null
+);
+
+/// <summary>
+/// Position-weighted average of the 7-factor percentile scores across every holding
+/// that has a current Signal/Breakdown. A portfolio at 80 Momentum + 40 Risk tells a
+/// very different story than one at 50 Momentum + 75 Risk — this is how we show that.
+/// </summary>
+public record PortfolioFactorProfile(
+    double Momentum,
+    double Volume,
+    double Catalyst,
+    double Fundamental,
+    double Sentiment,
+    double Trend,
+    double Risk,
+    int Coverage  // how many holdings contributed (= had an active signal)
 );

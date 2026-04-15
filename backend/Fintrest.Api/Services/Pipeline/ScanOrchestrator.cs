@@ -4,6 +4,9 @@ using Fintrest.Api.Data;
 using Fintrest.Api.Models;
 using Fintrest.Api.Services.Scoring;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+using RegimeModel = Fintrest.Api.Services.Scoring.MarketRegime;
 
 namespace Fintrest.Api.Services.Pipeline;
 
@@ -11,9 +14,28 @@ namespace Fintrest.Api.Services.Pipeline;
 /// Orchestrates a full scan: loads data → scores each stock → persists signals.
 /// This is the main entry point for the daily scan job.
 /// </summary>
-public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
+public class ScanOrchestrator(
+    AppDbContext db,
+    ILogger<ScanOrchestrator> logger,
+    IOptions<ScoringOptions> scoringOptions,
+    AthenaThesisService thesisService)
 {
+    private readonly ScoringOptions _options = scoringOptions.Value;
+    /// <summary>How many top signals get an AI thesis generated per scan.</summary>
+    private const int ThesisTopN = 10;
+
     public async Task<ScanResult> RunScanAsync(CancellationToken ct = default)
+        => await RunScanAsync(runType: "daily", liveTrigger: null, ct: ct);
+
+    /// <summary>
+    /// Run a scoring scan. <paramref name="liveTrigger"/> comes from the intraday drift watcher
+    /// and overrides the SPY/VIX values in the computed MarketRegime so the tilt + regime-conditional
+    /// weights reflect *now* rather than the stale daily bars in the DB.
+    /// </summary>
+    public async Task<ScanResult> RunScanAsync(
+        string runType,
+        DriftTrigger? liveTrigger,
+        CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
 
@@ -27,34 +49,48 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
         {
             Status = "RUNNING",
             StrategyVersion = "v1.0",
-            RunType = "daily",
-            MarketSession = "pre_market",
+            RunType = runType,
+            MarketSession = liveTrigger is not null ? "intraday" : "pre_market",
             UniverseSize = stocks.Count,
         };
         db.ScanRuns.Add(scanRun);
         await db.SaveChangesAsync(ct);
 
-        logger.LogInformation("Scan {ScanId} started", scanRun.Id);
+        logger.LogInformation("Scan {ScanId} started (type={Type})", scanRun.Id, runType);
 
         try
         {
             // Compute market regime once for all stocks
             await ComputeMarketRegime(ct);
+            if (liveTrigger is not null)
+            {
+                _regime = _regime with
+                {
+                    SpyReturn1d = liveTrigger.SpyChangePct,
+                    VixLevel = liveTrigger.VixLevel ?? _regime.VixLevel,
+                    VixChange1d = liveTrigger.VixChangePct ?? _regime.VixChange1d,
+                };
+                logger.LogInformation(
+                    "Drift override: SPY 1d={Spy:F2}% VIX={Vix} VIXΔ={VixChg}",
+                    _regime.SpyReturn1d,
+                    _regime.VixLevel?.ToString("F1") ?? "n/a",
+                    _regime.VixChange1d?.ToString("F2") ?? "n/a");
+            }
 
             logger.LogInformation("Loaded {Count} active stocks", stocks.Count);
 
-            var scoredSignals = new List<ScoredSignal>();
-
-            // 3. Score each stock
+            // ─────────────────────────────────────────────────────────────
+            // PASS 1 — Compute raw factor scores for every stock (no Total yet).
+            // ─────────────────────────────────────────────────────────────
+            var pending = new List<(StockSnapshot Snap, StockScorer.FactorResult Raw)>(stocks.Count);
             foreach (var stock in stocks)
             {
                 try
                 {
                     var snapshot = await BuildSnapshot(stock, ct);
-                    if (snapshot is null) continue; // Not enough data
-
-                    var scored = StockScorer.Score(snapshot);
-                    scoredSignals.Add(scored);
+                    if (snapshot is null) continue;
+                    var raw = StockScorer.ScoreFactors(snapshot);
+                    pending.Add((snapshot, raw));
                 }
                 catch (Exception ex)
                 {
@@ -62,31 +98,58 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
                 }
             }
 
-            // 4. Rank by total score descending
-            scoredSignals = scoredSignals
-                .OrderByDescending(s => s.ScoreTotal)
-                .ToList();
+            // ─────────────────────────────────────────────────────────────
+            // PASS 2 — Cross-sectional percentile ranking across universe.
+            // Converts each factor score from "raw table output" to "your stock's
+            // percentile within today's universe on this factor" (0-100).
+            // ─────────────────────────────────────────────────────────────
+            ScoringEngineV2.ScoreBreakdown[] ranked;
+            if (_options.UsePercentileRanking && pending.Count >= _options.MinUniverseForRanking)
+            {
+                ranked = PercentileRanker.RankBreakdowns(pending.Select(p => p.Raw.Breakdown).ToList());
+                logger.LogInformation("Percentile-ranked {N} stocks across 7 factors", ranked.Length);
+            }
+            else
+            {
+                ranked = pending.Select(p => p.Raw.Breakdown).ToArray();
+                logger.LogInformation("Percentile ranking skipped (universe={N}, min={Min})",
+                    pending.Count, _options.MinUniverseForRanking);
+            }
 
-            logger.LogInformation("Scored {Count} stocks, top: {Top}",
+            // ─────────────────────────────────────────────────────────────
+            // PASS 3 — Apply market-regime tilt (±TiltCap), then finalize each stock:
+            // pick regime-conditional weights, compute Total, classify, build trade zones.
+            // ─────────────────────────────────────────────────────────────
+            var scoredSignals = new List<ScoredSignal>(pending.Count);
+            for (int i = 0; i < pending.Count; i++)
+            {
+                var (snap, raw) = pending[i];
+                var tilted = ApplyRegimeTilt(ranked[i], snap.Sector, snap.StockReturn5d);
+                var final = StockScorer.Finalize(snap, tilted, raw.Provenance, _options, _regime);
+                scoredSignals.Add(final);
+            }
+
+            scoredSignals = scoredSignals.OrderByDescending(s => s.ScoreTotal).ToList();
+
+            logger.LogInformation("Scored {Count} stocks, top: {Top} ({Score:F1})",
                 scoredSignals.Count,
-                scoredSignals.FirstOrDefault()?.Ticker ?? "none");
+                scoredSignals.FirstOrDefault()?.Ticker ?? "none",
+                scoredSignals.FirstOrDefault()?.ScoreTotal ?? 0);
 
-            // 4b. Filter: only publish actionable signals per CLAUDE.md rules
-            //   - BUY_TODAY: must have valid trade zone AND R:R >= 1.5
-            //   - WATCH: must have valid trade zone, keep top 20
-            //   - HIGH_RISK / AVOID: don't publish
+            // ─────────────────────────────────────────────────────────────
+            // PASS 4 — Publish filter: BUY_TODAY with R:R >= min, WATCH capped at N.
+            // ─────────────────────────────────────────────────────────────
             var publishable = new List<ScoredSignal>();
 
             var buySignals = scoredSignals
                 .Where(s => s.SignalType == "BUY_TODAY"
                          && s.RiskRewardRatio.HasValue
-                         && s.RiskRewardRatio.Value >= 1.5)
+                         && s.RiskRewardRatio.Value >= _options.Thresholds.MinRiskReward)
                 .ToList();
 
             var watchSignals = scoredSignals
-                .Where(s => s.SignalType == "WATCH"
-                         && s.EntryLow.HasValue) // has trade zone
-                .Take(20)
+                .Where(s => s.SignalType == "WATCH" && s.EntryLow.HasValue)
+                .Take(_options.Thresholds.MaxWatchSignals)
                 .ToList();
 
             publishable.AddRange(buySignals);
@@ -158,6 +221,12 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
             logger.LogInformation(
                 "Scan {ScanId} completed: {Count} signals in {Ms}ms",
                 scanRun.Id, scoredSignals.Count, sw.ElapsedMilliseconds);
+
+            // 7. Athena AI theses for top N publishable signals — runs post-scan so signals are
+            //    visible to users immediately; theses appear as they're generated. Sequential
+            //    (not parallel) to stay under Anthropic rate limits and keep token usage predictable.
+            await GenerateThesesForTopSignals(
+                publishable, pending, scanRun.Id, ct);
 
             return new ScanResult
             {
@@ -264,35 +333,229 @@ public class ScanOrchestrator(AppDbContext db, ILogger<ScanOrchestrator> logger)
             NextEarningsDate = stock.NextEarningsDate,
             LastEpsSurprise = fundamental?.EpsGrowth, // Proxy: EPS growth as surprise indicator
             // Market regime (set separately)
-            SpyTrendDirection = _spyTrendDirection,
+            SpyTrendDirection = _regime.SpyTrendDirection,
+            Regime = _regime,
+            StockReturn5d = PctReturn(marketData.Select(m => m.Close).ToList(), 5),
         };
     }
 
-    private int _spyTrendDirection;
+    private RegimeModel _regime = RegimeModel.Neutral;
 
-    /// <summary>Compute SPY trend direction once per scan for market regime awareness.</summary>
+    /// <summary>
+    /// Generate AI theses for the top publishable signals. Best-effort — failures per ticker
+    /// are logged and skipped so one bad Claude response doesn't break the scan.
+    /// </summary>
+    private async Task GenerateThesesForTopSignals(
+        List<ScoredSignal> publishable,
+        List<(StockSnapshot Snap, StockScorer.FactorResult Raw)> pending,
+        long scanRunId,
+        CancellationToken ct)
+    {
+        var snapshotByTicker = pending.ToDictionary(p => p.Snap.Ticker, p => p.Snap);
+        var top = publishable.Take(ThesisTopN).ToList();
+        if (top.Count == 0) return;
+
+        logger.LogInformation("Generating Athena theses for top {N} signals", top.Count);
+
+        foreach (var signal in top)
+        {
+            if (ct.IsCancellationRequested) break;
+            if (!snapshotByTicker.TryGetValue(signal.Ticker, out var snap)) continue;
+
+            var zone = signal.EntryLow.HasValue
+                ? new TradeZoneCalculator.TradeZone(
+                    EntryLow: signal.EntryLow ?? 0,
+                    EntryHigh: signal.EntryHigh ?? 0,
+                    StopLoss: signal.StopLoss ?? 0,
+                    TargetLow: signal.TargetLow ?? 0,
+                    TargetHigh: signal.TargetHigh ?? 0,
+                    RiskRewardRatio: signal.RiskRewardRatio ?? 0)
+                : null;
+
+            var todayChangePct = snap.ClosePrices.Count >= 2 && snap.ClosePrices[^2] > 0
+                ? (snap.Price - snap.ClosePrices[^2]) / snap.ClosePrices[^2] * 100
+                : 0;
+
+            try
+            {
+                await thesisService.GenerateAsync(snap, signal.Breakdown, zone, _regime, scanRunId, todayChangePct, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Thesis generation failed for {Ticker}", signal.Ticker);
+            }
+        }
+    }
+
+    /// <summary>
+    /// On-demand thesis generation for a ticker not covered by the last scan (e.g. user visits a
+    /// detail page for a stock that didn't hit the top-N threshold). Builds a snapshot, scores it
+    /// with the most recent regime, and feeds the thesis service. Returns null if the stock lacks
+    /// enough history to score.
+    /// </summary>
+    public async Task<AthenaThesis?> GenerateThesisForTickerAsync(
+        Stock stock,
+        CancellationToken ct = default)
+    {
+        // Ensure we have a recent regime snapshot — reuse cached if fresh, else recompute.
+        if (_regime.SpyReturn5d == 0 && _regime.SpyReturn20d == 0)
+            await ComputeMarketRegime(ct);
+
+        var snapshot = await BuildSnapshot(stock, ct);
+        if (snapshot is null) return null;
+
+        var raw = StockScorer.ScoreFactors(snapshot);
+
+        // Single-stock percentile ranking doesn't make sense; apply regime tilt to the raw breakdown
+        // so the thesis sees a reasonable score profile rather than 50/50/50/...
+        var tilted = ApplyRegimeTilt(raw.Breakdown, snapshot.Sector, snapshot.StockReturn5d);
+        var signal = StockScorer.Finalize(snapshot, tilted, raw.Provenance, _options, _regime);
+
+        var zone = signal.EntryLow.HasValue
+            ? new TradeZoneCalculator.TradeZone(
+                EntryLow: signal.EntryLow ?? 0,
+                EntryHigh: signal.EntryHigh ?? 0,
+                StopLoss: signal.StopLoss ?? 0,
+                TargetLow: signal.TargetLow ?? 0,
+                TargetHigh: signal.TargetHigh ?? 0,
+                RiskRewardRatio: signal.RiskRewardRatio ?? 0)
+            : null;
+
+        var todayChangePct = snapshot.ClosePrices.Count >= 2 && snapshot.ClosePrices[^2] > 0
+            ? (snapshot.Price - snapshot.ClosePrices[^2]) / snapshot.ClosePrices[^2] * 100
+            : 0;
+
+        return await thesisService.GenerateAsync(
+            snapshot, signal.Breakdown, zone, _regime, scanRunId: null, todayChangePct, ct);
+    }
+
+
+    /// <summary>
+    /// Apply regime tilt to each factor of a ranked breakdown, bounded by configured cap.
+    /// Runs AFTER percentile ranking so the tilt is applied on universe-relative scores.
+    /// </summary>
+    private ScoringEngineV2.ScoreBreakdown ApplyRegimeTilt(
+        ScoringEngineV2.ScoreBreakdown ranked,
+        string? sector,
+        double? stockReturn5d)
+    {
+        var cap = _options.RegimeTiltCap;
+        return new ScoringEngineV2.ScoreBreakdown(
+            Momentum: ScoringEngineV2.ApplyRegime(ranked.Momentum, "Momentum", _regime, sector, stockReturn5d, cap),
+            Volume: ScoringEngineV2.ApplyRegime(ranked.Volume, "Volume", _regime, sector, stockReturn5d, cap),
+            Catalyst: ScoringEngineV2.ApplyRegime(ranked.Catalyst, "Catalyst", _regime, sector, stockReturn5d, cap),
+            Fundamental: ScoringEngineV2.ApplyRegime(ranked.Fundamental, "Fundamental", _regime, sector, stockReturn5d, cap),
+            Sentiment: ScoringEngineV2.ApplyRegime(ranked.Sentiment, "Sentiment", _regime, sector, stockReturn5d, cap),
+            Trend: ScoringEngineV2.ApplyRegime(ranked.Trend, "Trend", _regime, sector, stockReturn5d, cap),
+            Risk: ScoringEngineV2.ApplyRegime(ranked.Risk, "Risk", _regime, sector, stockReturn5d, cap)
+        );
+    }
+
+
+    /// <summary>
+    /// Compute full market regime once per scan: SPY trend, SPY returns (1d/5d/20d),
+    /// VIX level + change, and per-sector 5d average return. Snapshot is reused for every stock.
+    /// </summary>
     private async Task ComputeMarketRegime(CancellationToken ct)
     {
         var spy = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker == "SPY", ct);
-        if (spy is null) { _spyTrendDirection = 0; return; }
+        if (spy is null) { _regime = RegimeModel.Neutral; return; }
 
         var spyBars = await db.MarketData
             .Where(m => m.StockId == spy.Id)
             .OrderByDescending(m => m.Ts)
-            .Take(200)
+            .Take(250)
             .Select(m => m.Close)
             .ToListAsync(ct);
 
-        if (spyBars.Count < 50) { _spyTrendDirection = 0; return; }
+        if (spyBars.Count < 50) { _regime = RegimeModel.Neutral; return; }
 
         spyBars.Reverse();
-        var ma50 = spyBars.TakeLast(50).Average();
-        var ma200 = spyBars.Count >= 200 ? spyBars.Average() : ma50;
-        var price = spyBars[^1];
+        var spyMa50 = spyBars.TakeLast(50).Average();
+        var spyMa200 = spyBars.Count >= 200 ? spyBars.Average() : spyMa50;
+        var spyPrice = spyBars[^1];
+        var spyTrend = Indicators.TechnicalIndicators.TrendDirection(spyPrice, null, spyMa50, spyMa200);
 
-        _spyTrendDirection = Indicators.TechnicalIndicators.TrendDirection(price, null, ma50, ma200);
-        logger.LogInformation("Market regime: SPY trend = {Dir} (price={Price}, MA50={MA50})",
-            _spyTrendDirection, price, ma50);
+        var spy1d = PctReturn(spyBars, 1) ?? 0;
+        var spy5d = PctReturn(spyBars, 5) ?? 0;
+        var spy20d = PctReturn(spyBars, 20) ?? 0;
+
+        // VIX: try common tickers if user's universe includes it.
+        double? vixLevel = null, vixChange = null;
+        var vix = await db.Stocks.FirstOrDefaultAsync(
+            s => s.Ticker == "VIX" || s.Ticker == "^VIX" || s.Ticker == "VIXY",
+            ct);
+        if (vix is not null)
+        {
+            var vixBars = await db.MarketData
+                .Where(m => m.StockId == vix.Id)
+                .OrderByDescending(m => m.Ts)
+                .Take(5)
+                .Select(m => m.Close)
+                .ToListAsync(ct);
+            if (vixBars.Count >= 1) vixLevel = vixBars[0];
+            if (vixBars.Count >= 2 && vixBars[1] > 0)
+                vixChange = (vixBars[0] - vixBars[1]) / vixBars[1] * 100;
+        }
+
+        // Sector RS — average 5d return per sector across active stocks (cheap proxy for sector ETF RS).
+        var sectorReturns = new Dictionary<string, double>();
+        var sectorGroups = await db.Stocks
+            .Where(s => s.Active && s.Sector != null)
+            .Select(s => new { s.Id, s.Sector })
+            .ToListAsync(ct);
+
+        var cutoff = DateTime.UtcNow.AddDays(-12); // enough bars to span 5 sessions + weekends
+        var recentBars = await db.MarketData
+            .Where(m => m.Ts >= cutoff)
+            .Select(m => new { m.StockId, m.Ts, m.Close })
+            .ToListAsync(ct);
+
+        var closesByStock = recentBars
+            .GroupBy(b => b.StockId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderBy(b => b.Ts).Select(b => b.Close).ToList());
+
+        foreach (var bySector in sectorGroups.GroupBy(s => s.Sector!))
+        {
+            var returns = new List<double>();
+            foreach (var s in bySector)
+            {
+                if (closesByStock.TryGetValue(s.Id, out var closes) && closes.Count >= 6)
+                {
+                    var r = PctReturn(closes, 5);
+                    if (r.HasValue) returns.Add(r.Value);
+                }
+            }
+            if (returns.Count >= 3) // skip tiny sectors
+                sectorReturns[bySector.Key] = returns.Average();
+        }
+
+        _regime = new RegimeModel
+        {
+            SpyTrendDirection = spyTrend,
+            SpyReturn1d = spy1d,
+            SpyReturn5d = spy5d,
+            SpyReturn20d = spy20d,
+            VixLevel = vixLevel,
+            VixChange1d = vixChange,
+            SectorReturns5d = sectorReturns,
+        };
+
+        logger.LogInformation(
+            "Market regime: SPY trend={Dir} 1d={D1:F2}% 5d={D5:F2}% 20d={D20:F2}% VIX={Vix} Sectors={Sectors}",
+            spyTrend, spy1d, spy5d, spy20d,
+            vixLevel?.ToString("F1") ?? "n/a",
+            sectorReturns.Count);
+    }
+
+    private static double? PctReturn(IReadOnlyList<double> closes, int lookback)
+    {
+        if (closes.Count <= lookback) return null;
+        var prev = closes[^(lookback + 1)];
+        if (prev <= 0) return null;
+        return (closes[^1] - prev) / prev * 100;
     }
 }
 
@@ -303,3 +566,13 @@ public record ScanResult
     public int DurationMs { get; init; }
     public List<ScoredSignal> TopSignals { get; init; } = [];
 }
+
+/// <summary>
+/// Live market snapshot passed from <see cref="IntradayDriftJob"/> into the scan
+/// so regime-conditional weights + tilts react to what the tape is doing right now.
+/// </summary>
+public record DriftTrigger(
+    double SpyChangePct,
+    double? VixLevel,
+    double? VixChangePct,
+    string Reason);

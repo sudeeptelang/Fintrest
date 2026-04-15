@@ -98,6 +98,23 @@ class ApiService {
     return (res.data as List).cast<Map<String, dynamic>>();
   }
 
+  Future<Map<String, dynamic>> getStockOwnership(String ticker) async {
+    final res = await _client.get(ApiConstants.stockOwnership(ticker));
+    return res.data as Map<String, dynamic>;
+  }
+
+  // --- Insiders & Congress (global feeds) ---
+
+  Future<List<Map<String, dynamic>>> getInsidersLatest({int limit = 100}) async {
+    final res = await _client.get(ApiConstants.insidersLatest, params: {'limit': limit});
+    return (res.data as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getCongressLatest({int limit = 100}) async {
+    final res = await _client.get(ApiConstants.congressLatest, params: {'limit': limit});
+    return (res.data as List).cast<Map<String, dynamic>>();
+  }
+
   // --- Watchlists (authenticated) ---
 
   Future<List<Map<String, dynamic>>> getWatchlists() async {

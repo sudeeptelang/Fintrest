@@ -17,6 +17,8 @@ import {
   Bell,
   Bot,
   BellDot,
+  Users,
+  Landmark,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,9 +29,7 @@ const sidebarSections = [
     label: "Discover",
     links: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Top Picks", href: "/picks", icon: TrendingUp },
-      { label: "Swing Trades", href: "/swing", icon: CandlestickChart },
-      { label: "Ask Athena", href: "/athena", icon: Bot },
+      { label: "Athena's Picks", href: "/picks", icon: TrendingUp },
     ],
   },
   {
@@ -45,6 +45,8 @@ const sidebarSections = [
       { label: "Watchlist", href: "/watchlist", icon: Star },
       { label: "Alerts", href: "/alerts", icon: Bell },
       { label: "Markets", href: "/markets", icon: BarChart3 },
+      { label: "Insiders", href: "/insiders", icon: Users },
+      { label: "Congress", href: "/congress", icon: Landmark },
       { label: "Performance", href: "/performance", icon: LineChart },
       { label: "Notifications", href: "/notifications", icon: BellDot },
     ],

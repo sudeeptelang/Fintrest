@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/network/api_service.dart';
 import '../../core/network/api_client.dart';
+import '../insiders/insiders_screen.dart';
+import '../congress/congress_screen.dart';
 
 class MarketsScreen extends StatefulWidget {
   const MarketsScreen({super.key});
@@ -83,6 +85,39 @@ class _MarketsScreenState extends State<MarketsScreen> {
                   ),
                   const SizedBox(height: 12),
                   ..._buildIndexCards(),
+                  const SizedBox(height: 24),
+
+                  // Activity trackers (Insiders + Congress)
+                  Text(
+                    'Smart Money',
+                    style: GoogleFonts.sora(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(
+                      child: _TrackerTile(
+                        icon: Icons.groups_outlined,
+                        title: 'Insider Trades',
+                        subtitle: 'Form 4 filings · cluster buys',
+                        color: AppColors.emerald,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const InsidersScreen()),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _TrackerTile(
+                        icon: Icons.account_balance_outlined,
+                        title: 'Congress',
+                        subtitle: 'Senate + House disclosures',
+                        color: AppColors.emeraldLight,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const CongressScreen()),
+                        ),
+                      ),
+                    ),
+                  ]),
                   const SizedBox(height: 24),
 
                   // Sector performance
@@ -310,6 +345,66 @@ class _ErrorState extends StatelessWidget {
           const SizedBox(height: 16),
           ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
         ],
+      ),
+    );
+  }
+}
+
+class _TrackerTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _TrackerTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            const SizedBox(height: 10),
+            Text(title,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text(subtitle,
+                style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            const SizedBox(height: 6),
+            Row(children: [
+              Text('Open',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: color,
+                      fontWeight: FontWeight.w600)),
+              Icon(Icons.arrow_forward, size: 12, color: color),
+            ]),
+          ],
+        ),
       ),
     );
   }

@@ -3,14 +3,29 @@ using Fintrest.Api.Services.Indicators;
 namespace Fintrest.Api.Services.Scoring;
 
 /// <summary>
-/// Scores a single stock from its snapshot using the V2 scoring engine.
-/// Pure function: snapshot in, scored signal out. No DB access.
+/// Two-pass stock scorer:
+///
+///   1) <see cref="ScoreFactors"/> — produces a raw ScoreBreakdown (0-100 per factor, no Total)
+///      for a single stock. Called for every stock in the universe.
+///
+///   2) <see cref="Finalize"/> — given a final (percentile-ranked + regime-tilted) breakdown,
+///      computes Total via regime-conditional weights, classifies via configured thresholds,
+///      and produces trade zones + explanation for publishable signals.
+///
+/// Splitting the two steps lets <c>ScanOrchestrator</c> percentile-rank factor scores across
+/// the whole universe between pass 1 and pass 2 — so a "90 Momentum" means top-decile among
+/// today's ~500 names, not an absolute raw ROC value.
 /// </summary>
 public static class StockScorer
 {
-    public static ScoredSignal Score(StockSnapshot snap)
+    public record FactorResult(
+        ScoringEngineV2.ScoreBreakdown Breakdown,
+        Dictionary<string, object?> Provenance,
+        double? AvgDailyVolume30d);
+
+    /// <summary>Pass 1: compute raw factor scores for a stock.</summary>
+    public static FactorResult ScoreFactors(StockSnapshot snap)
     {
-        // 1. Compute technical indicators from price series
         var closes = snap.ClosePrices;
         var highs = snap.HighPrices;
         var lows = snap.LowPrices;
@@ -23,14 +38,12 @@ public static class StockScorer
         var atrPct = TechnicalIndicators.ATRPercent(highs, lows, closes);
         var trendDir = TechnicalIndicators.TrendDirection(snap.Price, ma20, ma50, ma200);
 
-        // Volume average (30-day)
         var avgVolume30D = snap.VolumeSeries.Count >= 30
             ? snap.VolumeSeries.TakeLast(30).Average(v => (double)v)
             : snap.VolumeSeries.Count > 0
                 ? snap.VolumeSeries.Average(v => (double)v)
                 : (double?)null;
 
-        // 2. Run V2 scoring engine with all available data
         var breakdown = ScoringEngineV2.Compute(
             closes: closes,
             highs: highs,
@@ -65,30 +78,13 @@ public static class StockScorer
             floatShares: snap.FloatShares,
             nextEarningsDate: snap.NextEarningsDate,
             lastEpsSurprise: snap.LastEpsSurprise,
-            spyTrendDirection: snap.SpyTrendDirection
-        );
+            spyTrendDirection: snap.SpyTrendDirection,
+            // Regime tilt is NOT applied here — it happens post-ranking in the orchestrator
+            // so percentile ranks are computed on pure factor scores.
+            regime: MarketRegime.Neutral,
+            sector: null,
+            stockReturn5d: null);
 
-        // 3. Calculate trade zones (only for actionable signals)
-        TradeZoneCalculator.TradeZone? zone = null;
-        if (breakdown.SignalType is "BUY_TODAY" or "WATCH")
-        {
-            zone = TradeZoneCalculator.Calculate(snap);
-            zone = TradeZoneCalculator.AdjustForConviction(zone, breakdown.Total);
-        }
-
-        // 4. Generate explanation
-        var explanation = ExplanationGenerator.Generate(
-            snap.Ticker, snap.Name, breakdown, snap, zone);
-
-        // 5. Determine risk level from score
-        var riskLevel = breakdown.Risk switch
-        {
-            >= 70 => "LOW",
-            >= 40 => "MEDIUM",
-            _ => "HIGH"
-        };
-
-        // 6. Build provenance
         var provenance = new Dictionary<string, object?>
         {
             ["engine"] = "v2",
@@ -112,14 +108,66 @@ public static class StockScorer
             ["next_earnings"] = snap.NextEarningsDate,
             ["spy_trend"] = snap.SpyTrendDirection,
             ["close_count"] = snap.ClosePrices.Count,
+            ["stock_return_5d"] = snap.StockReturn5d,
         };
+
+        return new FactorResult(breakdown, provenance, avgVolume30D);
+    }
+
+    /// <summary>
+    /// Pass 2: produce the final ScoredSignal given a ranked + tilted breakdown,
+    /// regime-conditional weights, and configured thresholds.
+    /// </summary>
+    public static ScoredSignal Finalize(
+        StockSnapshot snap,
+        ScoringEngineV2.ScoreBreakdown finalBreakdown,
+        Dictionary<string, object?> provenance,
+        ScoringOptions options,
+        MarketRegime regime)
+    {
+        var weights = options.RegimeWeights.Pick(regime, options.Weights);
+        var total = weights.Apply(finalBreakdown);
+        var signalType = options.Thresholds.Classify(total);
+
+        var classified = finalBreakdown with { Total = total, SignalType = signalType };
+
+        TradeZoneCalculator.TradeZone? zone = null;
+        if (signalType is "BUY_TODAY" or "WATCH")
+        {
+            zone = TradeZoneCalculator.Calculate(snap);
+            zone = TradeZoneCalculator.AdjustForConviction(zone, total);
+        }
+
+        var explanation = ExplanationGenerator.Generate(
+            snap.Ticker, snap.Name, classified, snap, zone);
+
+        var riskLevel = classified.Risk switch
+        {
+            >= 70 => "LOW",
+            >= 40 => "MEDIUM",
+            _ => "HIGH"
+        };
+
+        provenance["weights_regime"] = regime.SpyTrendDirection switch
+        {
+            1 => "bull",
+            -1 => "bear",
+            _ => "neutral"
+        };
+        provenance["regime_spy_1d"] = regime.SpyReturn1d;
+        provenance["regime_spy_5d"] = regime.SpyReturn5d;
+        provenance["regime_vix"] = regime.VixLevel;
+        provenance["sector_rs_5d"] = snap.Sector is not null
+            && regime.SectorReturns5d.TryGetValue(snap.Sector, out var sr)
+                ? sr
+                : (double?)null;
 
         return new ScoredSignal
         {
             StockId = snap.StockId,
             Ticker = snap.Ticker,
             Name = snap.Name,
-            Breakdown = breakdown,
+            Breakdown = classified,
             EntryLow = zone?.EntryLow,
             EntryHigh = zone?.EntryHigh,
             StopLoss = zone?.StopLoss,
@@ -127,7 +175,7 @@ public static class StockScorer
             TargetHigh = zone?.TargetHigh,
             RiskRewardRatio = zone?.RiskRewardRatio,
             RiskLevel = riskLevel,
-            HorizonDays = DetermineHorizon(breakdown, snap),
+            HorizonDays = DetermineHorizon(classified, snap),
             Explanation = explanation,
             Provenance = provenance,
         };

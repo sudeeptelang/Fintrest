@@ -7,7 +7,6 @@ import { Treemap, ResponsiveContainer, Tooltip } from "recharts";
 import { Loader2, TrendingUp, TrendingDown, Activity, ArrowUpDown } from "lucide-react";
 import {
   useMarketSummary,
-  useMarketSectors,
   useMarketIndices,
   useMarketScreener,
 } from "@/lib/hooks";
@@ -19,14 +18,11 @@ type MoverTab = "gainers" | "losers" | "active" | "all";
 export default function MarketsPage() {
   const { data: market, isLoading: summaryLoading } = useMarketSummary();
   const { data: indices } = useMarketIndices();
-  const { data: sectors } = useMarketSectors();
-  const { data: screener } = useMarketScreener(50);
+  const { data: screener } = useMarketScreener(100);
 
-  const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [moverTab, setMoverTab] = useState<MoverTab>("gainers");
 
   const indexList = indices ?? [];
-  const sectorList = sectors ?? [];
   const stocks = useMemo(() => screener ?? [], [screener]);
 
   // ─── Market Pulse: compute breadth score from screener data
@@ -46,23 +42,23 @@ export default function MarketsPage() {
     return { score, label, up, down, flat };
   }, [stocks]);
 
-  // ─── Treemap data
-  const treemapData = sectorList
-    .filter((s) => s.stockCount > 0)
-    .map((s) => ({
-      name: s.sector,
-      size: s.stockCount,
-      changePct: s.changePct ?? 0,
-      signalCount: s.signalCount,
-    }));
-
-  // ─── Filtered stocks for movers table
-  const filteredStocks = selectedSector
-    ? stocks.filter((s) => s.sector === selectedSector)
-    : stocks;
+  // ─── Heatmap data — top 40 stocks by market cap. Box size = market cap, color = today's % change.
+  const heatmapData = useMemo(() => {
+    return stocks
+      .filter((s) => s.marketCap && s.marketCap > 0 && s.changePct !== null)
+      .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
+      .slice(0, 40)
+      .map((s) => ({
+        name: s.ticker,
+        size: s.marketCap ?? 0,
+        changePct: s.changePct ?? 0,
+        stockName: s.name,
+        price: s.price,
+      }));
+  }, [stocks]);
 
   const moversRows = useMemo(() => {
-    const list = [...filteredStocks];
+    const list = [...stocks];
     switch (moverTab) {
       case "gainers":
         return list
@@ -83,7 +79,7 @@ export default function MarketsPage() {
           .sort((a, b) => (b.signalScore ?? 0) - (a.signalScore ?? 0))
           .slice(0, 20);
     }
-  }, [filteredStocks, moverTab]);
+  }, [stocks, moverTab]);
 
   // Loading check AFTER all hooks (Rules of Hooks)
   if (summaryLoading) {
@@ -122,61 +118,49 @@ export default function MarketsPage() {
         </div>
       </div>
 
-      {/* Sector Treemap */}
+      {/* Popular Stocks Heatmap — Finviz-style: box size = market cap, color = today's % change. */}
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="font-[var(--font-heading)] text-lg font-semibold">
-              Sector Heatmap
+              Popular Stocks Heatmap
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {selectedSector
-                ? `Filtered to ${selectedSector}. `
-                : "Click a sector to filter movers below. "}
-              Box size = stock count · color = performance
+              Top 40 by market cap · box size = market cap · color = today&apos;s % change · click to open
             </p>
           </div>
-          {selectedSector && (
-            <button
-              onClick={() => setSelectedSector(null)}
-              className="text-xs text-primary hover:underline"
-            >
-              Clear filter
-            </button>
-          )}
         </div>
-        {treemapData.length === 0 ? (
+        {heatmapData.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
-            No sector data yet.
+            No stock data yet.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={340}>
+          <ResponsiveContainer width="100%" height={420}>
             <Treemap
-              data={treemapData}
+              data={heatmapData}
               dataKey="size"
               aspectRatio={4 / 3}
-              stroke="rgba(0,0,0,0.05)"
-              content={
-                <SectorCell
-                  selectedSector={selectedSector}
-                  onSelect={setSelectedSector}
-                />
-              }
+              stroke="rgba(0,0,0,0.08)"
+              content={<StockCell />}
             >
               <Tooltip
                 content={({ active, payload }) => {
                   if (!active || !payload?.[0]?.payload) return null;
                   const d = payload[0].payload as {
                     name: string;
+                    stockName: string;
                     size: number;
                     changePct: number;
-                    signalCount: number;
+                    price: number | null;
                   };
                   return (
                     <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg text-xs">
-                      <p className="font-semibold">{d.name}</p>
+                      <p className="font-semibold">{d.name} · {d.stockName}</p>
                       <p className="text-muted-foreground mt-0.5">
-                        {d.size} stocks · {d.signalCount} signals
+                        {d.price ? `$${d.price.toFixed(2)} · ` : ""}
+                        {d.size >= 1e12 ? `$${(d.size / 1e12).toFixed(2)}T` :
+                         d.size >= 1e9 ? `$${(d.size / 1e9).toFixed(1)}B` :
+                         `$${(d.size / 1e6).toFixed(0)}M`} mkt cap
                       </p>
                       <p
                         className={`font-[var(--font-mono)] font-bold mt-1 ${
@@ -225,7 +209,7 @@ export default function MarketsPage() {
             })}
           </div>
           <span className="text-[10px] text-muted-foreground">
-            {moversRows.length} {selectedSector && `in ${selectedSector}`}
+            {moversRows.length}
           </span>
         </div>
 
@@ -508,63 +492,59 @@ function MarketPulse({
 }
 
 // ════════════════════════════════════════════════════════════════
-// Treemap cell
+// Heatmap cell — clickable, jumps to the stock detail page
 // ════════════════════════════════════════════════════════════════
 
-function SectorCell(props: any) {
-  const { x, y, width, height, name, changePct, signalCount, selectedSector, onSelect } = props;
+function StockCell(props: any) {
+  const { x, y, width, height, name, changePct } = props;
   const pct = changePct ?? 0;
 
-  // Color intensity based on performance
+  // Color intensity — saturates at ±3% so the heatmap never looks monotone.
   const getColor = () => {
-    const intensity = Math.min(Math.abs(pct) / 2, 1); // saturate at ±2%
-    if (pct >= 0) {
-      return `rgba(16, 185, 129, ${0.2 + intensity * 0.6})`;
-    }
-    return `rgba(239, 68, 68, ${0.2 + intensity * 0.6})`;
+    const intensity = Math.min(Math.abs(pct) / 3, 1);
+    if (pct >= 0) return `rgba(16, 185, 129, ${0.22 + intensity * 0.55})`;
+    return `rgba(239, 68, 68, ${0.22 + intensity * 0.55})`;
   };
 
-  const isSelected = selectedSector === name;
-  const textSize = Math.min(width, height) < 60 ? 9 : Math.min(width, height) < 100 ? 11 : 13;
+  const tickerSize = Math.min(width, height) < 50 ? 9 : Math.min(width, height) < 90 ? 12 : 15;
+  const pctSize = Math.max(tickerSize - 2, 8);
+
+  const handleClick = () => {
+    if (typeof window !== "undefined" && name) window.location.href = `/stock/${name}`;
+  };
 
   return (
-    <g
-      onClick={() => onSelect(isSelected ? null : name)}
-      style={{ cursor: "pointer" }}
-    >
+    <g onClick={handleClick} style={{ cursor: "pointer" }}>
       <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
+        x={x} y={y} width={width} height={height}
         fill={getColor()}
-        stroke={isSelected ? "#2563EB" : "rgba(0,0,0,0.08)"}
-        strokeWidth={isSelected ? 2.5 : 1}
-        rx={6}
+        stroke="rgba(0,0,0,0.08)"
+        strokeWidth={1}
+        rx={4}
       />
-      {width > 50 && height > 30 && (
+      {width > 40 && height > 28 && (
         <>
           <text
             x={x + width / 2}
-            y={y + height / 2 - 4}
+            y={y + height / 2 - 2}
             textAnchor="middle"
             fill="#0F172A"
-            fontSize={textSize}
+            fontSize={tickerSize}
             fontWeight={700}
+            fontFamily="Monaco, Courier, monospace"
           >
-            {name.length > 14 ? name.slice(0, 12) + "…" : name}
+            {name}
           </text>
           <text
             x={x + width / 2}
-            y={y + height / 2 + textSize + 2}
+            y={y + height / 2 + tickerSize - 1}
             textAnchor="middle"
-            fill={pct >= 0 ? "#059669" : "#DC2626"}
-            fontSize={textSize - 1}
-            fontWeight={600}
+            fill={pct >= 0 ? "#065f46" : "#991b1b"}
+            fontSize={pctSize}
+            fontWeight={700}
             fontFamily="Monaco, Courier, monospace"
           >
-            {pct >= 0 ? "+" : ""}
-            {pct.toFixed(2)}%
+            {pct >= 0 ? "+" : ""}{pct.toFixed(2)}%
           </text>
         </>
       )}

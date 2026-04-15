@@ -1,24 +1,27 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   User,
-  Bell,
-  Zap,
   Shield,
   CreditCard,
-  BarChart3,
   FileText,
   LogOut,
   ChevronRight,
   Loader2,
+  Mail,
+  Check,
+  ExternalLink,
+  ArrowUpRight,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser, useSubscription, useUpdatePreferences } from "@/lib/hooks";
 import { signOut } from "@/lib/auth";
-import Link from "next/link";
-import { Mail } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { api } from "@/lib/api";
 
 const planColors: Record<string, string> = {
   Free: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
@@ -27,19 +30,13 @@ const planColors: Record<string, string> = {
   Premium: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
 };
 
-const settingsRows = [
-  { label: "Personal Information", icon: User, href: "#" },
-  { label: "Security & Password", icon: Shield, href: "#" },
-  { label: "Billing & Plan", icon: CreditCard, href: "/pricing" },
-  { label: "Risk Profile", icon: BarChart3, href: "#" },
-  { label: "Disclaimers & Legal", icon: FileText, href: "#" },
-];
-
 export default function SettingsPage() {
   const router = useRouter();
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const { data: sub } = useSubscription();
   const updatePrefs = useUpdatePreferences();
+
+  const [expanded, setExpanded] = useState<"profile" | "security" | "billing" | null>(null);
 
   const plan = sub?.plan || user?.plan || "Free";
   const initials = user?.fullName
@@ -85,9 +82,7 @@ export default function SettingsPage() {
             <p className="font-semibold text-lg">{user?.fullName || "User"}</p>
             <p className="text-sm text-muted-foreground">{user?.email}</p>
             <div className="flex items-center gap-2 mt-2">
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${planColors[plan] || planColors.Free}`}
-              >
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${planColors[plan] || planColors.Free}`}>
                 {plan} Plan
               </span>
               {sub?.status === "Active" && (
@@ -136,27 +131,35 @@ export default function SettingsPage() {
         </div>
       </motion.div>
 
-      {/* Settings menu */}
+      {/* Expandable settings rows */}
       <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
-        {settingsRows.map((row, i) => (
-          <motion.div
-            key={row.label}
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.03 }}
-          >
-            <Link
-              href={row.href}
-              className="flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <row.icon className="h-4.5 w-4.5 text-muted-foreground" />
-                <span className="text-sm font-medium">{row.label}</span>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </Link>
-          </motion.div>
-        ))}
+        <SettingsRow
+          icon={User}
+          label="Personal Information"
+          expanded={expanded === "profile"}
+          onToggle={() => setExpanded(expanded === "profile" ? null : "profile")}
+        >
+          <ProfileForm />
+        </SettingsRow>
+
+        <SettingsRow
+          icon={Shield}
+          label="Security & Password"
+          expanded={expanded === "security"}
+          onToggle={() => setExpanded(expanded === "security" ? null : "security")}
+        >
+          <PasswordForm />
+        </SettingsRow>
+
+        <SettingsRow
+          icon={CreditCard}
+          label="Billing & Plan"
+          expanded={expanded === "billing"}
+          onToggle={() => setExpanded(expanded === "billing" ? null : "billing")}
+        >
+          <BillingPanel />
+        </SettingsRow>
+        <LinkRow icon={FileText} label="Disclaimers & Legal" href="/terms" external />
       </div>
 
       {/* Sign out */}
@@ -168,6 +171,329 @@ export default function SettingsPage() {
         <LogOut className="h-4 w-4 mr-2" />
         Sign Out
       </Button>
+    </div>
+  );
+}
+
+function SettingsRow({
+  icon: Icon,
+  label,
+  expanded,
+  onToggle,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Icon className="h-[18px] w-[18px] text-muted-foreground" />
+          <span className="text-sm font-medium">{label}</span>
+        </div>
+        <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
+      </button>
+      {expanded && <div className="px-5 pb-5 pt-1">{children}</div>}
+    </div>
+  );
+}
+
+function LinkRow({
+  icon: Icon,
+  label,
+  href,
+  external,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  href: string;
+  external?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      target={external ? "_blank" : undefined}
+      className="flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors"
+    >
+      <div className="flex items-center gap-3">
+        <Icon className="h-[18px] w-[18px] text-muted-foreground" />
+        <span className="text-sm font-medium">{label}</span>
+      </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+    </Link>
+  );
+}
+
+function ProfileForm() {
+  const { data: user } = useCurrentUser();
+  const updatePrefs = useUpdatePreferences();
+  const [fullName, setFullName] = useState(user?.fullName ?? "");
+  const [email] = useState(user?.email ?? "");
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await updatePrefs.mutateAsync({ fullName });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    }
+  }
+
+  return (
+    <form onSubmit={handleSave} className="space-y-3 pt-3 border-t border-border">
+      <div>
+        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Full Name</label>
+        <input
+          type="text"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          className="w-full mt-1 h-10 px-3 rounded-lg bg-muted/30 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+        />
+      </div>
+      <div>
+        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Email</label>
+        <input
+          type="email"
+          value={email}
+          disabled
+          className="w-full mt-1 h-10 px-3 rounded-lg bg-muted/50 border border-border text-sm text-muted-foreground cursor-not-allowed"
+        />
+        <p className="text-[10px] text-muted-foreground mt-1">
+          Email changes require re-confirmation — contact support for now.
+        </p>
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <Button type="submit" disabled={updatePrefs.isPending} size="sm" className="bg-primary hover:bg-primary/90 text-white">
+        {updatePrefs.isPending ? "Saving..." : saved ? <><Check className="h-3 w-3 mr-1" /> Saved</> : "Save changes"}
+      </Button>
+    </form>
+  );
+}
+
+function PasswordForm() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (next.length < 8) {
+      setError("New password must be at least 8 characters.");
+      return;
+    }
+    if (next !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    const supabase = createClient();
+    // Supabase doesn't require the current password to update, but we verify it
+    // by re-signing in — prevents a stolen-session-cookie attacker from rotating the password.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) {
+      setError("Could not verify current session.");
+      setLoading(false);
+      return;
+    }
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: current,
+    });
+    if (signInError) {
+      setError("Current password is incorrect.");
+      setLoading(false);
+      return;
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({ password: next });
+    setLoading(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setCurrent("");
+    setNext("");
+    setConfirm("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3 pt-3 border-t border-border">
+      <div>
+        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Current password</label>
+        <input
+          type="password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          required
+          className="w-full mt-1 h-10 px-3 rounded-lg bg-muted/30 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+        />
+      </div>
+      <div>
+        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">New password</label>
+        <input
+          type="password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          required
+          minLength={8}
+          className="w-full mt-1 h-10 px-3 rounded-lg bg-muted/30 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+        />
+      </div>
+      <div>
+        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Confirm new password</label>
+        <input
+          type="password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          required
+          minLength={8}
+          className="w-full mt-1 h-10 px-3 rounded-lg bg-muted/30 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+        />
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <Button type="submit" disabled={loading} size="sm" className="bg-primary hover:bg-primary/90 text-white">
+        {loading ? "Updating..." : saved ? <><Check className="h-3 w-3 mr-1" /> Updated</> : "Change password"}
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * Billing panel — inline summary of the user's subscription state and direct actions.
+ * Free users get an "Upgrade to Pro" call-to-action; paid users get plan badge +
+ * renewal date + a "Manage Subscription" button that opens the Stripe Customer Portal
+ * (cancel, update payment method, view invoices). No more round-trip through /pricing.
+ */
+function BillingPanel() {
+  const { data: sub, isLoading } = useSubscription();
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function openPortal() {
+    setError(null);
+    setOpening(true);
+    try {
+      const { url } = await api.openBillingPortal();
+      if (url) window.location.href = url;
+      else setError("Could not open billing portal.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Portal unavailable");
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="pt-3 border-t border-border flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" /> Loading subscription…
+      </div>
+    );
+  }
+
+  const plan = (sub?.plan ?? "Free").toLowerCase();
+  const isPaid = plan === "pro" || plan === "elite";
+  const status = sub?.status ?? "Inactive";
+  const periodEnd = sub?.currentPeriodEnd
+    ? new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", {
+        month: "long", day: "numeric", year: "numeric",
+      })
+    : null;
+
+  const badgeClass = plan === "elite"
+    ? "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+    : plan === "pro"
+    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+  const statusColor = status === "Active" ? "text-emerald-600 dark:text-emerald-400"
+    : status === "Trialing" ? "text-blue-600 dark:text-blue-400"
+    : status === "PastDue" ? "text-amber-600 dark:text-amber-400"
+    : status === "Canceled" ? "text-red-600 dark:text-red-400"
+    : "text-muted-foreground";
+
+  return (
+    <div className="pt-3 border-t border-border space-y-4">
+      {/* Current plan summary */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Current Plan
+          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${badgeClass}`}>
+              {plan.charAt(0).toUpperCase() + plan.slice(1)}
+            </span>
+            <span className={`text-xs font-semibold ${statusColor}`}>{status}</span>
+          </div>
+          {periodEnd && (
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              {status === "Canceled"
+                ? `Access ends ${periodEnd}`
+                : `Next billing date: ${periodEnd}`}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      {!isPaid ? (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <p className="text-sm font-medium">Upgrade for full signals + Athena chat + portfolio AI.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Pro is $19/mo ($199 annual) · Elite is $45/mo ($449 annual).
+          </p>
+          <Link href="/pricing" className="inline-block mt-3">
+            <Button size="sm" className="bg-primary hover:bg-primary/90 text-white">
+              View plans <ArrowUpRight className="h-3 w-3 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={openPortal}
+            disabled={opening || !sub?.stripeCustomerId}
+          >
+            {opening ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <ExternalLink className="h-3 w-3 mr-1.5" />}
+            Manage Subscription
+          </Button>
+          <Link
+            href="/pricing"
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Change plan →
+          </Link>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {sub && !sub.stripeConfigured && (
+        <p className="text-[10px] text-amber-600 dark:text-amber-400">
+          Stripe not configured — billing portal unavailable in this environment.
+        </p>
+      )}
     </div>
   );
 }

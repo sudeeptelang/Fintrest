@@ -1,3 +1,5 @@
+using Fintrest.Api.Services.Scoring;
+
 namespace Fintrest.Api.Services;
 
 /// <summary>
@@ -20,14 +22,13 @@ namespace Fintrest.Api.Services;
 /// </summary>
 public static class ScoringEngineV2
 {
-    private const double W_MOMENTUM = 0.22;
-    private const double W_VOLUME = 0.12;
-    private const double W_CATALYST = 0.15;
-    private const double W_FUNDAMENTAL = 0.18;
-    private const double W_SENTIMENT = 0.10;
-    private const double W_TREND = 0.13;
-    private const double W_RISK = 0.10;
-
+    /// <summary>
+    /// 7-factor score breakdown. Raw factor scores are 0-100 (either hardcoded-table output
+    /// or cross-sectional percentile ranks, depending on ScoringOptions.UsePercentileRanking).
+    /// Total and SignalType are set externally by the orchestrator using regime-conditional
+    /// weights + configured thresholds — they are NOT derived from the factor values here,
+    /// so the scoring pipeline can apply percentile ranking and tilts before classification.
+    /// </summary>
     public record ScoreBreakdown(
         double Momentum,
         double Volume,
@@ -38,22 +39,8 @@ public static class ScoringEngineV2
         double Risk
     )
     {
-        public double Total =>
-            Momentum * W_MOMENTUM +
-            Volume * W_VOLUME +
-            Catalyst * W_CATALYST +
-            Fundamental * W_FUNDAMENTAL +
-            Sentiment * W_SENTIMENT +
-            Trend * W_TREND +
-            Risk * W_RISK;
-
-        public string SignalType => Total switch
-        {
-            >= 78 => "BUY_TODAY",
-            >= 58 => "WATCH",
-            >= 38 => "HIGH_RISK",
-            _ => "AVOID"
-        };
+        public double Total { get; init; }
+        public string SignalType { get; init; } = "AVOID";
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -65,33 +52,67 @@ public static class ScoringEngineV2
         IReadOnlyList<double> closes,
         double price,
         double? ma20, double? ma50, double? ma200,
-        double? rsi)
+        double? rsi,
+        double? atrPct = null)
     {
         var sub = new List<double>();
 
         // 1a. Multi-timeframe ROC (Jegadeesh-Titman momentum factor)
+        //     Thresholds are expressed as multiples of the stock's own 30d ATR%
+        //     so a 4% move in a 1% ATR stock scores the same as a 12% move in a 3% ATR stock.
         var roc5 = ROC(closes, 5);
         var roc20 = ROC(closes, 20);
         var roc60 = ROC(closes, 60);
 
-        // Short-term momentum — but penalize parabolic moves (exhaustion/climax tops)
-        sub.Add(roc5 switch
+        // Expected daily noise in %. Fallback to 2% when ATR isn't available.
+        var atr = atrPct.GetValueOrDefault(2.0);
+        if (atr < 0.3) atr = 0.3; // floor to avoid divide-by-zero on ultra-low-vol names
+
+        // Short-term momentum expressed in ATR multiples over a 5-day window (~2.2 * ATR is typical).
+        if (roc5.HasValue)
         {
-            > 25 => 35, // Parabolic — exhaustion risk, likely to reverse
-            > 15 => 55, // Very hot — take caution
-            > 8 => 85,  // Strong but sustainable
-            > 5 => 80,
-            > 2 => 70,
-            > 0 => 58,
-            > -2 => 45,
-            > -5 => 30,
-            _ => 15
-        });
-        // Medium-term momentum
-        sub.Add(roc20 switch { > 10 => 90, > 5 => 75, > 0 => 60, > -5 => 40, _ => 20 });
-        // Long-term momentum (if enough data)
-        if (roc60 != null)
-            sub.Add(roc60.Value switch { > 15 => 85, > 8 => 70, > 0 => 55, > -8 => 35, _ => 15 });
+            var mult5 = roc5.Value / (atr * 2.2);
+            sub.Add(mult5 switch
+            {
+                > 3.0 => 35,  // Parabolic — ~6+ daily ATRs of net move, exhaustion risk
+                > 2.0 => 55,  // Very hot
+                > 1.2 => 85,  // Strong but sustainable (sweet spot)
+                > 0.7 => 80,
+                > 0.3 => 70,
+                > 0.0 => 58,
+                > -0.3 => 45,
+                > -1.0 => 30,
+                _ => 15
+            });
+        }
+
+        // Medium-term momentum — ATR-scaled over 20 sessions (~4.5 * ATR typical).
+        if (roc20.HasValue)
+        {
+            var mult20 = roc20.Value / (atr * 4.5);
+            sub.Add(mult20 switch
+            {
+                > 1.0 => 90,
+                > 0.5 => 75,
+                > 0.0 => 60,
+                > -0.5 => 40,
+                _ => 20
+            });
+        }
+
+        // Long-term momentum (60d, ~7.8 * ATR typical).
+        if (roc60.HasValue)
+        {
+            var mult60 = roc60.Value / (atr * 7.8);
+            sub.Add(mult60 switch
+            {
+                > 1.0 => 85,
+                > 0.5 => 70,
+                > 0.0 => 55,
+                > -0.5 => 35,
+                _ => 15
+            });
+        }
 
         // 1b. Momentum acceleration (is momentum increasing?)
         if (roc5 != null && roc20 != null)
@@ -704,21 +725,121 @@ public static class ScoringEngineV2
         // Earnings
         DateTime? nextEarningsDate, double? lastEpsSurprise,
         // Market regime
-        int spyTrendDirection)
+        int spyTrendDirection,
+        MarketRegime? regime = null,
+        string? sector = null,
+        double? stockReturn5d = null)
     {
+        regime ??= MarketRegime.Neutral;
+
+        var rawMomentum = ScoreMomentum(closes, price, ma20, ma50, ma200, rsi, atrPct);
+        var rawVolume = ScoreVolume(volumes, currentVolume, closes);
+        var rawCatalyst = ScoreCatalyst(avgSentiment, hasCatalyst, catalystType, newsCount,
+                                        nextEarningsDate, lastEpsSurprise);
+        var rawFundamental = ScoreFundamentals(peRatio, pegRatio, roe, roa,
+                                               operatingMargin, grossMargin, debtToEquity,
+                                               revenueGrowth, epsGrowth);
+        var rawSentiment = ScoreSentiment(analystRating, analystCount, analystTargetPrice,
+                                          price, insiderBuying, insiderBuyCount, insiderSellCount);
+        var rawTrend = ScoreTrend(closes, adx, trendDirection, ma20, ma50, ma200);
+        var rawRisk = ScoreRisk(closes, atrPct, beta, avgDailyVolume, floatShares, spyTrendDirection);
+
         return new ScoreBreakdown(
-            Momentum: ScoreMomentum(closes, price, ma20, ma50, ma200, rsi),
-            Volume: ScoreVolume(volumes, currentVolume, closes),
-            Catalyst: ScoreCatalyst(avgSentiment, hasCatalyst, catalystType, newsCount,
-                                    nextEarningsDate, lastEpsSurprise),
-            Fundamental: ScoreFundamentals(peRatio, pegRatio, roe, roa,
-                                           operatingMargin, grossMargin, debtToEquity,
-                                           revenueGrowth, epsGrowth),
-            Sentiment: ScoreSentiment(analystRating, analystCount, analystTargetPrice,
-                                      price, insiderBuying, insiderBuyCount, insiderSellCount),
-            Trend: ScoreTrend(closes, adx, trendDirection, ma20, ma50, ma200),
-            Risk: ScoreRisk(closes, atrPct, beta, avgDailyVolume, floatShares, spyTrendDirection)
+            Momentum: ApplyRegime(rawMomentum, "Momentum", regime, sector, stockReturn5d),
+            Volume: ApplyRegime(rawVolume, "Volume", regime, sector, stockReturn5d),
+            Catalyst: ApplyRegime(rawCatalyst, "Catalyst", regime, sector, stockReturn5d),
+            Fundamental: ApplyRegime(rawFundamental, "Fundamental", regime, sector, stockReturn5d),
+            Sentiment: ApplyRegime(rawSentiment, "Sentiment", regime, sector, stockReturn5d),
+            Trend: ApplyRegime(rawTrend, "Trend", regime, sector, stockReturn5d),
+            Risk: ApplyRegime(rawRisk, "Risk", regime, sector, stockReturn5d)
         );
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // MARKET-CONTEXT ADJUSTMENT
+    // Applied to every factor so scores breathe with the tape.
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Shifts a raw factor score based on today's market regime — relative strength vs SPY,
+    /// sector tailwind, SPY's 1-day move, and VIX fear level. Bounded to ±<paramref name="tiltCap"/>.
+    /// Exposed publicly so ScanOrchestrator can apply the tilt AFTER percentile ranking.
+    /// </summary>
+    public static double ApplyRegime(
+        double raw,
+        string factor,
+        MarketRegime regime,
+        string? sector,
+        double? stockReturn5d,
+        double tiltCap = 15.0)
+    {
+        double adj = 0;
+
+        // A. Relative strength vs SPY over 5d — stocks beating the index get a bump.
+        if (stockReturn5d.HasValue)
+        {
+            var rs = stockReturn5d.Value - regime.SpyReturn5d;
+            adj += rs switch
+            {
+                > 10 => 8,
+                > 5 => 5,
+                > 2 => 2,
+                > -2 => 0,
+                > -5 => -3,
+                _ => -6
+            };
+        }
+
+        // B. Sector tailwind — sector outperforming SPY lifts momentum/trend/volume factors.
+        if (sector is not null && regime.SectorReturns5d.TryGetValue(sector, out var sectorReturn)
+            && factor is "Momentum" or "Trend" or "Volume")
+        {
+            var sectorRs = sectorReturn - regime.SpyReturn5d;
+            adj += sectorRs switch
+            {
+                > 3 => 4,
+                > 1 => 2,
+                > -1 => 0,
+                > -3 => -2,
+                _ => -4
+            };
+        }
+
+        // C. SPY 1-day tape — momentum/volume/trend follow the market; catalysts dampened on red days.
+        if (factor is "Momentum" or "Volume" or "Trend")
+        {
+            adj += regime.SpyReturn1d switch
+            {
+                > 1.5 => 4,
+                > 0.5 => 2,
+                > -0.5 => 0,
+                > -1.5 => -3,
+                _ => -6
+            };
+        }
+
+        // D. VIX / fear — reduce conviction on every factor except Risk (risk factor handled elsewhere).
+        if (factor != "Risk" && regime.VixLevel.HasValue)
+        {
+            adj += regime.VixLevel.Value switch
+            {
+                > 30 => -5,
+                > 25 => -3,
+                > 20 => -1,
+                _ => 0
+            };
+        }
+
+        // E. Extreme regime flags — compound the signal.
+        if (regime.IsRiskOff && factor is "Momentum" or "Catalyst")
+            adj -= 3;
+        if (regime.IsRiskOn && factor is "Momentum" or "Trend")
+            adj += 3;
+
+        // Cap total adjustment to keep factor scores meaningful.
+        adj = Math.Clamp(adj, -tiltCap, tiltCap);
+
+        return Math.Clamp(raw + adj, 0, 100);
     }
 
     // ════════════════════════════════════════════════════════════════

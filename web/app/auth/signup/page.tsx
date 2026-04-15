@@ -10,6 +10,7 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedTos, setAcceptedTos] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -17,6 +18,10 @@ export default function SignupPage() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!acceptedTos) {
+      setError("Please accept the Terms of Service and Privacy Policy.");
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -141,9 +146,29 @@ export default function SignupPage() {
             className="w-full h-11 px-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
           />
 
+          <label className="flex items-start gap-2 text-xs text-muted-foreground select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acceptedTos}
+              onChange={(e) => setAcceptedTos(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+            />
+            <span>
+              I agree to the{" "}
+              <Link href="/terms" className="text-primary hover:underline" target="_blank">
+                Terms of Service
+              </Link>
+              {" "}and{" "}
+              <Link href="/privacy" className="text-primary hover:underline" target="_blank">
+                Privacy Policy
+              </Link>
+              . I understand Fintrest provides educational content only — not financial advice.
+            </span>
+          </label>
+
           <Button
             type="submit"
-            disabled={loading}
+            disabled={loading || !acceptedTos}
             className="w-full h-11 bg-primary hover:bg-primary/90 text-white font-semibold"
           >
             {loading ? "Creating account..." : "Create Account"}

@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NAV_LINKS } from "@/lib/constants";
 
@@ -44,12 +45,15 @@ export function Navbar() {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
-            <Button variant="ghost" size="sm">
+            <Link href="/auth/login" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
               Log in
-            </Button>
-            <Button size="sm" className="bg-primary hover:bg-primary/90 text-white px-4">
+            </Link>
+            <Link
+              href="/auth/signup"
+              className={cn(buttonVariants({ size: "sm" }), "bg-primary hover:bg-primary/90 text-white px-4")}
+            >
               Get Started Free
-            </Button>
+            </Link>
           </div>
 
           {/* Mobile toggle */}
@@ -84,12 +88,20 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="pt-3 border-t border-border/50 flex flex-col gap-2">
-                <Button variant="ghost" size="sm" className="justify-start">
+                <Link
+                  href="/auth/login"
+                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "justify-start")}
+                  onClick={() => setMobileOpen(false)}
+                >
                   Log in
-                </Button>
-                <Button size="sm" className="bg-primary hover:bg-primary/90 text-white">
+                </Link>
+                <Link
+                  href="/auth/signup"
+                  className={cn(buttonVariants({ size: "sm" }), "bg-primary hover:bg-primary/90 text-white")}
+                  onClick={() => setMobileOpen(false)}
+                >
                   Get Started Free
-                </Button>
+                </Link>
               </div>
             </div>
           </motion.div>

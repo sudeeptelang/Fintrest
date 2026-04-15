@@ -40,6 +40,11 @@ builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.IFundam
 builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.INewsProvider,
     Fintrest.Api.Services.Providers.Finnhub.FinnhubProvider>();
 
+// Scoring configuration — weights, regime-conditional weight sets, thresholds.
+// Tune these in appsettings.json without a recompile.
+builder.Services.Configure<Fintrest.Api.Services.Scoring.ScoringOptions>(
+    builder.Configuration.GetSection(Fintrest.Api.Services.Scoring.ScoringOptions.SectionName));
+
 // Services
 builder.Services.AddScoped<Fintrest.Api.Services.Ingestion.DataIngestionService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Pipeline.ScanOrchestrator>();
@@ -49,6 +54,8 @@ builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.RiskAnalytics>();
 builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.PortfolioImporter>();
 builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.ClaudeFinancialAdvisor>();
 builder.Services.AddScoped<Fintrest.Api.Services.AthenaService>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.AthenaThesisService>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.AthenaNewsService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Email.EmailService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Billing.StripeService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Email.AlertDispatcher>();
@@ -56,6 +63,7 @@ builder.Services.AddHostedService<Fintrest.Api.Services.Email.MorningBriefingJob
 
 // Background Jobs
 builder.Services.AddHostedService<Fintrest.Api.Services.Pipeline.DailyCronJob>();
+builder.Services.AddHostedService<Fintrest.Api.Services.Pipeline.IntradayDriftJob>();
 
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];

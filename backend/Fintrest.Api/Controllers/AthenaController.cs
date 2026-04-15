@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Fintrest.Api.Core;
 using Fintrest.Api.Data;
+using Fintrest.Api.Models;
 using Fintrest.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Fintrest.Api.Controllers;
 
 [Authorize]
+[RequiresPlan(PlanType.Pro)]  // Ask Athena chat is a Pro-tier feature
 [ApiController]
 [Route("api/v1/athena")]
 public class AthenaController(AppDbContext db, AthenaService athena) : ControllerBase

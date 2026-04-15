@@ -26,13 +26,15 @@ public record MarketDataResponse(
 );
 
 public record NewsResponse(
+    long Id,
     string Headline,
     string? Summary,
     string? Source,
     string? Url,
     double? SentimentScore,
     string? CatalystType,
-    DateTime? PublishedAt
+    DateTime? PublishedAt,
+    string? Ticker
 );
 
 public record AnalystConsensusResponse(
@@ -99,7 +101,16 @@ public record ScreenerRowResponse(
     DateTime? NextEarningsDate,
     // Signal (from latest scan)
     double? SignalScore,
-    string? SignalType
+    string? SignalType,
+    // Trade zone + thesis verdict (from latest scan)
+    double? EntryLow,
+    double? EntryHigh,
+    double? StopLoss,
+    double? TargetLow,
+    double? TargetHigh,
+    double? RiskReward,
+    int? HorizonDays,
+    string? Verdict
 );
 
 public record TrendingStockResponse(
@@ -135,6 +146,50 @@ public record MarketIndexResponse(
     double? Price,
     double? PrevClose,
     double? ChangePct
+);
+
+public record OwnershipResponse(
+    string Ticker,
+    double? InstitutionalPercent,
+    int? InvestorsHolding,
+    int? InvestorsHoldingChange,
+    double? TotalInvested,
+    double? OwnershipPercentChange,
+    List<InsiderTradeDto> RecentInsiderTrades
+);
+
+public record InsiderTradeDto(
+    DateTime? TransactionDate,
+    string? ReportingName,
+    string? Relationship,
+    string? TransactionType,
+    double? SharesTraded,
+    double? Price,
+    double? TotalValue
+);
+
+public record InsiderActivityItem(
+    string Ticker,
+    DateTime? TransactionDate,
+    DateTime? FilingDate,
+    string? ReportingName,
+    string? Relationship,
+    string? TransactionType,
+    double? SharesTraded,
+    double? Price,
+    double? TotalValue
+);
+
+public record CongressTradeItem(
+    string Chamber,
+    string Ticker,
+    string? AssetDescription,
+    string? Representative,
+    string? TransactionType,
+    DateTime? TransactionDate,
+    DateTime? DisclosureDate,
+    string? Amount,
+    string? SourceUrl
 );
 
 public record StockSnapshotResponse(

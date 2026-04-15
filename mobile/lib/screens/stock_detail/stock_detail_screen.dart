@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
@@ -24,6 +25,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   List<Map<String, dynamic>>? _earnings;
   List<Map<String, dynamic>>? _news;
   List<Signal>? _peers;
+  Map<String, dynamic>? _ownership;
   bool _loading = true;
 
   Signal get signal => widget.signal;
@@ -43,6 +45,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
         _api.getStockEarnings(signal.ticker).catchError((_) => <Map<String, dynamic>>[]),
         _api.getTopPicks(limit: 50).catchError((_) => <Signal>[]),
         _api.getStockNews(signal.ticker).catchError((_) => <Map<String, dynamic>>[]),
+        _api.getStockOwnership(signal.ticker).catchError((_) => <String, dynamic>{}),
       ]);
 
       final snapshot = results[0] as Map<String, dynamic>;
@@ -50,6 +53,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
       final earnings = results[2] as List<Map<String, dynamic>>;
       final allSignals = results[3] as List<Signal>;
       final newsItems = results[4] as List<Map<String, dynamic>>;
+      final ownership = results[5] as Map<String, dynamic>;
 
       // Peers = same sector, excluding self, top 5 by score
       final sector = snapshot['sector'] as String?;
@@ -67,6 +71,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           _earnings = earnings.isNotEmpty ? earnings : null;
           _news = newsItems.isNotEmpty ? newsItems : null;
           _peers = peers.isNotEmpty ? peers : null;
+          _ownership = ownership.isNotEmpty ? ownership : null;
           _loading = false;
         });
       }
@@ -113,9 +118,21 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               _buildAthenaSummary(explanation),
             if (explanation['Summary'] != null) const SizedBox(height: 20),
 
+            // ─── Athena Snowflake (5-axis) ───
+            if (_snapshot != null) _buildSnowflake(),
+            if (_snapshot != null) const SizedBox(height: 20),
+
+            // ─── Rewards & Risks (Simply Wall St-style) ───
+            if (_snapshot != null) _buildRewardsRisks(),
+            if (_snapshot != null) const SizedBox(height: 20),
+
             // ─── Valuation (Fair Value + Range + Sensitivity) ───
             if (_snapshot != null) _buildValuation(),
             if (_snapshot != null) const SizedBox(height: 20),
+
+            // ─── Ownership & Insider Activity ───
+            if (_ownership != null) _buildOwnership(),
+            if (_ownership != null) const SizedBox(height: 20),
 
             // ─── Snapshot Metrics (Finviz-style) ───
             if (_snapshot != null) _buildSnapshotGrid(),
@@ -802,6 +819,387 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     return '${n.toStringAsFixed(1)}%';
   }
 
+  // ─── Athena Snowflake (5-axis 0-6 tier profile) ───
+  Widget _buildSnowflake() {
+    final s = _snapshot!;
+    final scores = _snowflakeScores(s);
+    final avg = scores.values.reduce((a, b) => a + b) / scores.length;
+    final tier = avg >= 4
+        ? ('Strong', AppColors.gain)
+        : avg >= 2.5
+            ? ('Balanced', AppColors.emerald)
+            : avg >= 1.5
+                ? ('Mixed', AppColors.amber)
+                : ('Weak', AppColors.red);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('ATHENA SNOWFLAKE',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey[500],
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w700)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: tier.$2.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(tier.$1,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: tier.$2,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('Five-dimensional profile · 0–6 per axis',
+              style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 200,
+            child: _SnowflakePainter(scores: scores, color: tier.$2),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: scores.entries.map((e) {
+              final color = e.value >= 4
+                  ? AppColors.gain
+                  : e.value >= 2.5
+                      ? AppColors.emerald
+                      : e.value >= 1.5
+                          ? AppColors.amber
+                          : AppColors.red;
+              return Column(
+                children: [
+                  Text(e.key.toUpperCase(),
+                      style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.grey[500],
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8)),
+                  const SizedBox(height: 4),
+                  Text(e.value.toStringAsFixed(1),
+                      style: GoogleFonts.dmMono(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: color)),
+                ],
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Map<String, double> _snowflakeScores(Map<String, dynamic> s) {
+    double value = 0;
+    final pe = (s['peRatio'] ?? s['forwardPe']) as num?;
+    final peg = s['pegRatio'] as num?;
+    final pb = s['priceToBook'] as num?;
+    if (pe != null) {
+      if (pe < 12) value += 2;
+      else if (pe < 20) value += 1.5;
+      else if (pe < 30) value += 0.75;
+    }
+    if (peg != null) {
+      if (peg < 1) value += 2;
+      else if (peg < 1.5) value += 1.25;
+      else if (peg < 2) value += 0.5;
+    }
+    if (pb != null) {
+      if (pb < 2) value += 2;
+      else if (pb < 4) value += 1;
+      else if (pb < 8) value += 0.25;
+    }
+    value = value.clamp(0, 6).toDouble();
+
+    double growth = 0;
+    final revG = s['revenueGrowth'] as num?;
+    final epsG = s['epsGrowth'] as num?;
+    if (revG != null) {
+      if (revG > 25) growth += 3;
+      else if (revG > 10) growth += 2;
+      else if (revG > 0) growth += 1;
+    }
+    if (epsG != null) {
+      if (epsG > 25) growth += 3;
+      else if (epsG > 10) growth += 2;
+      else if (epsG > 0) growth += 1;
+    }
+    growth = growth.clamp(0, 6).toDouble();
+
+    double past = 0;
+    final pY = s['perfYear'] as num?;
+    final pQ = s['perfQuarter'] as num?;
+    final r52 = s['week52RangePct'] as num?;
+    if (pY != null) {
+      if (pY > 30) past += 3;
+      else if (pY > 10) past += 2;
+      else if (pY > 0) past += 1;
+    }
+    if (pQ != null) {
+      if (pQ > 10) past += 2;
+      else if (pQ > 0) past += 1;
+    }
+    if (r52 != null && r52 > 70) past += 1;
+    past = past.clamp(0, 6).toDouble();
+
+    double health = 0;
+    final de = s['debtToEquity'] as num?;
+    final om = s['operatingMargin'] as num?;
+    final roe = s['returnOnEquity'] as num?;
+    if (de != null) {
+      if (de < 0.5) health += 2;
+      else if (de < 1) health += 1.25;
+      else if (de < 2) health += 0.5;
+    }
+    if (om != null) {
+      if (om > 0.25) health += 2;
+      else if (om > 0.12) health += 1.25;
+      else if (om > 0) health += 0.5;
+    }
+    if (roe != null) {
+      if (roe > 0.2) health += 2;
+      else if (roe > 0.1) health += 1.25;
+      else if (roe > 0) health += 0.5;
+    }
+    health = health.clamp(0, 6).toDouble();
+
+    const income = 0.0; // No dividend yield on current snapshot — defaulted.
+
+    return {
+      'Value': value,
+      'Growth': growth,
+      'Past': past,
+      'Health': health,
+      'Income': income,
+    };
+  }
+
+  // ─── Rewards & Risks (plain-English bullets) ───
+  Widget _buildRewardsRisks() {
+    final s = _snapshot!;
+    final rewards = _deriveRewards(s);
+    final risks = _deriveRisks(s);
+
+    if (rewards.isEmpty && risks.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        _ProsConsCard(
+          title: 'REWARDS',
+          items: rewards,
+          color: AppColors.gain,
+          icon: Icons.check_circle_outline,
+          emptyLabel: 'No notable rewards flagged right now.',
+        ),
+        if (rewards.isNotEmpty && risks.isNotEmpty) const SizedBox(height: 12),
+        _ProsConsCard(
+          title: 'RISKS',
+          items: risks,
+          color: AppColors.red,
+          icon: Icons.warning_amber_rounded,
+          emptyLabel: 'No material risks flagged right now.',
+        ),
+      ],
+    );
+  }
+
+  List<String> _deriveRewards(Map<String, dynamic> s) {
+    final out = <String>[];
+    final pe = (s['peRatio'] ?? s['forwardPe']) as num?;
+    if (pe != null && pe < 15 && pe > 0) {
+      out.add('Trading at ${pe.toStringAsFixed(1)}× earnings — below market average');
+    }
+    final peg = s['pegRatio'] as num?;
+    if (peg != null && peg < 1 && peg > 0) {
+      out.add('PEG ${peg.toStringAsFixed(2)} suggests growth may be undervalued');
+    }
+    final revG = s['revenueGrowth'] as num?;
+    if (revG != null && revG > 15) {
+      out.add('Revenue growing at ${revG.toStringAsFixed(1)}% — well above peers');
+    }
+    final epsG = s['epsGrowth'] as num?;
+    if (epsG != null && epsG > 20) {
+      out.add('Earnings expanding at ${epsG.toStringAsFixed(0)}% year-over-year');
+    }
+    final roe = s['returnOnEquity'] as num?;
+    if (roe != null && roe > 0.2) {
+      out.add('ROE of ${(roe * 100).toStringAsFixed(0)}% signals efficient capital use');
+    }
+    final om = s['operatingMargin'] as num?;
+    if (om != null && om > 0.25) {
+      out.add('Operating margin ${(om * 100).toStringAsFixed(0)}% — strong pricing power');
+    }
+    final de = s['debtToEquity'] as num?;
+    if (de != null && de < 0.5) {
+      out.add('Low debt (D/E ${de.toStringAsFixed(2)}) — balance sheet resilient');
+    }
+    final tgt = s['analystTargetPrice'] as num?;
+    final px = s['price'] as num?;
+    if (tgt != null && px != null && tgt > px) {
+      final up = ((tgt - px) / px) * 100;
+      if (up > 10) {
+        out.add('Analyst target implies ${up.toStringAsFixed(0)}% upside');
+      }
+    }
+    final pY = s['perfYear'] as num?;
+    if (pY != null && pY > 25) {
+      out.add('Up ${pY.toStringAsFixed(0)}% over the past year — sustained momentum');
+    }
+    return out.take(5).toList();
+  }
+
+  List<String> _deriveRisks(Map<String, dynamic> s) {
+    final out = <String>[];
+    final pe = (s['peRatio'] ?? s['forwardPe']) as num?;
+    if (pe != null && pe > 40) {
+      out.add('Priced at ${pe.toStringAsFixed(0)}× earnings — richly valued');
+    }
+    final peg = s['pegRatio'] as num?;
+    if (peg != null && peg > 2.5) {
+      out.add('PEG ${peg.toStringAsFixed(1)} — growth may not justify multiple');
+    }
+    final revG = s['revenueGrowth'] as num?;
+    if (revG != null && revG < 0) {
+      out.add('Revenue contracting (${revG.toStringAsFixed(1)}%)');
+    }
+    final epsG = s['epsGrowth'] as num?;
+    if (epsG != null && epsG < 0) {
+      out.add('Earnings declined ${epsG.abs().toStringAsFixed(0)}% YoY');
+    }
+    final de = s['debtToEquity'] as num?;
+    if (de != null && de > 2) {
+      out.add('Elevated leverage (D/E ${de.toStringAsFixed(1)})');
+    }
+    final om = s['operatingMargin'] as num?;
+    if (om != null && om < 0.05 && om > -1) {
+      out.add('Thin operating margin (${(om * 100).toStringAsFixed(1)}%)');
+    }
+    final r52 = s['week52RangePct'] as num?;
+    if (r52 != null && r52 > 95) {
+      out.add('Trading near 52-week high — pullback risk elevated');
+    }
+    final rsi = s['rsi'] as num?;
+    if (rsi != null && rsi > 75) {
+      out.add('RSI ${rsi.toStringAsFixed(0)} signals overbought conditions');
+    }
+    final beta = s['beta'] as num?;
+    if (beta != null && beta > 1.5) {
+      out.add('Beta ${beta.toStringAsFixed(2)} — more volatile than the market');
+    }
+    if (signal.riskLevel == 'HIGH') {
+      out.add('Athena flags overall risk as HIGH');
+    }
+    return out.take(5).toList();
+  }
+
+  // ─── Ownership & Insider Activity ───
+  Widget _buildOwnership() {
+    final o = _ownership!;
+    final instPct = (o['institutionalPercent'] as num?)?.toDouble();
+    final investors = o['investorsHolding'] as int?;
+    final investorsChange = (o['investorsHoldingChange'] as int?) ?? 0;
+    final trades = (o['recentInsiderTrades'] as List?) ?? [];
+    final buys = trades
+        .where((t) => _isInsiderBuy(t['transactionType'] as String?))
+        .length;
+    final sells = trades.length - buys;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.apartment_outlined,
+                  size: 16, color: Colors.grey[700]),
+              const SizedBox(width: 6),
+              Text('OWNERSHIP & INSIDERS',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _StatTile(
+                    label: 'Institutional %',
+                    value: instPct != null
+                        ? '${instPct.toStringAsFixed(1)}%'
+                        : '—'),
+              ),
+              Expanded(
+                child: _StatTile(
+                    label: 'Investors',
+                    value: investors?.toString() ?? '—',
+                    sub: investorsChange != 0
+                        ? '${investorsChange >= 0 ? '+' : ''}$investorsChange QoQ'
+                        : null,
+                    subColor:
+                        investorsChange >= 0 ? AppColors.gain : AppColors.red),
+              ),
+              Expanded(
+                child: _StatTile(
+                    label: 'Insider Buys / Sells',
+                    value: '$buys / $sells',
+                    valueColor: buys > sells
+                        ? AppColors.gain
+                        : (sells > buys ? AppColors.red : null)),
+              ),
+            ],
+          ),
+          if (trades.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('RECENT INSIDER TRANSACTIONS',
+                style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey[500],
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            ...trades.take(5).map((t) => _InsiderRow(
+                  map: t as Map<String, dynamic>,
+                  isBuy: _isInsiderBuy(t['transactionType'] as String?),
+                )),
+          ],
+        ],
+      ),
+    );
+  }
+
+  bool _isInsiderBuy(String? t) {
+    if (t == null) return false;
+    final u = t.toUpperCase();
+    return u.contains('P-') || u.contains('PURCHASE') || u.startsWith('P');
+  }
+
   String _fmtChangePct(dynamic v) {
     if (v == null) return '—';
     final n = (v as num).toDouble();
@@ -992,5 +1390,350 @@ class _RangeLabel extends StatelessWidget {
             style: GoogleFonts.dmMono(fontSize: 11, fontWeight: FontWeight.w600)),
       ],
     );
+  }
+}
+
+/// 5-axis pentagon radar painter for the Athena Snowflake.
+class _SnowflakePainter extends StatelessWidget {
+  final Map<String, double> scores;
+  final Color color;
+  const _SnowflakePainter({required this.scores, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size.fromHeight(200),
+      painter: _SnowflakeCustomPainter(
+        scores: scores.values.toList(),
+        labels: scores.keys.toList(),
+        color: color,
+      ),
+    );
+  }
+}
+
+class _SnowflakeCustomPainter extends CustomPainter {
+  final List<double> scores;
+  final List<String> labels;
+  final Color color;
+
+  _SnowflakeCustomPainter({
+    required this.scores,
+    required this.labels,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide / 2) * 0.78;
+    final n = scores.length;
+    final angleStep = (2 * 3.14159265) / n;
+    const startAngle = -3.14159265 / 2; // start at top
+
+    final gridPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = Colors.grey.withValues(alpha: 0.25)
+      ..strokeWidth = 1;
+
+    // Background rings at 2, 4, 6
+    for (final frac in [1.0 / 3, 2.0 / 3, 1.0]) {
+      final path = Path();
+      for (var i = 0; i < n; i++) {
+        final a = startAngle + angleStep * i;
+        final p = Offset(
+          center.dx + radius * frac * _cos(a),
+          center.dy + radius * frac * _sin(a),
+        );
+        if (i == 0) {
+          path.moveTo(p.dx, p.dy);
+        } else {
+          path.lineTo(p.dx, p.dy);
+        }
+      }
+      path.close();
+      canvas.drawPath(path, gridPaint);
+    }
+
+    // Radial spokes
+    for (var i = 0; i < n; i++) {
+      final a = startAngle + angleStep * i;
+      canvas.drawLine(
+        center,
+        Offset(center.dx + radius * _cos(a), center.dy + radius * _sin(a)),
+        gridPaint,
+      );
+    }
+
+    // Data polygon (scale 0-6)
+    final dataPath = Path();
+    for (var i = 0; i < n; i++) {
+      final a = startAngle + angleStep * i;
+      final r = (scores[i] / 6.0).clamp(0.0, 1.0) * radius;
+      final p = Offset(center.dx + r * _cos(a), center.dy + r * _sin(a));
+      if (i == 0) {
+        dataPath.moveTo(p.dx, p.dy);
+      } else {
+        dataPath.lineTo(p.dx, p.dy);
+      }
+    }
+    dataPath.close();
+
+    canvas.drawPath(
+      dataPath,
+      Paint()
+        ..style = PaintingStyle.fill
+        ..color = color.withValues(alpha: 0.28),
+    );
+    canvas.drawPath(
+      dataPath,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..color = color
+        ..strokeWidth = 2,
+    );
+
+    // Dots at data points
+    for (var i = 0; i < n; i++) {
+      final a = startAngle + angleStep * i;
+      final r = (scores[i] / 6.0).clamp(0.0, 1.0) * radius;
+      final p = Offset(center.dx + r * _cos(a), center.dy + r * _sin(a));
+      canvas.drawCircle(p, 3, Paint()..color = color);
+    }
+
+    // Axis labels
+    for (var i = 0; i < n; i++) {
+      final a = startAngle + angleStep * i;
+      final labelR = radius + 14;
+      final p =
+          Offset(center.dx + labelR * _cos(a), center.dy + labelR * _sin(a));
+      final tp = TextPainter(
+        text: TextSpan(
+          text: labels[i],
+          style: const TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(p.dx - tp.width / 2, p.dy - tp.height / 2));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SnowflakeCustomPainter old) =>
+      old.scores != scores || old.color != color;
+
+  double _cos(double a) => math.cos(a);
+  double _sin(double a) => math.sin(a);
+}
+
+/// Rewards / Risks card.
+class _ProsConsCard extends StatelessWidget {
+  final String title;
+  final List<String> items;
+  final Color color;
+  final IconData icon;
+  final String emptyLabel;
+
+  const _ProsConsCard({
+    required this.title,
+    required this.items,
+    required this.color,
+    required this.icon,
+    required this.emptyLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: color,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w800)),
+              const Spacer(),
+              Text('${items.length} signal${items.length == 1 ? '' : 's'}',
+                  style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.8))),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (items.isEmpty)
+            Text(emptyLabel,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]))
+          else
+            ...items.map((t) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 6),
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                            color: color, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(t,
+                            style: const TextStyle(
+                                fontSize: 13, height: 1.4)),
+                      ),
+                    ],
+                  ),
+                )),
+        ],
+      ),
+    );
+  }
+}
+
+/// Stat tile inside the Ownership card.
+class _StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final String? sub;
+  final Color? subColor;
+  final Color? valueColor;
+  const _StatTile({
+    required this.label,
+    required this.value,
+    this.sub,
+    this.subColor,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(),
+            style: TextStyle(
+                fontSize: 9,
+                color: Colors.grey[500],
+                letterSpacing: 1.0,
+                fontWeight: FontWeight.w700)),
+        const SizedBox(height: 4),
+        Text(value,
+            style: GoogleFonts.dmMono(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: valueColor)),
+        if (sub != null) ...[
+          const SizedBox(height: 2),
+          Text(sub!,
+              style: TextStyle(
+                  fontSize: 9,
+                  color: subColor ?? Colors.grey[500],
+                  fontWeight: FontWeight.w600)),
+        ],
+      ],
+    );
+  }
+}
+
+/// A single insider transaction row (inside the Ownership card).
+class _InsiderRow extends StatelessWidget {
+  final Map<String, dynamic> map;
+  final bool isBuy;
+  const _InsiderRow({required this.map, required this.isBuy});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = map['reportingName'] as String? ?? '—';
+    final role = map['relationship'] as String? ?? '';
+    final shares = (map['sharesTraded'] as num?) ?? 0;
+    final value = (map['totalValue'] as num?) ?? 0;
+    final date = map['transactionDate'] as String?;
+    final color = isBuy ? AppColors.gain : AppColors.red;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(isBuy ? 'BUY' : 'SELL',
+                style: TextStyle(
+                    fontSize: 9,
+                    color: color,
+                    fontWeight: FontWeight.w800)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                if (role.isNotEmpty)
+                  Text(role,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(_fmtMoney(value.toDouble()),
+                  style: GoogleFonts.dmMono(
+                      fontSize: 12, fontWeight: FontWeight.w700)),
+              Text(
+                  '${_fmtShares(shares.toDouble())}${date != null ? ' · ${_fmtShortDate(date)}' : ''}',
+                  style: TextStyle(fontSize: 9, color: Colors.grey[600])),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmtMoney(double v) {
+    final abs = v.abs();
+    if (abs >= 1e9) return '\$${(v / 1e9).toStringAsFixed(2)}B';
+    if (abs >= 1e6) return '\$${(v / 1e6).toStringAsFixed(2)}M';
+    if (abs >= 1e3) return '\$${(v / 1e3).toStringAsFixed(0)}K';
+    return '\$${v.toStringAsFixed(0)}';
+  }
+
+  String _fmtShares(double v) {
+    final abs = v.abs();
+    if (abs >= 1e6) return '${(v / 1e6).toStringAsFixed(2)}M sh';
+    if (abs >= 1e3) return '${(v / 1e3).toStringAsFixed(1)}K sh';
+    return '${v.toStringAsFixed(0)} sh';
+  }
+
+  String _fmtShortDate(String iso) {
+    try {
+      final d = DateTime.parse(iso);
+      const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return '${m[d.month - 1]} ${d.day}';
+    } catch (_) {
+      return '';
+    }
   }
 }

@@ -47,11 +47,14 @@ public class StripeService
     {
         if (!_enabled) return CheckoutResult.Stub("Stripe not configured");
 
+        // Plan slugs: "pro" / "pro-annual" / "elite" / "elite-annual".
+        // Monthly slugs stay short to preserve backwards-compat with older checkout calls.
         var priceId = plan.ToLowerInvariant() switch
         {
-            "starter" => _config["Stripe:Prices:StarterMonthly"],
-            "pro" => _config["Stripe:Prices:ProMonthly"],
-            "elite" or "premium" => _config["Stripe:Prices:EliteMonthly"],
+            "pro" or "pro-monthly"      => _config["Stripe:Prices:ProMonthly"],
+            "pro-annual" or "pro-yearly"=> _config["Stripe:Prices:ProAnnual"],
+            "elite" or "elite-monthly"  => _config["Stripe:Prices:EliteMonthly"],
+            "elite-annual" or "elite-yearly" => _config["Stripe:Prices:EliteAnnual"],
             _ => null,
         };
 
@@ -129,7 +132,11 @@ public class StripeService
 
         try
         {
-            return EventUtility.ConstructEvent(json, signature, secret);
+            // throwOnApiVersionMismatch=false: Stripe's server API rev (dahlia/acacia/etc) moves
+            // independently of the Stripe.NET SDK. A mismatch doesn't break event deserialization
+            // for the handful of fields we actually use (customer, subscription, status, period_end).
+            // Without this, every webhook 400s whenever Stripe ships a new API version.
+            return EventUtility.ConstructEvent(json, signature, secret, throwOnApiVersionMismatch: false);
         }
         catch (StripeException ex)
         {
