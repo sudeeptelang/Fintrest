@@ -60,12 +60,7 @@ public class AuthController(AppDbContext db) : ControllerBase
             await db.SaveChangesAsync();
         }
 
-        return Ok(new UserResponse(
-            user.Id,
-            user.Email,
-            user.FullName,
-            user.Plan.ToString()
-        ));
+        return Ok(ToDto(user));
     }
 
     /// <summary>
@@ -106,12 +101,28 @@ public class AuthController(AppDbContext db) : ControllerBase
 
         await db.SaveChangesAsync();
 
-        return Ok(new UserResponse(
-            user.Id,
-            user.Email,
-            user.FullName,
-            user.Plan.ToString()
-        ));
+        return Ok(ToDto(user));
+    }
+
+    /// <summary>Update email preferences + optional profile fields.</summary>
+    [Authorize]
+    [HttpPatch("me/preferences")]
+    public async Task<ActionResult<UserResponse>> UpdatePreferences([FromBody] UpdatePreferencesRequest request)
+    {
+        var supabaseUuid = GetSupabaseUuid();
+        if (supabaseUuid is null) return Unauthorized();
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.SupabaseId == supabaseUuid.Value);
+        if (user is null) return NotFound();
+
+        if (request.ReceiveMorningBriefing.HasValue) user.ReceiveMorningBriefing = request.ReceiveMorningBriefing.Value;
+        if (request.ReceiveSignalAlerts.HasValue) user.ReceiveSignalAlerts = request.ReceiveSignalAlerts.Value;
+        if (request.ReceiveWeeklyNewsletter.HasValue) user.ReceiveWeeklyNewsletter = request.ReceiveWeeklyNewsletter.Value;
+        if (request.FullName is not null) user.FullName = request.FullName;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+        return Ok(ToDto(user));
     }
 
     private Guid? GetSupabaseUuid()
@@ -120,6 +131,16 @@ public class AuthController(AppDbContext db) : ControllerBase
                   ?? User.FindFirstValue("sub");
         return Guid.TryParse(sub, out var guid) ? guid : null;
     }
+
+    private static UserResponse ToDto(User user) => new(
+        user.Id,
+        user.Email,
+        user.FullName,
+        user.Plan.ToString(),
+        user.ReceiveMorningBriefing,
+        user.ReceiveSignalAlerts,
+        user.ReceiveWeeklyNewsletter
+    );
 }
 
 public record SyncProfileRequest(string? FullName);

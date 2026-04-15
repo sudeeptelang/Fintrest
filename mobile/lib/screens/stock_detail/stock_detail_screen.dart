@@ -113,6 +113,10 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               _buildAthenaSummary(explanation),
             if (explanation['Summary'] != null) const SizedBox(height: 20),
 
+            // ─── Valuation (Fair Value + Range + Sensitivity) ───
+            if (_snapshot != null) _buildValuation(),
+            if (_snapshot != null) const SizedBox(height: 20),
+
             // ─── Snapshot Metrics (Finviz-style) ───
             if (_snapshot != null) _buildSnapshotGrid(),
             if (_snapshot != null) const SizedBox(height: 20),
@@ -547,6 +551,174 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     );
   }
 
+  Widget _buildValuation() {
+    final s = _snapshot!;
+    final currentPrice = (signal.currentPrice ?? s['price'] as num?)?.toDouble() ?? 0.0;
+    final analystTarget = (s['analystTargetPrice'] as num?)?.toDouble();
+    final w52High = (s['week52High'] as num?)?.toDouble();
+    final w52Low = (s['week52Low'] as num?)?.toDouble();
+    final peRatio = (s['peRatio'] as num?)?.toDouble()
+        ?? (s['forwardPe'] as num?)?.toDouble();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.insights_rounded, size: 18, color: AppColors.emerald),
+            const SizedBox(width: 8),
+            Text('Valuation',
+                style: GoogleFonts.sora(fontSize: 17, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Fair Value hero
+        if (analystTarget != null && currentPrice > 0) ...[
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Text('FAIR VALUE — ANALYST CONSENSUS',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey[500],
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 12),
+                  Text('\$${analystTarget.toStringAsFixed(2)}',
+                      style: GoogleFonts.sora(
+                          fontSize: 38, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Builder(builder: (_) {
+                    final upsidePct =
+                        (analystTarget - currentPrice) / currentPrice * 100;
+                    final positive = upsidePct >= 0;
+                    return Text(
+                      '${positive ? '+' : ''}${upsidePct.toStringAsFixed(1)}% vs current \$${currentPrice.toStringAsFixed(2)}',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: positive ? AppColors.emerald : Colors.red[400]),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Valuation Range bar
+        if (w52High != null && w52Low != null && currentPrice > 0) ...[
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: _ValuationRangeBar(
+                currentPrice: currentPrice,
+                target: analystTarget ?? (w52High + w52Low) / 2,
+                low: w52Low,
+                high: analystTarget != null
+                    ? (analystTarget > w52High ? analystTarget : w52High) * 1.05
+                    : w52High * 1.1,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Sensitivity table
+        if (peRatio != null && peRatio > 0) ...[
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Sensitivity',
+                      style: GoogleFonts.sora(
+                          fontSize: 15, fontWeight: FontWeight.w600)),
+                  Text('Implied price at different P/E multiples',
+                      style:
+                          TextStyle(fontSize: 11, color: Colors.grey[500])),
+                  const SizedBox(height: 12),
+                  Builder(builder: (_) {
+                    final eps = currentPrice / peRatio;
+                    final scenarios = [
+                      ('Contraction', peRatio * 0.8),
+                      ('Consensus', peRatio * 0.9),
+                      ('Current', peRatio),
+                      ('Expansion', peRatio * 1.1),
+                      ('Bullish', peRatio * 1.2),
+                    ];
+                    return Column(
+                      children: scenarios.map((sc) {
+                        final impliedPrice = eps * sc.$2;
+                        final returnPct =
+                            (impliedPrice - currentPrice) / currentPrice * 100;
+                        final isCurrent = sc.$1 == 'Current';
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 6),
+                          margin: const EdgeInsets.only(bottom: 4),
+                          decoration: isCurrent
+                              ? BoxDecoration(
+                                  color: AppColors.emerald.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(6),
+                                )
+                              : null,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                  flex: 3,
+                                  child: Text(sc.$1,
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: isCurrent
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: isCurrent
+                                              ? AppColors.emerald
+                                              : null))),
+                              Expanded(
+                                  flex: 2,
+                                  child: Text('${sc.$2.toStringAsFixed(1)}x',
+                                      style: GoogleFonts.dmMono(fontSize: 11))),
+                              Expanded(
+                                  flex: 3,
+                                  child: Text(
+                                      '\$${impliedPrice.toStringAsFixed(2)}',
+                                      style: GoogleFonts.dmMono(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700),
+                                      textAlign: TextAlign.right)),
+                              Expanded(
+                                  flex: 2,
+                                  child: Text(
+                                      '${returnPct >= 0 ? '+' : ''}${returnPct.toStringAsFixed(1)}%',
+                                      style: GoogleFonts.dmMono(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: returnPct >= 0
+                                              ? AppColors.emerald
+                                              : Colors.red[400]),
+                                      textAlign: TextAlign.right)),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildNews() {
     return Card(
       child: Padding(
@@ -693,6 +865,132 @@ class _SnapshotRow extends StatelessWidget {
           Text(value, style: GoogleFonts.dmMono(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
         ],
       ),
+    );
+  }
+}
+
+/// Valuation range visualization: Bear / Current / Target / Bull along a gradient bar.
+class _ValuationRangeBar extends StatelessWidget {
+  final double currentPrice;
+  final double target;
+  final double low;
+  final double high;
+
+  const _ValuationRangeBar({
+    required this.currentPrice,
+    required this.target,
+    required this.low,
+    required this.high,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final range = high - low;
+    final currentPos = range > 0 ? ((currentPrice - low) / range).clamp(0.0, 1.0) : 0.5;
+    final targetPos = range > 0 ? ((target - low) / range).clamp(0.0, 1.0) : 0.5;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('VALUATION RANGE',
+            style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey[500],
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Gradient bar
+                Container(
+                  height: 24,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [
+                      Colors.red.withValues(alpha: 0.25),
+                      Colors.amber.withValues(alpha: 0.2),
+                      AppColors.emerald.withValues(alpha: 0.3),
+                    ]),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                // Current marker (dashed)
+                Positioned(
+                  left: (width * currentPos) - 1,
+                  top: -6,
+                  bottom: -6,
+                  child: Container(
+                    width: 2,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                // Target marker (solid blue)
+                Positioned(
+                  left: (width * targetPos) - 2,
+                  top: -2,
+                  bottom: -2,
+                  child: Container(
+                    width: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.emerald,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _RangeLabel(
+                label: 'BEAR',
+                value: '\$${low.toStringAsFixed(0)}',
+                color: Colors.red[400]!),
+            _RangeLabel(
+                label: 'NOW',
+                value: '\$${currentPrice.toStringAsFixed(2)}',
+                color: Colors.grey[700]!),
+            _RangeLabel(
+                label: 'TARGET',
+                value: '\$${target.toStringAsFixed(0)}',
+                color: AppColors.emerald),
+            _RangeLabel(
+                label: 'BULL',
+                value: '\$${high.toStringAsFixed(0)}',
+                color: AppColors.emerald),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _RangeLabel extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _RangeLabel({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(label,
+            style: TextStyle(
+                fontSize: 9,
+                color: color,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.0)),
+        const SizedBox(height: 2),
+        Text(value,
+            style: GoogleFonts.dmMono(fontSize: 11, fontWeight: FontWeight.w600)),
+      ],
     );
   }
 }

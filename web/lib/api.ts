@@ -279,6 +279,16 @@ export interface UserResponse {
   email: string;
   fullName: string | null;
   plan: string;
+  receiveMorningBriefing: boolean;
+  receiveSignalAlerts: boolean;
+  receiveWeeklyNewsletter: boolean;
+}
+
+export interface UpdatePreferencesRequest {
+  receiveMorningBriefing?: boolean;
+  receiveSignalAlerts?: boolean;
+  receiveWeeklyNewsletter?: boolean;
+  fullName?: string;
 }
 
 export interface SubscriptionResponse {
@@ -349,6 +359,11 @@ export const api = {
 
   // Auth (authenticated)
   me: () => authFetchApi<UserResponse>("/auth/me"),
+  updatePreferences: (req: UpdatePreferencesRequest) =>
+    authFetchApi<UserResponse>("/auth/me/preferences", {
+      method: "PATCH",
+      body: JSON.stringify(req),
+    }),
 
   // Subscription (authenticated)
   subscription: () => authFetchApi<SubscriptionResponse>("/subscription"),

@@ -81,6 +81,14 @@ export function useCurrentUser() {
   return useQuery({ queryKey: ["current-user"], queryFn: api.me });
 }
 
+export function useUpdatePreferences() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.updatePreferences,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["current-user"] }),
+  });
+}
+
 export function useSubscription() {
   return useQuery({ queryKey: ["subscription"], queryFn: api.subscription });
 }

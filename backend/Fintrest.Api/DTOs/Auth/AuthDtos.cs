@@ -19,5 +19,15 @@ public record UserResponse(
     long Id,
     string Email,
     string? FullName,
-    string Plan
+    string Plan,
+    bool ReceiveMorningBriefing,
+    bool ReceiveSignalAlerts,
+    bool ReceiveWeeklyNewsletter
+);
+
+public record UpdatePreferencesRequest(
+    bool? ReceiveMorningBriefing,
+    bool? ReceiveSignalAlerts,
+    bool? ReceiveWeeklyNewsletter,
+    string? FullName
 );

@@ -15,9 +15,10 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCurrentUser, useSubscription } from "@/lib/hooks";
+import { useCurrentUser, useSubscription, useUpdatePreferences } from "@/lib/hooks";
 import { signOut } from "@/lib/auth";
 import Link from "next/link";
+import { Mail } from "lucide-react";
 
 const planColors: Record<string, string> = {
   Free: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
@@ -28,8 +29,6 @@ const planColors: Record<string, string> = {
 
 const settingsRows = [
   { label: "Personal Information", icon: User, href: "#" },
-  { label: "Notification Preferences", icon: Bell, href: "#" },
-  { label: "Alert Delivery", icon: Zap, href: "#" },
   { label: "Security & Password", icon: Shield, href: "#" },
   { label: "Billing & Plan", icon: CreditCard, href: "/pricing" },
   { label: "Risk Profile", icon: BarChart3, href: "#" },
@@ -40,6 +39,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const { data: sub } = useSubscription();
+  const updatePrefs = useUpdatePreferences();
 
   const plan = sub?.plan || user?.plan || "Free";
   const initials = user?.fullName
@@ -100,6 +100,42 @@ export default function SettingsPage() {
         </div>
       </motion.div>
 
+      {/* Email preferences */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="rounded-xl border border-border bg-card p-5 space-y-4"
+      >
+        <div className="flex items-center gap-2">
+          <Mail className="h-4 w-4 text-muted-foreground" />
+          <h2 className="font-semibold text-sm">Email Preferences</h2>
+        </div>
+        <div className="space-y-3">
+          <EmailToggle
+            label="Morning Briefing"
+            description="Daily email at 6:30 AM ET with top 10 signals"
+            checked={user?.receiveMorningBriefing ?? true}
+            onChange={(v) => updatePrefs.mutate({ receiveMorningBriefing: v })}
+            disabled={updatePrefs.isPending}
+          />
+          <EmailToggle
+            label="Signal Alerts"
+            description="Real-time email when a stock in your watchlist triggers"
+            checked={user?.receiveSignalAlerts ?? true}
+            onChange={(v) => updatePrefs.mutate({ receiveSignalAlerts: v })}
+            disabled={updatePrefs.isPending}
+          />
+          <EmailToggle
+            label="Weekly Newsletter"
+            description="Friday afternoon market recap with top weekly picks"
+            checked={user?.receiveWeeklyNewsletter ?? true}
+            onChange={(v) => updatePrefs.mutate({ receiveWeeklyNewsletter: v })}
+            disabled={updatePrefs.isPending}
+          />
+        </div>
+      </motion.div>
+
       {/* Settings menu */}
       <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
         {settingsRows.map((row, i) => (
@@ -132,6 +168,45 @@ export default function SettingsPage() {
         <LogOut className="h-4 w-4 mr-2" />
         Sign Out
       </Button>
+    </div>
+  );
+}
+
+function EmailToggle({
+  label,
+  description,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+          checked ? "bg-primary" : "bg-muted"
+        }`}
+      >
+        <span
+          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0.5"
+          } mt-0.5`}
+        />
+      </button>
     </div>
   );
 }
