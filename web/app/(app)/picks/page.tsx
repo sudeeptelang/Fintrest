@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { AthenaBoard } from "@/components/dashboard/athena-board";
 
 /**
@@ -7,6 +8,10 @@ import { AthenaBoard } from "@/components/dashboard/athena-board";
  * Lens chips let users filter by setup type (Buy the Dip / Breakout / Momentum Run /
  * Value / Event-Driven / Defensive). Swing traders pick "Momentum Run"; dip-buyers
  * pick "Buy the Dip"; event-driven traders pick "Event-Driven". One source of truth.
+ *
+ * AthenaBoard uses useSearchParams() to sync the active lens with the URL
+ * (?lens=momentum). Next.js requires that to live inside a <Suspense> boundary
+ * so the static prerender can bail out cleanly during build.
  */
 export default function PicksPage() {
   return (
@@ -19,7 +24,9 @@ export default function PicksPage() {
           or Defensive. Tap any ticker for Athena&apos;s full thesis.
         </p>
       </div>
-      <AthenaBoard limit={100} defaultLens="all" title="All Signals" syncUrl />
+      <Suspense fallback={null}>
+        <AthenaBoard limit={100} defaultLens="all" title="All Signals" syncUrl />
+      </Suspense>
     </div>
   );
 }
