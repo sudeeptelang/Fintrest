@@ -133,8 +133,10 @@ export function Pricing() {
             const isCurrentPlan = isPaid && currentPlan === thisPlanLower;
 
             // CTA label adapts: "Current" if already on this tier, "Upgrade"/"Downgrade" for
-            // the other tier, otherwise the default CTA from constants.
-            let ctaLabel = plan.cta;
+            // the other tier, otherwise the default CTA from constants. Typed as string so we
+            // can assign arbitrary labels — without the annotation, TS narrows to the literal
+            // union of plan.cta values from the `as const` PLANS.
+            let ctaLabel: string = plan.cta;
             if (isPaid) {
               if (isCurrentPlan) ctaLabel = "Current Plan";
               else if (thisPlanLower === "free") ctaLabel = "Cancel plan";
