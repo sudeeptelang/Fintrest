@@ -32,25 +32,30 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
   const { id } = use(params);
   const portfolioId = parseInt(id);
 
-  const { data: holdingsRaw, isLoading: holdingsLoading, isError: holdingsErrored } = useQuery({
+  // Portfolio 4 is the reserved demo slot — always renders hardcoded sample holdings
+  // with no backend calls. Guarantees a clean, populated page for demo / marketing links
+  // regardless of DB state, Athena advisor errors, or Fly backend availability.
+  const usingDemoData = portfolioId === 4;
+
+  const { data: holdingsRaw, isLoading: holdingsLoading } = useQuery({
     queryKey: ["portfolio-holdings", portfolioId],
     queryFn: () => api.portfolioHoldings(portfolioId),
     retry: 1,
     throwOnError: false,
+    enabled: !usingDemoData,
   });
 
-  // Demo fallback for portfolio 4 — if the live portfolio has no holdings (empty array
-  // or fetch error), inject a sample set so the page shows real-looking data for demo links.
-  const usingDemoData = portfolioId === 4 && (holdingsErrored || (holdingsRaw !== undefined && holdingsRaw.length === 0));
   const holdings = usingDemoData ? DEMO_HOLDINGS : holdingsRaw;
 
-  // Analytics + advisor are enrichment — if either fails (e.g. Athena thesis bug,
-  // missing risk metrics), we still want the holdings page to render.
+  // Analytics + advisor are enrichment — skipped entirely for the demo portfolio. For
+  // real portfolios, failures (Athena thesis bug, missing risk metrics) degrade gracefully
+  // without crashing the page.
   const { data: analytics } = useQuery({
     queryKey: ["portfolio-analytics", portfolioId],
     queryFn: () => api.portfolioAnalytics(portfolioId),
     retry: false,
     throwOnError: false,
+    enabled: !usingDemoData,
   });
 
   const { data: advisorData, isError: advisorErrored } = useQuery({
@@ -58,6 +63,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
     queryFn: () => api.portfolioAdvisor(portfolioId),
     retry: false,
     throwOnError: false,
+    enabled: !usingDemoData,
   });
 
   // Sortable holdings
@@ -138,7 +144,9 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
           <p className="text-xs text-muted-foreground mb-1">Health Score</p>
           <div className="flex items-center gap-2">
             <p className="font-[var(--font-heading)] text-2xl font-bold">
-              {Math.round(analytics?.healthScore ?? advisorData?.healthScore ?? 0)}
+              {usingDemoData
+                ? 78
+                : Math.round(analytics?.healthScore ?? advisorData?.healthScore ?? 0)}
             </p>
             <span className="text-xs text-muted-foreground">/ 100</span>
           </div>
@@ -146,9 +154,11 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-xs text-muted-foreground mb-1">Recommendations</p>
           <p className="font-[var(--font-heading)] text-2xl font-bold">
-            {advisorData?.recommendations?.length ?? 0}
+            {usingDemoData ? 4 : (advisorData?.recommendations?.length ?? 0)}
           </p>
-          {(advisorData?.alerts?.length ?? 0) > 0 && (
+          {usingDemoData ? (
+            <p className="text-[10px] text-muted-foreground mt-0.5">sample · rebalance + tax-loss</p>
+          ) : (advisorData?.alerts?.length ?? 0) > 0 && (
             <p className="text-xs text-amber-400 mt-0.5 flex items-center gap-1">
               <AlertTriangle className="h-3 w-3" /> {advisorData!.alerts.length} alerts
             </p>
