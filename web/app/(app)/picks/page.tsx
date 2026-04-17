@@ -30,6 +30,33 @@ export default function PicksPage() {
         </p>
       </div>
 
+      {!isPro && (
+        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.06] to-primary/[0.02] p-8 text-center">
+          <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/15 mx-auto mb-4">
+            <Lock className="h-5 w-5 text-primary" />
+          </div>
+          <h3 className="font-[var(--font-heading)] text-xl font-bold">See every signal with Pro</h3>
+          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+            You&apos;re seeing a free preview of the top 3 picks. Upgrade to unlock the full scan output,
+            Athena&apos;s thesis on every pick, lens filters, and real-time alerts.
+          </p>
+          <ul className="mt-5 space-y-1.5 text-sm max-w-md mx-auto text-left inline-block">
+            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>All 50+ signals, not just 3</span></li>
+            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Buy the Dip · Breakout · Momentum lens filters</span></li>
+            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Athena AI thesis on every pick</span></li>
+            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Congress + Insider trade feeds</span></li>
+          </ul>
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <Link href="/pricing">
+              <Button className="bg-primary hover:bg-primary/90 text-white">Upgrade for $19/mo</Button>
+            </Link>
+            <Link href="/pricing" className="text-xs text-muted-foreground hover:text-foreground">
+              Compare plans →
+            </Link>
+          </div>
+        </div>
+      )}
+
       <Suspense fallback={null}>
         <AthenaBoard
           limit={isPro ? 100 : 3}
@@ -38,29 +65,6 @@ export default function PicksPage() {
           syncUrl={isPro}
         />
       </Suspense>
-
-      {!isPro && (
-        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.06] to-primary/[0.02] p-8 text-center">
-          <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/15 mx-auto mb-4">
-            <Lock className="h-5 w-5 text-primary" />
-          </div>
-          <h3 className="font-[var(--font-heading)] text-xl font-bold">See every signal with Pro</h3>
-          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-            Unlock the full scan output, Athena&apos;s thesis on every pick, lens filters, and real-time alerts.
-          </p>
-          <ul className="mt-5 space-y-1.5 text-sm max-w-md mx-auto text-left inline-block">
-            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>All 50+ signals, not just 3</span></li>
-            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Buy the Dip · Breakout · Momentum lens filters</span></li>
-            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Athena AI thesis on every pick</span></li>
-            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Congress + Insider trade feeds</span></li>
-          </ul>
-          <div className="mt-6">
-            <Link href="/pricing">
-              <Button className="bg-primary hover:bg-primary/90 text-white">Upgrade for $19/mo</Button>
-            </Link>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
