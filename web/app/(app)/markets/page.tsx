@@ -15,6 +15,7 @@ import {
 import type { MarketIndex, NewsItem } from "@/lib/api";
 import { StockLogo } from "@/components/stock/stock-logo";
 import { NewsReaderDrawer } from "@/components/news/news-reader-drawer";
+import { PaywallGate } from "@/components/billing/paywall-gate";
 import { Newspaper, Sparkles } from "lucide-react";
 
 export default function MarketsPage() {
@@ -98,7 +99,8 @@ export default function MarketsPage() {
         </div>
       </div>
 
-      {/* Popular Stocks Heatmap — Finviz-style: box size = market cap, color = today's % change. */}
+      {/* Popular Stocks Heatmap — Pro only. Finviz-style: box size = market cap, color = today's % change. */}
+      <PaywallGate tier="pro" compact>
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -158,6 +160,7 @@ export default function MarketsPage() {
           </ResponsiveContainer>
         )}
       </div>
+      </PaywallGate>
 
       {/* Earnings Calendar — upcoming reports in the next 14 days */}
       <div className="rounded-xl border border-border bg-card p-5">

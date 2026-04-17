@@ -36,6 +36,7 @@ import { AthenaSnowflake } from "@/components/stock/athena-snowflake";
 import { AthenaThesisCard } from "@/components/stock/athena-thesis-card";
 import { RewardsRisks } from "@/components/stock/rewards-risks";
 import { OwnershipStrip } from "@/components/stock/ownership-strip";
+import { PaywallGate } from "@/components/billing/paywall-gate";
 
 interface StockDetailPageProps {
   params: Promise<{ ticker: string }>;
@@ -352,9 +353,11 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
       {/* Finviz-style snapshot */}
       {snapshot && <StockSnapshot snapshot={snapshot} />}
 
-      {/* Athena's Take — full thesis (why/when/what). Placed first, before the chart. */}
+      {/* Athena's Take — Pro+ only. Full thesis (why/when/what). Placed first, before the chart. */}
       <motion.div custom={2.5} initial="hidden" animate="visible" variants={fadeIn}>
-        <AthenaThesisCard ticker={ticker.toUpperCase()} />
+        <PaywallGate tier="pro">
+          <AthenaThesisCard ticker={ticker.toUpperCase()} />
+        </PaywallGate>
       </motion.div>
 
       {/* Price Chart */}

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Zap } from "lucide-react";
-import { useTopPicks, useMarketIndices } from "@/lib/hooks";
+import { ArrowUpRight, Lock, Zap } from "lucide-react";
+import { useTopPicks, useMarketIndices, usePlan, planMeets } from "@/lib/hooks";
 import { SetupLensTiles } from "@/components/dashboard/setup-lens-tiles";
 import { HeroSignalCard } from "@/components/dashboard/hero-signal-card";
 import { AthenaPulse } from "@/components/dashboard/athena-pulse";
@@ -14,8 +14,13 @@ import { MoversTable } from "@/components/dashboard/movers-table";
 export default function DashboardPage() {
   const { data: picks } = useTopPicks(20);
   const { data: indices } = useMarketIndices();
+  const { plan } = usePlan();
+  const isPro = planMeets(plan, "pro");
 
   const signals = picks?.signals ?? [];
+  // Free users see top 3; Pro+ see top 5.
+  const visibleSignals = isPro ? signals.slice(0, 5) : signals.slice(0, 3);
+  const lockedSignalsCount = isPro ? 0 : Math.max(0, Math.min(signals.length, 5) - 3);
 
   const [activeScreener, setActiveScreener] = useState<ScreenerKey | null>(null);
 
@@ -75,7 +80,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Today's Top Signals — balanced 5-up strip, no single hero */}
+      {/* Today's Top Signals — Free sees top 3, Pro+ sees top 5 */}
       {signals.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -84,15 +89,34 @@ export default function DashboardPage() {
               <h2 className="font-[var(--font-heading)] text-sm font-semibold uppercase tracking-wider">
                 Today&apos;s Top Signals
               </h2>
+              {!isPro && (
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  · Free preview: top 3
+                </span>
+              )}
             </div>
             <Link href="/picks" className="text-xs text-primary hover:underline flex items-center gap-1">
               View all <ArrowUpRight className="h-3 w-3" />
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-            {signals.slice(0, 5).map((s, i) => (
+            {visibleSignals.map((s, i) => (
               <HeroSignalCard key={s.id} signal={s} rank={i + 1} />
             ))}
+            {lockedSignalsCount > 0 && (
+              <Link
+                href="/pricing"
+                className="flex flex-col items-center justify-center rounded-xl border border-dashed border-primary/40 bg-primary/[0.04] p-4 text-center hover:bg-primary/[0.08] transition-colors"
+              >
+                <Lock className="h-5 w-5 text-primary mb-2" />
+                <p className="text-sm font-semibold text-primary">
+                  +{lockedSignalsCount} more with Pro
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  See every signal + Athena thesis
+                </p>
+              </Link>
+            )}
           </div>
         </div>
       )}
