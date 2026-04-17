@@ -226,7 +226,6 @@ public class SubscriptionController(AppDbContext db, StripeService stripe, ILogg
         await db.SaveChangesAsync();
         logger.LogInformation("Subscription {Id} canceled for user {UserId}", stripeSub.Id, sub.UserId);
     }
-}
 
     /// <summary>
     /// Extract CurrentPeriodEnd from a Stripe Subscription across API versions.
