@@ -38,6 +38,34 @@ public class AlertsController(AppDbContext db) : ControllerBase
     public async Task<ActionResult<AlertResponse>> CreateAlert(AlertCreateRequest request)
     {
         var userId = await GetUserId();
+
+        // Tier cap: Free = 1 active alert, Pro/Elite = unlimited (soft cap 200 for sanity).
+        var plan = await db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.Plan)
+            .FirstOrDefaultAsync();
+        var cap = plan switch
+        {
+            PlanType.Elite => 500,
+            PlanType.Pro => 200,
+            _ => 1,  // Free
+        };
+        var activeCount = await db.Alerts.CountAsync(a => a.UserId == userId && a.Active);
+        if (activeCount >= cap)
+        {
+            return StatusCode(StatusCodes.Status402PaymentRequired, new
+            {
+                error = "plan_limit_reached",
+                plan = plan.ToString().ToLower(),
+                cap,
+                current = activeCount,
+                message = plan == PlanType.Free
+                    ? "Free plan is limited to 1 active alert. Upgrade to Pro for unlimited alerts."
+                    : "Alert cap reached.",
+                upgradeUrl = "/pricing",
+            });
+        }
+
         var alert = new Alert
         {
             UserId = userId,

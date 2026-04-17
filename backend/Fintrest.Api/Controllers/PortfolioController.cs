@@ -1,6 +1,7 @@
 using Fintrest.Api.Core;
 using Fintrest.Api.Data;
 using Fintrest.Api.DTOs.Portfolio;
+using Fintrest.Api.Models;
 using Fintrest.Api.Services.Portfolio;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -74,6 +75,37 @@ public class PortfolioController(
     public async Task<ActionResult<PortfolioResponse>> CreatePortfolio(PortfolioCreateRequest request)
     {
         var userId = await GetUserId();
+
+        // Tier cap: Free = 1 portfolio, Pro = 3, Elite = unlimited.
+        var plan = await db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.Plan)
+            .FirstOrDefaultAsync();
+        var cap = plan switch
+        {
+            PlanType.Elite => int.MaxValue,
+            PlanType.Pro => 3,
+            _ => 1,
+        };
+        var existing = await db.Portfolios.CountAsync(p => p.UserId == userId);
+        if (existing >= cap)
+        {
+            return StatusCode(StatusCodes.Status402PaymentRequired, new
+            {
+                error = "plan_limit_reached",
+                plan = plan.ToString().ToLower(),
+                cap,
+                current = existing,
+                message = plan switch
+                {
+                    PlanType.Free => "Free plan is limited to 1 portfolio. Upgrade to Pro for 3 portfolios.",
+                    PlanType.Pro => "Pro plan is limited to 3 portfolios. Upgrade to Elite for unlimited.",
+                    _ => "Portfolio cap reached.",
+                },
+                upgradeUrl = "/pricing",
+            });
+        }
+
         var portfolio = await portfolioService.CreatePortfolio(userId, request);
         var response = new PortfolioResponse(
             portfolio.Id, portfolio.Name, portfolio.Strategy, portfolio.CashBalance,

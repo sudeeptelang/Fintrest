@@ -155,6 +155,28 @@ public class WatchlistsController(AppDbContext db) : ControllerBase
         var wl = await db.Watchlists.FirstOrDefaultAsync(w => w.Id == watchlistId && w.UserId == userId);
         if (wl is null) return NotFound(new { message = "Watchlist not found" });
 
+        // Tier cap: Free = 5 tickers across all their watchlists, Pro/Elite = unlimited.
+        var plan = await db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.Plan)
+            .FirstOrDefaultAsync();
+        if (plan == PlanType.Free)
+        {
+            var total = await db.WatchlistItems.CountAsync(i => i.Watchlist.UserId == userId);
+            if (total >= 5)
+            {
+                return StatusCode(StatusCodes.Status402PaymentRequired, new
+                {
+                    error = "plan_limit_reached",
+                    plan = "free",
+                    cap = 5,
+                    current = total,
+                    message = "Free plan is limited to 5 watchlist tickers. Upgrade to Pro for unlimited.",
+                    upgradeUrl = "/pricing",
+                });
+            }
+        }
+
         var item = new WatchlistItem { WatchlistId = wl.Id, StockId = request.StockId };
         db.WatchlistItems.Add(item);
         await db.SaveChangesAsync();
