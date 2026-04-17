@@ -4,7 +4,7 @@ import { use, useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Brain, BarChart3, ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, type Holding } from "@/lib/api";
 import { ScoreRing } from "@/components/charts/score-ring";
@@ -21,16 +21,23 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
   const { data: holdings, isLoading: holdingsLoading } = useQuery({
     queryKey: ["portfolio-holdings", portfolioId],
     queryFn: () => api.portfolioHoldings(portfolioId),
+    retry: 1,
   });
 
+  // Analytics + advisor are enrichment — if either fails (e.g. Athena thesis bug,
+  // missing risk metrics), we still want the holdings page to render.
   const { data: analytics } = useQuery({
     queryKey: ["portfolio-analytics", portfolioId],
     queryFn: () => api.portfolioAnalytics(portfolioId),
+    retry: false,
+    throwOnError: false,
   });
 
-  const { data: advisorData } = useQuery({
+  const { data: advisorData, isError: advisorErrored } = useQuery({
     queryKey: ["portfolio-advisor", portfolioId],
     queryFn: () => api.portfolioAdvisor(portfolioId),
+    retry: false,
+    throwOnError: false,
   });
 
   // Sortable holdings
@@ -81,14 +88,9 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
           <h1 className="font-[var(--font-heading)] text-2xl font-bold">Portfolio</h1>
           <p className="text-sm text-muted-foreground mt-1">{holdings?.length ?? 0} holdings</p>
         </div>
-        <div className="flex gap-2">
-          <Link href={`/portfolio/${id}/advisor`}>
-            <Button variant="outline" size="sm"><Brain className="h-3.5 w-3.5 mr-1.5" /> AI Advisor</Button>
-          </Link>
-          <Link href={`/portfolio/${id}/analytics`}>
-            <Button variant="outline" size="sm"><BarChart3 className="h-3.5 w-3.5 mr-1.5" /> Analytics</Button>
-          </Link>
-        </div>
+        <Link href="/portfolio/upload">
+          <Button variant="outline" size="sm"><Upload className="h-3.5 w-3.5 mr-1.5" /> Upload / Import</Button>
+        </Link>
       </div>
 
       {/* Summary row */}
@@ -128,8 +130,12 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
         </div>
       </div>
 
-      {/* Athena profile — factor radar + verdict mix + regime */}
-      <PortfolioAthenaProfile advisor={advisorData} />
+      {/* Athena profile — factor radar + verdict mix + regime. Only renders when the advisor
+          call succeeds; if Athena errored (known Npgsql disposed-connector issue during scans,
+          or stale advisor record), we skip it rather than crash the whole page. */}
+      {!advisorErrored && advisorData && (
+        <PortfolioAthenaProfile advisor={advisorData} />
+      )}
 
       {/* Holdings table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
