@@ -10,6 +10,20 @@ import { api, type Holding } from "@/lib/api";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-profile";
 
+// Sample holdings for the /portfolio/4 demo. Falls back in when the live portfolio has no
+// holdings (empty or error), so the page never renders blank for a demo link. Values
+// approximate reasonable entry prices vs current; day % is cosmetic.
+const DEMO_HOLDINGS: Holding[] = [
+  { id: 1001, stockId: 1, ticker: "AAPL",  stockName: "Apple Inc.",              quantity: 50, avgCost: 175.20, currentPrice: 189.40, currentValue: 9470,   unrealizedPnl: 710,    unrealizedPnlPct: 8.10,  signalScore: 72, dayChangePct: 1.24  },
+  { id: 1002, stockId: 2, ticker: "MSFT",  stockName: "Microsoft Corp.",         quantity: 25, avgCost: 378.50, currentPrice: 421.30, currentValue: 10532.5, unrealizedPnl: 1070,   unrealizedPnlPct: 11.31, signalScore: 81, dayChangePct: 0.82  },
+  { id: 1003, stockId: 3, ticker: "NVDA",  stockName: "NVIDIA Corp.",            quantity: 30, avgCost: 520.00, currentPrice: 875.60, currentValue: 26268,   unrealizedPnl: 10668,  unrealizedPnlPct: 68.38, signalScore: 88, dayChangePct: 2.45  },
+  { id: 1004, stockId: 4, ticker: "GOOGL", stockName: "Alphabet Inc. Class A",   quantity: 20, avgCost: 138.80, currentPrice: 164.20, currentValue: 3284,    unrealizedPnl: 508,    unrealizedPnlPct: 18.30, signalScore: 66, dayChangePct: -0.34 },
+  { id: 1005, stockId: 5, ticker: "AMZN",  stockName: "Amazon.com Inc.",         quantity: 15, avgCost: 142.50, currentPrice: 178.90, currentValue: 2683.5,  unrealizedPnl: 546,    unrealizedPnlPct: 25.54, signalScore: 74, dayChangePct: 1.12  },
+  { id: 1006, stockId: 6, ticker: "META",  stockName: "Meta Platforms Inc.",     quantity: 12, avgCost: 320.00, currentPrice: 498.10, currentValue: 5977.2,  unrealizedPnl: 2137.2, unrealizedPnlPct: 55.66, signalScore: 79, dayChangePct: 1.88  },
+  { id: 1007, stockId: 7, ticker: "TSLA",  stockName: "Tesla Inc.",              quantity: 20, avgCost: 240.00, currentPrice: 214.50, currentValue: 4290,    unrealizedPnl: -510,   unrealizedPnlPct: -10.63, signalScore: 48, dayChangePct: -2.15 },
+  { id: 1008, stockId: 8, ticker: "JPM",   stockName: "JPMorgan Chase & Co.",    quantity: 25, avgCost: 165.40, currentPrice: 201.80, currentValue: 5045,    unrealizedPnl: 910,    unrealizedPnlPct: 22.01, signalScore: 69, dayChangePct: 0.42  },
+];
+
 interface PortfolioDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -18,11 +32,17 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
   const { id } = use(params);
   const portfolioId = parseInt(id);
 
-  const { data: holdings, isLoading: holdingsLoading } = useQuery({
+  const { data: holdingsRaw, isLoading: holdingsLoading, isError: holdingsErrored } = useQuery({
     queryKey: ["portfolio-holdings", portfolioId],
     queryFn: () => api.portfolioHoldings(portfolioId),
     retry: 1,
+    throwOnError: false,
   });
+
+  // Demo fallback for portfolio 4 — if the live portfolio has no holdings (empty array
+  // or fetch error), inject a sample set so the page shows real-looking data for demo links.
+  const usingDemoData = portfolioId === 4 && (holdingsErrored || (holdingsRaw !== undefined && holdingsRaw.length === 0));
+  const holdings = usingDemoData ? DEMO_HOLDINGS : holdingsRaw;
 
   // Analytics + advisor are enrichment — if either fails (e.g. Athena thesis bug,
   // missing risk metrics), we still want the holdings page to render.
@@ -85,8 +105,14 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-[var(--font-heading)] text-2xl font-bold">Portfolio</h1>
-          <p className="text-sm text-muted-foreground mt-1">{holdings?.length ?? 0} holdings</p>
+          <h1 className="font-[var(--font-heading)] text-2xl font-bold">
+            Portfolio{usingDemoData && <span className="ml-2 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-primary/10 text-primary align-middle">Sample</span>}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {usingDemoData
+              ? "Demo portfolio — upload your own to see personalized analysis."
+              : `${holdings?.length ?? 0} holdings`}
+          </p>
         </div>
         <Link href="/portfolio/upload">
           <Button variant="outline" size="sm"><Upload className="h-3.5 w-3.5 mr-1.5" /> Upload / Import</Button>
