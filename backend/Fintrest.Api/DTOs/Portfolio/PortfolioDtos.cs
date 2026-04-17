@@ -30,7 +30,8 @@ public record HoldingResponse(
     double CurrentValue,
     double UnrealizedPnl,
     double UnrealizedPnlPct,
-    double? SignalScore
+    double? SignalScore,
+    double? DayChangePct = null
 );
 
 public record TransactionRequest(

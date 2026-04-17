@@ -54,8 +54,8 @@ public class RateLimiter
     }
 }
 
-/// <summary>FMP rate limiter: 250/min leaves safe headroom under Starter plan (300/min).</summary>
+/// <summary>FMP rate limiter: 650/min leaves safe headroom under Premier plan (750/min).</summary>
 public sealed class FmpRateLimiter : RateLimiter
 {
-    public FmpRateLimiter() : base(250, TimeSpan.FromMinutes(1)) { }
+    public FmpRateLimiter() : base(650, TimeSpan.FromMinutes(1)) { }
 }

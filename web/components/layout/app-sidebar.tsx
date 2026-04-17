@@ -31,6 +31,7 @@ const sidebarSections = [
     links: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { label: "Athena's Picks", href: "/picks", icon: TrendingUp },
+      { label: "Markets", href: "/markets", icon: BarChart3 },
     ],
   },
   {
@@ -45,7 +46,6 @@ const sidebarSections = [
     links: [
       { label: "Watchlist", href: "/watchlist", icon: Star },
       { label: "Alerts", href: "/alerts", icon: Bell },
-      { label: "Markets", href: "/markets", icon: BarChart3 },
       { label: "Insiders", href: "/insiders", icon: Users },
       { label: "Congress", href: "/congress", icon: Landmark },
       { label: "Performance", href: "/performance", icon: LineChart },
@@ -66,8 +66,15 @@ export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
     <>
       {/* Logo */}
       <div className="h-16 flex items-center justify-between px-6 border-b border-border">
-        <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo-icon.png" alt="Fintrest" width={32} height={32} className="rounded-lg" />
+        <Link href="/" className="flex items-center gap-2.5">
+          <Image
+            src="/logo-icon.png"
+            alt="Fintrest"
+            width={32}
+            height={32}
+            priority
+            className="rounded-[8px] shadow-md ring-1 ring-foreground/15"
+          />
           <span className="font-[var(--font-heading)] text-lg font-bold tracking-tight">
             Fintrest<span className="text-primary">.ai</span>
           </span>

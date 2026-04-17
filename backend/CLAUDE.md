@@ -5,7 +5,7 @@
 - **PostgreSQL** via Supabase (primary DB)
 - **Redis** for caching (signals, sessions)
 - **Supabase Auth** (JWT tokens)
-- **AWS SES** for email alerts + morning briefings
+- **Azure Communication Services (ACS)** for email alerts + morning briefings
 - **Stripe** for subscription billing
 - **Twilio** for SMS (Elite plan only)
 
@@ -40,7 +40,7 @@ backend/Fintrest.Api/
 ```
 ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
 POLYGON_API_KEY, FMP_API_KEY, FINNHUB_API_KEY
-AWS_SES_ACCESS_KEY, AWS_SES_SECRET_KEY, AWS_SES_REGION
+Acs__ConnectionString, Acs__Email__FromEmail, Acs__Email__FromName, Acs__Email__ReplyTo
 STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
 REDIS_URL

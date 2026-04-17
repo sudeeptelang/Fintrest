@@ -189,6 +189,13 @@ export default function InsidersPage() {
                 <tr><td colSpan={8} className="p-8 text-center">
                   <Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" />
                 </td></tr>
+              ) : (data?.length ?? 0) === 0 ? (
+                <tr><td colSpan={8} className="p-10 text-center space-y-1">
+                  <p className="text-sm font-medium">No insider filings available yet</p>
+                  <p className="text-xs text-muted-foreground">
+                    Recent SEC Form 4 data isn&apos;t loading from the provider right now. Check back shortly.
+                  </p>
+                </td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={8} className="p-8 text-center text-xs text-muted-foreground">
                   No filings match the current filters.

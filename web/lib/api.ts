@@ -457,8 +457,8 @@ export const api = {
   marketEarningsCalendar: (days = 14) => fetchApi<EarningsCalendarItem[]>(`/market/earnings-calendar?days=${days}`),
   marketNews: (limit = 10) => fetchApi<NewsItem[]>(`/market/news?limit=${limit}`),
   marketScreener: (limit = 50) => fetchApi<ScreenerRow[]>(`/market/screener?limit=${limit}`),
-  marketInsidersLatest: (limit = 50) => fetchApi<InsiderActivity[]>(`/market/insiders/latest?limit=${limit}`),
-  marketCongressLatest: (limit = 50) => fetchApi<CongressTradeRow[]>(`/market/congress/latest?limit=${limit}`),
+  marketInsidersLatest: (limit = 50) => authFetchApi<InsiderActivity[]>(`/market/insiders/latest?limit=${limit}`),
+  marketCongressLatest: (limit = 50) => authFetchApi<CongressTradeRow[]>(`/market/congress/latest?limit=${limit}`),
   topPicks: (limit = 12) => fetchApi<SignalListResponse>(`/picks/top-today?limit=${limit}`),
   swingWeek: () => fetchApi<SignalListResponse>("/picks/swing-week"),
 
@@ -610,6 +610,7 @@ export interface Holding {
   unrealizedPnl: number;
   unrealizedPnlPct: number;
   signalScore: number | null;
+  dayChangePct: number | null;
 }
 
 export interface Transaction {

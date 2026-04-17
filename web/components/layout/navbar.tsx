@@ -14,12 +14,19 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/60">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo-icon.png" alt="Fintrest" width={36} height={36} className="rounded-lg" />
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <Image
+              src="/logo-icon.png"
+              alt="Fintrest"
+              width={36}
+              height={36}
+              priority
+              className="rounded-[9px] shadow-md ring-1 ring-foreground/15 transition-transform group-hover:scale-105"
+            />
             <span className="font-[var(--font-heading)] text-xl font-bold tracking-tight">
               Fintrest
               <span className="text-primary">.ai</span>
@@ -71,7 +78,7 @@ export function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t border-border/50 bg-background/95 backdrop-blur-xl"
+            className="md:hidden border-t border-slate-200/80 dark:border-slate-800/60 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl"
           >
             <div className="px-4 py-4 space-y-3">
               {NAV_LINKS.map((link) => (

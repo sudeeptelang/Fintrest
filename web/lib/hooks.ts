@@ -3,40 +3,47 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
 
+// Stale-time budget — market data rarely changes by the second, so we lean on React Query's
+// cache to avoid re-hitting the API on every route change. Global default is 60s
+// (see QueryProvider); these override where the domain allows a longer window.
+const FIVE_MIN = 1000 * 60 * 5;
+const TWO_MIN = 1000 * 60 * 2;
+const TEN_MIN = 1000 * 60 * 10;
+
 export function useMarketSummary() {
-  return useQuery({ queryKey: ["market-summary"], queryFn: api.marketSummary });
+  return useQuery({ queryKey: ["market-summary"], queryFn: api.marketSummary, staleTime: TWO_MIN });
 }
 
 export function useMarketSectors() {
-  return useQuery({ queryKey: ["market-sectors"], queryFn: api.marketSectors });
+  return useQuery({ queryKey: ["market-sectors"], queryFn: api.marketSectors, staleTime: FIVE_MIN });
 }
 
 export function useMarketIndices() {
-  return useQuery({ queryKey: ["market-indices"], queryFn: api.marketIndices });
+  return useQuery({ queryKey: ["market-indices"], queryFn: api.marketIndices, staleTime: TWO_MIN });
 }
 
 export function useMarketTrending(limit = 10) {
-  return useQuery({ queryKey: ["market-trending", limit], queryFn: () => api.marketTrending(limit) });
+  return useQuery({ queryKey: ["market-trending", limit], queryFn: () => api.marketTrending(limit), staleTime: TWO_MIN });
 }
 
 export function useMarketMostActive(limit = 10) {
-  return useQuery({ queryKey: ["market-most-active", limit], queryFn: () => api.marketMostActive(limit) });
+  return useQuery({ queryKey: ["market-most-active", limit], queryFn: () => api.marketMostActive(limit), staleTime: TWO_MIN });
 }
 
 export function useMarketEarningsCalendar(days = 14) {
-  return useQuery({ queryKey: ["market-earnings-calendar", days], queryFn: () => api.marketEarningsCalendar(days) });
+  return useQuery({ queryKey: ["market-earnings-calendar", days], queryFn: () => api.marketEarningsCalendar(days), staleTime: TEN_MIN });
 }
 
 export function useMarketNews(limit = 10) {
-  return useQuery({ queryKey: ["market-news", limit], queryFn: () => api.marketNews(limit) });
+  return useQuery({ queryKey: ["market-news", limit], queryFn: () => api.marketNews(limit), staleTime: TWO_MIN });
 }
 
 export function useMarketScreener(limit = 50) {
-  return useQuery({ queryKey: ["market-screener", limit], queryFn: () => api.marketScreener(limit) });
+  return useQuery({ queryKey: ["market-screener", limit], queryFn: () => api.marketScreener(limit), staleTime: TWO_MIN });
 }
 
 export function useTopPicks(limit = 12) {
-  return useQuery({ queryKey: ["top-picks", limit], queryFn: () => api.topPicks(limit) });
+  return useQuery({ queryKey: ["top-picks", limit], queryFn: () => api.topPicks(limit), staleTime: TWO_MIN });
 }
 
 export function useSwingWeek() {

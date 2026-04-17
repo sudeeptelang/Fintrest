@@ -116,14 +116,38 @@ public class PortfolioController(
 
         var holdings = await portfolioService.GetHoldings(userId, id);
 
+        // Batch-load the last 2 bars per stock so we can surface today's % move on the holdings table
+        // without an N+1 price lookup.
+        var stockIds = holdings.Select(h => h.StockId).Distinct().ToList();
+        var dayChangeByStock = new Dictionary<long, double>();
+        if (stockIds.Count > 0)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-14);
+            var recentBars = await db.MarketData
+                .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
+                .Select(m => new { m.StockId, m.Ts, m.Close, m.PrevClose })
+                .ToListAsync();
+
+            foreach (var grp in recentBars.GroupBy(b => b.StockId))
+            {
+                var sorted = grp.OrderByDescending(b => b.Ts).Take(2).ToList();
+                var latest = sorted[0];
+                double? prev = latest.PrevClose;
+                if (prev is null or 0 && sorted.Count > 1) prev = sorted[1].Close;
+                if (prev is > 0)
+                    dayChangeByStock[grp.Key] = Math.Round((latest.Close - prev.Value) / prev.Value * 100, 2);
+            }
+        }
+
         var responses = new List<HoldingResponse>();
         foreach (var h in holdings)
         {
             var signalScore = await portfolioService.GetLatestSignalScore(h.StockId);
+            double? dayChange = dayChangeByStock.TryGetValue(h.StockId, out var d) ? d : null;
             responses.Add(new HoldingResponse(
                 h.Id, h.StockId, h.Stock.Ticker, h.Stock.Name,
                 h.Quantity, h.AvgCost, h.CurrentPrice, h.CurrentValue,
-                h.UnrealizedPnl, h.UnrealizedPnlPct, signalScore
+                h.UnrealizedPnl, h.UnrealizedPnlPct, signalScore, dayChange
             ));
         }
 

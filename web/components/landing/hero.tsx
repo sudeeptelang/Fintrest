@@ -188,23 +188,24 @@ function CapabilityInfographic() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] rounded-full border border-white/[0.03]" />
         </div>
 
-        {/* Center Athena orb */}
+        {/* Athena badge — compact inline header, not a dominant orb */}
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.6 }}
-          className="relative flex flex-col items-center mb-6"
+          transition={{ delay: 0.6, duration: 0.5 }}
+          className="relative flex items-center gap-3 mb-5"
         >
-          <div className="relative flex items-center justify-center h-20 w-20 rounded-full bg-[#0d1a2e] border border-[#00b87c]/30 shadow-[0_0_40px_rgba(0,184,124,0.25)]">
-            <span className="absolute inset-0 rounded-full bg-[#00b87c]/10 animate-ping [animation-duration:3s]" />
-            <Sparkles className="h-9 w-9 text-[#00b87c]" />
+          <div className="relative flex items-center justify-center h-10 w-10 rounded-lg bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] shadow-lg shadow-blue-500/20">
+            <Sparkles className="h-5 w-5 text-white" />
           </div>
-          <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[#00b87c]">
-            Athena AI
-          </p>
-          <p className="text-[11px] text-white/50 mt-0.5">
-            The editorial brain at the center
-          </p>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+              Athena AI
+            </p>
+            <p className="text-[11px] text-white/50">
+              The editorial brain at the center
+            </p>
+          </div>
         </motion.div>
 
         {/* Four capability rings, stacked */}

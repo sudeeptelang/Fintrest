@@ -352,10 +352,20 @@ public class ScanOrchestrator(
         CancellationToken ct)
     {
         var snapshotByTicker = pending.ToDictionary(p => p.Snap.Ticker, p => p.Snap);
-        var top = publishable.Take(ThesisTopN).ToList();
-        if (top.Count == 0) return;
+        // Only BUY_TODAY signals get an Athena thesis. WATCH signals are tracked but don't
+        // need full AI narratives — keeps LLM spend focused on actionable picks and cuts
+        // per-scan failure surface significantly.
+        var top = publishable
+            .Where(s => s.SignalType == "BUY_TODAY")
+            .Take(ThesisTopN)
+            .ToList();
+        if (top.Count == 0)
+        {
+            logger.LogInformation("No BUY_TODAY signals this scan — skipping Athena thesis generation.");
+            return;
+        }
 
-        logger.LogInformation("Generating Athena theses for top {N} signals", top.Count);
+        logger.LogInformation("Generating Athena theses for top {N} BUY_TODAY signals", top.Count);
 
         foreach (var signal in top)
         {

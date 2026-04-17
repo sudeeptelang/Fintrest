@@ -4,23 +4,27 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Treemap, ResponsiveContainer, Tooltip } from "recharts";
-import { Loader2, TrendingUp, TrendingDown, Activity, ArrowUpDown } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Calendar } from "lucide-react";
 import {
   useMarketSummary,
   useMarketIndices,
   useMarketScreener,
+  useMarketNews,
+  useMarketEarningsCalendar,
 } from "@/lib/hooks";
-import type { ScreenerRow, MarketIndex } from "@/lib/api";
+import type { MarketIndex, NewsItem } from "@/lib/api";
 import { StockLogo } from "@/components/stock/stock-logo";
-
-type MoverTab = "gainers" | "losers" | "active" | "all";
+import { NewsReaderDrawer } from "@/components/news/news-reader-drawer";
+import { Newspaper, Sparkles } from "lucide-react";
 
 export default function MarketsPage() {
   const { data: market, isLoading: summaryLoading } = useMarketSummary();
   const { data: indices } = useMarketIndices();
-  const { data: screener } = useMarketScreener(100);
+  const { data: screener } = useMarketScreener(500);
+  const { data: marketNews } = useMarketNews(12);
+  const { data: earnings } = useMarketEarningsCalendar(14);
 
-  const [moverTab, setMoverTab] = useState<MoverTab>("gainers");
+  const [newsReaderItem, setNewsReaderItem] = useState<NewsItem | null>(null);
 
   const indexList = indices ?? [];
   const stocks = useMemo(() => screener ?? [], [screener]);
@@ -56,30 +60,6 @@ export default function MarketsPage() {
         price: s.price,
       }));
   }, [stocks]);
-
-  const moversRows = useMemo(() => {
-    const list = [...stocks];
-    switch (moverTab) {
-      case "gainers":
-        return list
-          .filter((s) => (s.changePct ?? 0) > 0)
-          .sort((a, b) => (b.changePct ?? 0) - (a.changePct ?? 0))
-          .slice(0, 20);
-      case "losers":
-        return list
-          .filter((s) => (s.changePct ?? 0) < 0)
-          .sort((a, b) => (a.changePct ?? 0) - (b.changePct ?? 0))
-          .slice(0, 20);
-      case "active":
-        return list
-          .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
-          .slice(0, 20);
-      default:
-        return list
-          .sort((a, b) => (b.signalScore ?? 0) - (a.signalScore ?? 0))
-          .slice(0, 20);
-    }
-  }, [stocks, moverTab]);
 
   // Loading check AFTER all hooks (Rules of Hooks)
   if (summaryLoading) {
@@ -179,81 +159,146 @@ export default function MarketsPage() {
         )}
       </div>
 
-      {/* Movers — tabbed table */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-1">
-            {(
-              [
-                { key: "gainers", label: "Top Gainers", icon: TrendingUp },
-                { key: "losers", label: "Top Losers", icon: TrendingDown },
-                { key: "active", label: "Most Active", icon: Activity },
-                { key: "all", label: "All Signals", icon: ArrowUpDown },
-              ] as const
-            ).map((t) => {
-              const Icon = t.icon;
-              return (
-                <button
-                  key={t.key}
-                  onClick={() => setMoverTab(t.key)}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs rounded-md font-medium transition-colors ${
-                    moverTab === t.key
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-          <span className="text-[10px] text-muted-foreground">
-            {moversRows.length}
+      {/* Earnings Calendar — upcoming reports in the next 14 days */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-[var(--font-heading)] text-lg font-semibold flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-purple-500" /> Earnings Calendar
+          </h2>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            next 14 days
           </span>
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/20">
-                <th className="text-left px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Symbol
-                </th>
-                <th className="text-right px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Price
-                </th>
-                <th className="text-right px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Change
-                </th>
-                <th className="text-right px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Volume
-                </th>
-                <th className="text-left px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Sector
-                </th>
-                <th className="text-center px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Signal
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50">
-              {moversRows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-8 text-center text-xs text-muted-foreground"
-                  >
-                    No data for this filter.
-                  </td>
-                </tr>
-              ) : (
-                moversRows.map((r) => <MoverRow key={r.ticker} row={r} />)
-              )}
-            </tbody>
-          </table>
-        </div>
+        {!earnings || earnings.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            No upcoming earnings in the next 14 days.
+          </p>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-2">
+            {earnings.map((e) => (
+              <Link
+                key={e.ticker}
+                href={`/stock/${e.ticker}`}
+                className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <StockLogo ticker={e.ticker} size={32} />
+                  <div className="min-w-0">
+                    <p className="font-[var(--font-mono)] font-semibold text-sm">{e.ticker}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{e.name}</p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs font-medium">
+                    {new Date(e.earningsDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </p>
+                  {e.price && (
+                    <p className="font-[var(--font-mono)] text-[10px] text-muted-foreground">
+                      ${e.price.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Market News — macro context for the "why" behind the moves above.
+          Featured lead story on top + grid of supporting headlines below. */}
+      {marketNews && marketNews.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-[var(--font-heading)] text-lg font-semibold flex items-center gap-2">
+              <Newspaper className="h-5 w-5 text-primary" /> Market News
+            </h2>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+              {marketNews.length} stories
+            </span>
+          </div>
+
+          {/* Featured (most recent) — larger editorial card */}
+          <button
+            onClick={() => setNewsReaderItem(marketNews[0])}
+            className="group block w-full text-left rounded-xl border border-border bg-background hover:border-primary/40 transition-all p-5 mb-4"
+          >
+            <div className="flex items-center gap-2 mb-2 text-[10px] font-bold uppercase tracking-widest">
+              <span className={`px-1.5 py-0.5 rounded ${
+                (marketNews[0].sentimentScore ?? 0) > 0.2
+                  ? "bg-emerald-500/10 text-emerald-500"
+                  : (marketNews[0].sentimentScore ?? 0) < -0.2
+                    ? "bg-red-500/10 text-red-500"
+                    : "bg-amber-500/10 text-amber-500"
+              }`}>
+                {(marketNews[0].sentimentScore ?? 0) > 0.2 ? "Bullish" : (marketNews[0].sentimentScore ?? 0) < -0.2 ? "Bearish" : "Neutral"}
+              </span>
+              {marketNews[0].catalystType && (
+                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                  {marketNews[0].catalystType}
+                </span>
+              )}
+              {marketNews[0].ticker && (
+                <span className="font-[var(--font-mono)] text-foreground">{marketNews[0].ticker}</span>
+              )}
+            </div>
+            <h3 className="font-[var(--font-heading)] text-lg font-semibold leading-snug group-hover:text-primary transition-colors">
+              {marketNews[0].headline}
+            </h3>
+            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+              <span>{marketNews[0].source}</span>
+              {marketNews[0].publishedAt && (
+                <>
+                  <span>·</span>
+                  <span>{new Date(marketNews[0].publishedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                </>
+              )}
+              <Sparkles className="h-3 w-3 ml-auto text-muted-foreground/40 group-hover:text-primary transition-colors" />
+            </div>
+          </button>
+
+          {/* Supporting headlines — 2-up grid of compact cards */}
+          <div className="grid md:grid-cols-2 gap-3">
+            {marketNews.slice(1).map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setNewsReaderItem(item)}
+                className="group flex items-start gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors text-left"
+              >
+                <div
+                  className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${
+                    (item.sentimentScore ?? 0) > 0.2
+                      ? "bg-emerald-500"
+                      : (item.sentimentScore ?? 0) < -0.2
+                        ? "bg-red-500"
+                        : "bg-amber-400"
+                  }`}
+                />
+                <div className="min-w-0">
+                  <p className="text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                    {item.headline}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                    <span>{item.source}</span>
+                    {item.ticker && (
+                      <span className="font-[var(--font-mono)] font-semibold text-foreground">{item.ticker}</span>
+                    )}
+                    {item.catalystType && (
+                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                        {item.catalystType}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <NewsReaderDrawer item={newsReaderItem} onClose={() => setNewsReaderItem(null)} />
     </div>
   );
 }
@@ -552,68 +597,3 @@ function StockCell(props: any) {
   );
 }
 
-// ════════════════════════════════════════════════════════════════
-// Mover row
-// ════════════════════════════════════════════════════════════════
-
-function MoverRow({ row }: { row: ScreenerRow }) {
-  const positive = (row.changePct ?? 0) >= 0;
-  const signalColor =
-    row.signalType === "BUY_TODAY"
-      ? "bg-emerald-500/10 text-emerald-500"
-      : row.signalType === "WATCH"
-        ? "bg-amber-500/10 text-amber-500"
-        : "bg-muted text-muted-foreground";
-
-  return (
-    <tr className="hover:bg-muted/20 transition-colors">
-      <td className="px-4 py-2.5">
-        <Link href={`/stock/${row.ticker}`} className="flex items-center gap-2">
-          <StockLogo ticker={row.ticker} size={24} />
-          <div>
-            <p className="font-[var(--font-mono)] text-xs font-bold">{row.ticker}</p>
-            <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">
-              {row.name}
-            </p>
-          </div>
-        </Link>
-      </td>
-      <td className="px-4 py-2.5 text-right font-[var(--font-mono)] text-xs font-semibold">
-        {row.price ? `$${row.price.toFixed(2)}` : "—"}
-      </td>
-      <td
-        className={`px-4 py-2.5 text-right font-[var(--font-mono)] text-xs font-bold ${
-          positive ? "text-emerald-500" : "text-red-500"
-        }`}
-      >
-        {row.changePct === null
-          ? "—"
-          : `${positive ? "+" : ""}${row.changePct.toFixed(2)}%`}
-      </td>
-      <td className="px-4 py-2.5 text-right font-[var(--font-mono)] text-xs text-muted-foreground">
-        {row.volume
-          ? row.volume >= 1e6
-            ? `${(row.volume / 1e6).toFixed(1)}M`
-            : `${(row.volume / 1e3).toFixed(0)}K`
-          : "—"}
-      </td>
-      <td className="px-4 py-2.5 text-xs text-muted-foreground">
-        {row.sector ?? "—"}
-      </td>
-      <td className="px-4 py-2.5 text-center">
-        {row.signalScore !== null && row.signalType !== null ? (
-          <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${signalColor}`}
-          >
-            <span className="font-[var(--font-mono)] font-bold">
-              {Math.round(row.signalScore)}
-            </span>
-            <span>{row.signalType.replace("_", " ")}</span>
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
-      </td>
-    </tr>
-  );
-}

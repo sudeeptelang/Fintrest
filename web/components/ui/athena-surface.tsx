@@ -3,20 +3,19 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Shared navy treatment for every Athena-voiced surface (thesis cards, pulse banner,
- * inline row expansions). Per CLAUDE.md design rule: Athena output NEVER renders on
- * plain white; it always gets the dark, editorial treatment. Centralizing this here
- * keeps the look consistent everywhere Athena speaks.
+ * Shared slate-blue treatment for every Athena-voiced surface (thesis cards, pulse banner,
+ * inline row expansions). Still dark enough to read white text, but lighter and cooler
+ * than the old navy — tuned to the current blue+purple theme on cool-slate backgrounds.
  *
  * Layered look:
- *   1. Linear gradient navy base (135deg, slightly lighter in the middle for depth)
- *   2. Radial glow in top-right, tinted by `accent` (default emerald, regime color on Pulse)
- *   3. Secondary soft green glow bottom-left for brand warmth
+ *   1. Linear gradient slate base (135deg, subtle mid-tone shift for depth)
+ *   2. Radial glow in top-right, tinted by `accent` (default primary blue, regime color on Pulse)
+ *   3. Secondary soft blue glow bottom-left for brand warmth
  *   4. Ultra-subtle grid texture at 5% opacity (Bloomberg / terminal feel)
  *   5. Top inner-highlight line (1px glass sheen)
  */
 export function AthenaSurface({
-  accent = "#00b87c",
+  accent = "#3b82f6",
   rounded = "rounded-2xl",
   className,
   children,
@@ -29,15 +28,15 @@ export function AthenaSurface({
   return (
     <div
       className={cn(
-        "relative text-white shadow-[0_12px_32px_rgba(16,12,8,0.12)] overflow-hidden border border-white/5",
+        "relative text-white shadow-[0_12px_32px_rgba(15,23,42,0.18)] overflow-hidden border border-white/5",
         rounded,
         className,
       )}
       style={{
         backgroundImage: `
-          radial-gradient(circle at 85% 15%, ${accent}22 0%, transparent 45%),
-          radial-gradient(circle at 15% 85%, #00b87c12 0%, transparent 55%),
-          linear-gradient(135deg, #0a1628 0%, #0d1a2e 50%, #0c1829 100%)
+          radial-gradient(circle at 85% 15%, ${accent}26 0%, transparent 45%),
+          radial-gradient(circle at 15% 85%, #8b5cf61a 0%, transparent 55%),
+          linear-gradient(135deg, #1e293b 0%, #334155 50%, #1e293b 100%)
         `,
       }}
     >

@@ -25,6 +25,9 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://fintrestweb.vercel.app"
+  ),
   title: "Fintrest.ai — Pick Winning Stocks Before The Market Does",
   description:
     "AI-powered swing trade discovery. Explainable signals, transparent scoring, daily research delivered before the open.",
@@ -35,6 +38,27 @@ export const metadata: Metadata = {
     "trade discovery",
     "stock analytics",
   ],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/logo-icon.png", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    title: "Fintrest.ai — Pick Winning Stocks Before The Market Does",
+    description:
+      "AI-powered swing trade discovery. Explainable signals, transparent scoring, daily research delivered before the open.",
+    images: ["/og-image-1200x630.jpg"],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Fintrest.ai — Pick Winning Stocks Before The Market Does",
+    description:
+      "AI-powered swing trade discovery. Explainable signals, transparent scoring, daily research delivered before the open.",
+    images: ["/og-image-1200x630.jpg"],
+  },
 };
 
 export default function RootLayout({

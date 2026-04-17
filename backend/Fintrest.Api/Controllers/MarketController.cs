@@ -124,20 +124,58 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             : new Dictionary<long, double>();
     }
 
-    /// <summary>Upcoming earnings in the next N days — "Earnings Calendar" widget.</summary>
+    /// <summary>Upcoming earnings in the next N days — "Earnings Calendar" widget.
+    /// Primary source: FMP global earning-calendar (no per-stock ingestion needed).
+    /// Fallback: stocks in our universe that have <c>NextEarningsDate</c> populated.</summary>
     [HttpGet("market/earnings-calendar")]
-    public async Task<ActionResult<List<EarningsCalendarItem>>> EarningsCalendar([FromQuery] int days = 14)
+    public async Task<ActionResult<List<EarningsCalendarItem>>> EarningsCalendar(
+        [FromServices] ILogger<MarketController> logger,
+        [FromQuery] int days = 14)
     {
         var from = DateTime.UtcNow.Date;
         var to = from.AddDays(days);
 
-        var stocks = await db.Stocks
-            .Where(s => s.Active && s.NextEarningsDate >= from && s.NextEarningsDate <= to)
-            .OrderBy(s => s.NextEarningsDate)
-            .Take(30)
-            .ToListAsync();
+        // 1. Try FMP first for fresh calendar data (requires Premier plan).
+        var live = await fundamentalsProvider.GetEarningCalendarAsync(from, to);
 
-        var stockIds = stocks.Select(s => s.Id).ToList();
+        // Tickers we actually track — only surface earnings for stocks in our universe
+        // so clicking a row lands on a valid /stock/{ticker} page.
+        var universeTickers = await db.Stocks
+            .Where(s => s.Active)
+            .Select(s => new { s.Id, s.Ticker, s.Name })
+            .ToListAsync();
+        var tickerToMeta = universeTickers.ToDictionary(
+            s => s.Ticker, s => (s.Id, s.Name), StringComparer.OrdinalIgnoreCase);
+
+        List<(long StockId, string Ticker, string Name, DateTime Date)> matched;
+        if (live.Count > 0)
+        {
+            matched = live
+                .Where(e => tickerToMeta.ContainsKey(e.Ticker))
+                .Select(e => (tickerToMeta[e.Ticker].Id, e.Ticker, tickerToMeta[e.Ticker].Name, e.Date))
+                .DistinctBy(x => x.Ticker)
+                .OrderBy(x => x.Date)
+                .Take(30)
+                .ToList();
+        }
+        else
+        {
+            // 2. Fallback — our stored NextEarningsDate from per-ticker ingestion.
+            logger.LogWarning("Earnings calendar: FMP global feed empty, falling back to Stock.NextEarningsDate.");
+            var fallback = await db.Stocks
+                .Where(s => s.Active && s.NextEarningsDate >= from && s.NextEarningsDate <= to)
+                .OrderBy(s => s.NextEarningsDate)
+                .Take(30)
+                .Select(s => new { s.Id, s.Ticker, s.Name, s.NextEarningsDate })
+                .ToListAsync();
+            matched = fallback
+                .Select(s => (s.Id, s.Ticker, s.Name, s.NextEarningsDate!.Value))
+                .ToList();
+        }
+
+        if (matched.Count == 0) return Ok(new List<EarningsCalendarItem>());
+
+        var stockIds = matched.Select(m => m.StockId).ToList();
 
         // Latest prices
         var cutoff = DateTime.UtcNow.AddDays(-7);
@@ -155,10 +193,10 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 .ToDictionaryAsync(s => s.StockId, s => s.ScoreTotal)
             : new Dictionary<long, double>();
 
-        return Ok(stocks.Select(s => new EarningsCalendarItem(
-            s.Ticker, s.Name, s.NextEarningsDate!.Value,
-            prices.GetValueOrDefault(s.Id),
-            signalScores.GetValueOrDefault(s.Id)
+        return Ok(matched.Select(m => new EarningsCalendarItem(
+            m.Ticker, m.Name, m.Date,
+            prices.GetValueOrDefault(m.StockId),
+            signalScores.GetValueOrDefault(m.StockId)
         )).ToList());
     }
 
@@ -204,9 +242,24 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 })
             : new();
 
-        if (signalsByStock.Count == 0) return Ok(new List<ScreenerRowResponse>());
-
-        var stockIds = signalsByStock.Keys.ToList();
+        // If no scan has completed yet, fall back to top-N active stocks by market cap so
+        // screeners (gainers/losers/penny/etc.) still have data to filter. Signal fields
+        // will be null for these rows.
+        List<long> stockIds;
+        if (signalsByStock.Count == 0)
+        {
+            stockIds = await db.Stocks
+                .Where(s => s.Active)
+                .OrderByDescending(s => s.MarketCap ?? 0)
+                .Take(limit)
+                .Select(s => s.Id)
+                .ToListAsync();
+            if (stockIds.Count == 0) return Ok(new List<ScreenerRowResponse>());
+        }
+        else
+        {
+            stockIds = signalsByStock.Keys.ToList();
+        }
 
         // Load stocks (has TTM metrics: Beta, Forward P/E, PEG, ROE, ROA, analyst target, next earnings)
         var stocks = await db.Stocks
@@ -504,10 +557,10 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         if (stocks.Count == 0) return Ok(new List<MarketIndexResponse>());
 
         var stockIds = stocks.Select(s => s.Id).ToList();
-        // Use a 30-day lookback to ensure we always find at least 2 bars even across
-        // weekends, holidays, and ingestion gaps. We only take 2 per stock so the
-        // query stays cheap.
-        var cutoff = DateTime.UtcNow.AddDays(-30);
+        // 90-day lookback so we can always find 2 bars for day-over-day change, even
+        // when ingestion has gaps or a ticker just joined the universe. For ~20 index
+        // ETFs the row count stays well under a thousand.
+        var cutoff = DateTime.UtcNow.AddDays(-90);
         var recentBars = await db.MarketData
             .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
             .Select(m => new { m.StockId, m.Ts, m.Close, m.PrevClose })
@@ -782,9 +835,13 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     [Authorize]
     [RequiresPlan(PlanType.Pro)]
     [HttpGet("market/insiders/latest")]
-    public async Task<ActionResult<List<InsiderActivityItem>>> GetLatestInsiderTrades([FromQuery] int limit = 50)
+    public async Task<ActionResult<List<InsiderActivityItem>>> GetLatestInsiderTrades(
+        [FromServices] ILogger<MarketController> logger,
+        [FromQuery] int limit = 50)
     {
         var trades = await fundamentalsProvider.GetLatestInsiderTradesAsync(Math.Clamp(limit, 1, 200));
+        if (trades.Count == 0)
+            logger.LogWarning("Insider feed empty — provider returned 0 rows. Check FMP plan access to /insider-trading/latest.");
         return Ok(trades.Select(t => new InsiderActivityItem(
             t.Ticker, t.TransactionDate, t.FilingDate, t.ReportingName, t.Relationship,
             t.TransactionType, t.SharesTraded, t.Price, t.TotalValue
@@ -794,9 +851,13 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     [Authorize]
     [RequiresPlan(PlanType.Pro)]
     [HttpGet("market/congress/latest")]
-    public async Task<ActionResult<List<CongressTradeItem>>> GetCongressTrades([FromQuery] int limit = 50)
+    public async Task<ActionResult<List<CongressTradeItem>>> GetCongressTrades(
+        [FromServices] ILogger<MarketController> logger,
+        [FromQuery] int limit = 50)
     {
         var trades = await fundamentalsProvider.GetCongressTradesAsync(Math.Clamp(limit, 1, 200));
+        if (trades.Count == 0)
+            logger.LogWarning("Congress feed empty — provider returned 0 rows. Check FMP plan access to /senate-latest + /house-latest.");
         return Ok(trades.Select(t => new CongressTradeItem(
             t.Chamber, t.Ticker, t.AssetDescription, t.Representative, t.TransactionType,
             t.TransactionDate, t.DisclosureDate, t.Amount, t.SourceUrl

@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowLeft, Bell, Loader2, Mail, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,46 +29,66 @@ export default function CreateAlertPage() {
 
 function CreateAlertForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
-  const prefilledTicker = searchParams.get("ticker") || "";
+  const urlTicker = (searchParams.get("ticker") || "").toUpperCase();
 
-  const [ticker, setTicker] = useState(prefilledTicker);
-  const [stockId, setStockId] = useState<number | null>(null);
+  const [ticker, setTicker] = useState(urlTicker);
   const [alertType, setAlertType] = useState<string>("price");
   const [triggerValue, setTriggerValue] = useState("");
   const [channel, setChannel] = useState("email");
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState("");
 
-  const { data: stock } = useStock(ticker);
+  // Keep state in sync when the URL changes mid-session (client-side nav from another page).
+  useEffect(() => {
+    if (urlTicker && urlTicker !== ticker) setTicker(urlTicker);
+  }, [urlTicker]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // useStock fetches id + name for the resolved ticker — auto-resolves whether ticker came
+  // from the URL or from TickerSearch.
+  const { data: stock, isLoading: stockLoading } = useStock(ticker);
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      if (!stock?.id) {
+        // Last-resort resolve in case useStock hasn't settled yet.
+        const fallback = await api.stock(ticker.trim().toUpperCase());
+        return api.createAlert({
+          alertType,
+          channel,
+          stockId: fallback.id,
+          thresholdJson: JSON.stringify({ value: parseFloat(triggerValue) }),
+        });
+      }
+      return api.createAlert({
+        alertType,
+        channel,
+        stockId: stock.id,
+        thresholdJson: JSON.stringify({ value: parseFloat(triggerValue) }),
+      });
+    },
+    onSuccess: () => {
+      // Refresh the alerts list so the new alert is visible without a hard refresh.
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      router.push("/alerts");
+    },
+  });
 
   function handleTickerSelect(s: StockSearchResult) {
     setTicker(s.ticker);
-    setStockId(s.id);
-    setError("");
   }
 
-  async function handleCreate() {
+  function handleCreate() {
     if (!ticker.trim() || !triggerValue) return;
-    setCreating(true);
-    setError("");
-    try {
-      const stockInfo = stock || (await api.stock(ticker.trim().toUpperCase()));
-      await api.createAlert({
-        alertType,
-        channel,
-        stockId: stockInfo.id,
-        thresholdJson: JSON.stringify({ value: parseFloat(triggerValue) }),
-      });
-      router.push("/alerts");
-    } catch {
-      setError("Failed to create alert. Check the ticker and try again.");
-    } finally {
-      setCreating(false);
-    }
+    createMutation.mutate();
   }
 
   const triggerNum = parseFloat(triggerValue) || 0;
+  const tickerUnresolved = Boolean(ticker) && !stock && !stockLoading;
+  const errorMessage = createMutation.isError
+    ? (createMutation.error as Error)?.message || "Failed to create alert. Check the ticker and try again."
+    : tickerUnresolved
+      ? `Couldn't find "${ticker}" in our universe. Pick one from search.`
+      : "";
 
   return (
     <div className="space-y-6 max-w-lg">
@@ -92,8 +113,14 @@ function CreateAlertForm() {
           {ticker ? (
             <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border bg-card">
               <span className="font-[var(--font-mono)] text-sm font-bold">{ticker}</span>
-              {stock && <span className="text-xs text-muted-foreground truncate">{stock.name}</span>}
-              <button onClick={() => { setTicker(""); setStockId(null); }} className="ml-auto text-xs text-muted-foreground hover:text-foreground">Change</button>
+              {stockLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              ) : stock ? (
+                <span className="text-xs text-muted-foreground truncate">{stock.name}</span>
+              ) : (
+                <span className="text-xs text-red-500">not found</span>
+              )}
+              <button onClick={() => { setTicker(""); }} className="ml-auto text-xs text-muted-foreground hover:text-foreground">Change</button>
             </div>
           ) : (
             <TickerSearch onSelect={handleTickerSelect} placeholder="Search by ticker or name (AAPL, Apple, Nvidia…)" />
@@ -183,14 +210,14 @@ function CreateAlertForm() {
         </motion.div>
       )}
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
 
       <Button
         className="w-full bg-primary hover:bg-primary/90 text-white py-6 text-base font-bold rounded-xl"
         onClick={handleCreate}
-        disabled={creating || !ticker.trim() || !triggerValue}
+        disabled={createMutation.isPending || !ticker.trim() || !triggerValue || tickerUnresolved}
       >
-        {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Bell className="h-4 w-4 mr-2" />}
+        {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Bell className="h-4 w-4 mr-2" />}
         Create Alert
       </Button>
     </div>

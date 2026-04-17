@@ -34,7 +34,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
   });
 
   // Sortable holdings
-  type HoldingSortKey = "ticker" | "shares" | "avgCost" | "price" | "value" | "pnl" | "signal";
+  type HoldingSortKey = "ticker" | "shares" | "avgCost" | "price" | "dayChange" | "value" | "pnl" | "signal";
   type SortDir = "asc" | "desc";
   const [sortKey, setSortKey] = useState<HoldingSortKey>("value");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -48,6 +48,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
         case "shares": diff = a.quantity - b.quantity; break;
         case "avgCost": diff = a.avgCost - b.avgCost; break;
         case "price": diff = a.currentPrice - b.currentPrice; break;
+        case "dayChange": diff = (a.dayChangePct ?? 0) - (b.dayChangePct ?? 0); break;
         case "value": diff = a.currentValue - b.currentValue; break;
         case "pnl": diff = a.unrealizedPnlPct - b.unrealizedPnlPct; break;
         case "signal": diff = (a.signalScore ?? 0) - (b.signalScore ?? 0); break;
@@ -140,30 +141,40 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
             <thead>
               <tr className="border-b border-border bg-muted/30">
                 {([
-                  ["Stock", "ticker", "left"],
-                  ["Shares", "shares", "right"],
-                  ["Avg Cost", "avgCost", "right"],
-                  ["Price", "price", "right"],
-                  ["Value", "value", "right"],
-                  ["Gain/Loss $", "pnl", "right"],
-                  ["Return %", "pnl", "right"],
-                  ["Signal", "signal", "center"],
-                ] as const).map(([label, key, align], i) => (
-                  <th
-                    key={`${key}-${i}`}
-                    className={`text-${align} px-5 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors`}
-                    onClick={() => handleSort(key)}
-                  >
-                    {label}<SortIcon k={key} />
-                  </th>
-                ))}
+                  ["Stock", "ticker", "text-left"],
+                  ["Shares", "shares", "text-right"],
+                  ["Avg Cost", "avgCost", "text-right"],
+                  ["Price", "price", "text-right"],
+                  ["% Today", "dayChange", "text-right"],
+                  ["Value", "value", "text-right"],
+                  ["Gain/Loss $", "pnl", "text-right"],
+                  ["Return %", "pnl", "text-right"],
+                  ["Signal", "signal", "text-center"],
+                ] as const).map(([label, key, alignClass], i) => {
+                  const active = sortKey === key;
+                  return (
+                    <th
+                      key={`${key}-${i}`}
+                      className={`${alignClass} px-5 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer select-none transition-colors ${
+                        active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      onClick={() => handleSort(key)}
+                      title="Click to sort"
+                    >
+                      <span className="inline-flex items-center gap-0.5">
+                        {label}
+                        <SortIcon k={key} />
+                      </span>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {holdingsLoading ? (
-                <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Loading...</td></tr>
+                <tr><td colSpan={9} className="px-5 py-8 text-center text-muted-foreground">Loading...</td></tr>
               ) : sortedHoldings.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-8 text-center text-muted-foreground">No holdings</td></tr>
+                <tr><td colSpan={9} className="px-5 py-8 text-center text-muted-foreground">No holdings</td></tr>
               ) : sortedHoldings.map((h) => {
                 const costBasis = h.quantity * h.avgCost;
                 return (
@@ -182,6 +193,15 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
                     <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">{h.quantity}</td>
                     <td className="px-5 py-3.5 text-right font-[var(--font-mono)] text-muted-foreground">${h.avgCost.toFixed(2)}</td>
                     <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">${h.currentPrice.toFixed(2)}</td>
+                    <td className={`px-5 py-3.5 text-right font-[var(--font-mono)] font-semibold ${
+                      h.dayChangePct === null
+                        ? "text-muted-foreground"
+                        : h.dayChangePct >= 0 ? "text-emerald-500" : "text-red-500"
+                    }`}>
+                      {h.dayChangePct === null
+                        ? "—"
+                        : `${h.dayChangePct >= 0 ? "+" : ""}${h.dayChangePct.toFixed(2)}%`}
+                    </td>
                     <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">
                       <p>${h.currentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                       <p className="text-[10px] text-muted-foreground">cost ${costBasis.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>

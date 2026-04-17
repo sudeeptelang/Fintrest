@@ -32,7 +32,18 @@ public interface IFundamentalsProvider
     /// <summary>Merged Senate + House trading disclosures, most recent first.
     /// Used by the /congress tracker page.</summary>
     Task<List<CongressTrade>> GetCongressTradesAsync(int limit = 50, CancellationToken ct = default);
+
+    /// <summary>Global earning calendar for a date range (no symbol filter).
+    /// Used by the dashboard earnings widget so it works without per-stock ingestion.</summary>
+    Task<List<EarningCalendarEntry>> GetEarningCalendarAsync(DateTime from, DateTime to, CancellationToken ct = default);
 }
+
+public record EarningCalendarEntry(
+    string Ticker,
+    DateTime Date,
+    double? EpsEstimated,
+    double? RevenueEstimated
+);
 
 public record InsiderTradeEvent(
     string Ticker,

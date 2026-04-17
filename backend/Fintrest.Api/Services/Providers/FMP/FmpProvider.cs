@@ -207,6 +207,9 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         // FMP stable: /insider-trading/latest returns the firehose (no symbol filter).
         var url = $"{_baseUrl}/insider-trading/latest?page=0&limit=100&apikey={_apiKey}";
         var rows = await TryFetch<List<FmpInsiderTradeFull>>(url, ct);
+        logger.LogInformation(
+            "FMP insider-trading/latest: rows={Rows} (null={Null})",
+            rows?.Count ?? 0, rows is null);
         if (rows is null) return [];
 
         return rows
@@ -225,6 +228,25 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
                     : null
             ))
             .Where(a => !string.IsNullOrEmpty(a.Ticker))
+            .ToList();
+    }
+
+    public async Task<List<EarningCalendarEntry>> GetEarningCalendarAsync(DateTime from, DateTime to, CancellationToken ct = default)
+    {
+        // FMP stable: /earning-calendar with date range returns all companies reporting.
+        var url = $"{_baseUrl}/earning-calendar?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpEarningCalendar>>(url, ct);
+        if (rows is null) return [];
+
+        return rows
+            .Where(r => !string.IsNullOrWhiteSpace(r.Symbol) && DateTime.TryParse(r.Date, out _))
+            .Select(r => new EarningCalendarEntry(
+                Ticker: r.Symbol!.ToUpperInvariant(),
+                Date: DateTime.Parse(r.Date!),
+                EpsEstimated: r.EpsEstimated,
+                RevenueEstimated: r.RevenueEstimated
+            ))
+            .OrderBy(e => e.Date)
             .ToList();
     }
 
@@ -266,7 +288,7 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
 
     private async Task<T?> TryFetch<T>(string url, CancellationToken ct) where T : class
     {
-        // Throttle through the shared rate limiter (250/min leaves headroom under FMP Starter 300/min)
+        // Throttle through the shared rate limiter (650/min leaves headroom under FMP Premier 750/min)
         await rateLimiter.WaitAsync(ct);
         try
         {
@@ -278,7 +300,12 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "FMP: Failed to fetch {Url}", url);
+            // Elevate log level for insider/congress so silent deserialization failures are visible.
+            var isDiagnostic = url.Contains("insider-trading") || url.Contains("senate-latest") || url.Contains("house-latest");
+            if (isDiagnostic)
+                logger.LogWarning(ex, "FMP: Failed to fetch {Url}", url);
+            else
+                logger.LogDebug(ex, "FMP: Failed to fetch {Url}", url);
             return null;
         }
     }

@@ -151,6 +151,7 @@ public class PortfolioRiskMetric
     public double? SortinoRatio { get; set; }
     public double? MaxDrawdown { get; set; }
     public double? Beta { get; set; }
+    [Column("var_95")]
     public double? Var95 { get; set; } // Value at Risk 95%
     public double? Volatility { get; set; } // Annualized
     public double? TotalReturn { get; set; }

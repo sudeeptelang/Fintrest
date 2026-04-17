@@ -90,10 +90,11 @@ public class IntradayDriftJob(
             double? vixLevel = null, vixChange = null;
 
             // VIX via providers that accept the index symbol — silently ignored if unsupported.
+            // Polygon uses the "I:VIX" prefix for CBOE indices; VIXY is the tradable ETF proxy.
+            // "^VIX" was the Yahoo-style notation and 404s on Polygon, so we don't probe it anymore.
             try
             {
-                var vix = await marketProvider.GetSnapshotAsync("VIX")
-                       ?? await marketProvider.GetSnapshotAsync("^VIX")
+                var vix = await marketProvider.GetSnapshotAsync("I:VIX")
                        ?? await marketProvider.GetSnapshotAsync("VIXY");
                 if (vix is not null)
                 {

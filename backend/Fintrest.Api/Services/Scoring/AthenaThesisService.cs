@@ -170,7 +170,18 @@ public class AthenaThesisService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Athena thesis generation failed for {Ticker}", snap.Ticker);
+            // Known Npgsql bug during scan loops: the shared DbContext's connector gets
+            // disposed mid-transaction, surfacing as ManualResetEventSlim.Reset throwing.
+            // Log a one-line summary instead of the full stack so scans don't flood the console.
+            var isKnownDbDisposed = ex is Microsoft.EntityFrameworkCore.DbUpdateException
+                && ex.InnerException is ObjectDisposedException ode
+                && ode.ObjectName == "System.Threading.ManualResetEventSlim";
+            if (isKnownDbDisposed)
+                logger.LogWarning(
+                    "Athena thesis save skipped for {Ticker} — shared DbContext disposed mid-scan (pre-existing concurrency bug).",
+                    snap.Ticker);
+            else
+                logger.LogError(ex, "Athena thesis generation failed for {Ticker}", snap.Ticker);
             return null;
         }
     }
