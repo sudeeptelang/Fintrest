@@ -504,15 +504,22 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         if (stocks.Count == 0) return Ok(new List<MarketIndexResponse>());
 
         var stockIds = stocks.Select(s => s.Id).ToList();
-        var cutoff = DateTime.UtcNow.AddDays(-7);
+        // Use a 30-day lookback to ensure we always find at least 2 bars even across
+        // weekends, holidays, and ingestion gaps. We only take 2 per stock so the
+        // query stays cheap.
+        var cutoff = DateTime.UtcNow.AddDays(-30);
         var recentBars = await db.MarketData
             .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
             .Select(m => new { m.StockId, m.Ts, m.Close, m.PrevClose })
             .ToListAsync();
 
-        var latest = recentBars
+        // Get last 2 bars per stock so we can compute changePct even when PrevClose is null.
+        var barsByStock = recentBars
             .GroupBy(m => m.StockId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(m => m.Ts).First());
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(m => m.Ts).Take(2).ToList());
+        var latest = barsByStock.ToDictionary(
+            kv => kv.Key,
+            kv => kv.Value.First());
 
         var categories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -529,15 +536,20 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             .Select(s =>
             {
                 latest.TryGetValue(s.Id, out var bar);
+                barsByStock.TryGetValue(s.Id, out var bars);
                 double? changePct = null;
-                if (bar?.PrevClose is > 0)
-                    changePct = Math.Round((bar.Close - bar.PrevClose.Value) / bar.PrevClose.Value * 100, 2);
+                double? prevClose = bar?.PrevClose;
+                // Prefer PrevClose from the bar; fall back to the prior day's close.
+                if (prevClose is null or 0 && bars?.Count >= 2)
+                    prevClose = bars[1].Close;
+                if (prevClose is > 0 && bar is not null)
+                    changePct = Math.Round((bar.Close - prevClose.Value) / prevClose.Value * 100, 2);
                 return new MarketIndexResponse(
                     Ticker: s.Ticker,
                     Label: labels.GetValueOrDefault(s.Ticker, s.Name),
                     Category: categories.GetValueOrDefault(s.Ticker, "Other"),
                     Price: bar?.Close,
-                    PrevClose: bar?.PrevClose,
+                    PrevClose: prevClose,
                     ChangePct: changePct
                 );
             })

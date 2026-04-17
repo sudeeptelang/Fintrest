@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -18,11 +19,7 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <span className="font-[var(--font-heading)] text-lg font-extrabold text-white">
-                F
-              </span>
-            </div>
+            <Image src="/logo-icon.png" alt="Fintrest" width={36} height={36} className="rounded-lg" />
             <span className="font-[var(--font-heading)] text-xl font-bold tracking-tight">
               Fintrest
               <span className="text-primary">.ai</span>

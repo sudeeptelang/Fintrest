@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Bell, Loader2, Mail, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { api, type StockSearchResult } from "@/lib/api";
 import { useStock } from "@/lib/hooks";
+import { TickerSearch } from "@/components/stock/ticker-search";
 import Link from "next/link";
 
 const ALERT_TYPES = ["price", "stop_loss", "target", "volume"] as const;
@@ -31,6 +32,7 @@ function CreateAlertForm() {
   const prefilledTicker = searchParams.get("ticker") || "";
 
   const [ticker, setTicker] = useState(prefilledTicker);
+  const [stockId, setStockId] = useState<number | null>(null);
   const [alertType, setAlertType] = useState<string>("price");
   const [triggerValue, setTriggerValue] = useState("");
   const [channel, setChannel] = useState("email");
@@ -38,6 +40,12 @@ function CreateAlertForm() {
   const [error, setError] = useState("");
 
   const { data: stock } = useStock(ticker);
+
+  function handleTickerSelect(s: StockSearchResult) {
+    setTicker(s.ticker);
+    setStockId(s.id);
+    setError("");
+  }
 
   async function handleCreate() {
     if (!ticker.trim() || !triggerValue) return;
@@ -76,18 +84,20 @@ function CreateAlertForm() {
       </div>
 
       <div className="space-y-4">
-        {/* Ticker */}
+        {/* Ticker — typeahead resolves by ticker or company name */}
         <div>
           <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 block">
             Ticker
           </label>
-          <input
-            type="text"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            placeholder="e.g. AAPL"
-            className="w-full px-4 py-3 rounded-xl border border-border bg-card text-sm font-[var(--font-mono)] font-semibold"
-          />
+          {ticker ? (
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border bg-card">
+              <span className="font-[var(--font-mono)] text-sm font-bold">{ticker}</span>
+              {stock && <span className="text-xs text-muted-foreground truncate">{stock.name}</span>}
+              <button onClick={() => { setTicker(""); setStockId(null); }} className="ml-auto text-xs text-muted-foreground hover:text-foreground">Change</button>
+            </div>
+          ) : (
+            <TickerSearch onSelect={handleTickerSelect} placeholder="Search by ticker or name (AAPL, Apple, Nvidia…)" />
+          )}
         </div>
 
         {/* Alert Type */}

@@ -21,6 +21,7 @@ import {
   Landmark,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/auth";
 
@@ -66,11 +67,7 @@ export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
       {/* Logo */}
       <div className="h-16 flex items-center justify-between px-6 border-b border-border">
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <span className="font-[var(--font-heading)] text-sm font-extrabold text-white">
-              F
-            </span>
-          </div>
+          <Image src="/logo-icon.png" alt="Fintrest" width={32} height={32} className="rounded-lg" />
           <span className="font-[var(--font-heading)] text-lg font-bold tracking-tight">
             Fintrest<span className="text-primary">.ai</span>
           </span>

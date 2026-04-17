@@ -145,11 +145,12 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
                   ["Avg Cost", "avgCost", "right"],
                   ["Price", "price", "right"],
                   ["Value", "value", "right"],
-                  ["P&L", "pnl", "right"],
+                  ["Gain/Loss $", "pnl", "right"],
+                  ["Return %", "pnl", "right"],
                   ["Signal", "signal", "center"],
-                ] as const).map(([label, key, align]) => (
+                ] as const).map(([label, key, align], i) => (
                   <th
-                    key={key}
+                    key={`${key}-${i}`}
                     className={`text-${align} px-5 py-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors`}
                     onClick={() => handleSort(key)}
                   >
@@ -162,36 +163,45 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
               {holdingsLoading ? (
                 <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Loading...</td></tr>
               ) : sortedHoldings.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">No holdings</td></tr>
-              ) : sortedHoldings.map((h) => (
-                <tr key={h.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-5 py-3.5">
-                    <Link href={`/stock/${h.ticker}`} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <span className="font-[var(--font-mono)] text-[10px] font-bold text-primary">{h.ticker.slice(0, 2)}</span>
-                      </div>
-                      <div>
-                        <p className="font-semibold font-[var(--font-mono)]">{h.ticker}</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[120px]">{h.stockName}</p>
-                      </div>
-                    </Link>
-                  </td>
-                  <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">{h.quantity}</td>
-                  <td className="px-5 py-3.5 text-right font-[var(--font-mono)] text-muted-foreground">${h.avgCost.toFixed(2)}</td>
-                  <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">${h.currentPrice.toFixed(2)}</td>
-                  <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">${h.currentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                  <td className={`px-5 py-3.5 text-right font-[var(--font-mono)] ${h.unrealizedPnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                    {h.unrealizedPnl >= 0 ? "+" : ""}{h.unrealizedPnlPct.toFixed(1)}%
-                  </td>
-                  <td className="px-5 py-3.5 text-center">
-                    {h.signalScore != null ? (
-                      <span className="font-[var(--font-mono)] text-xs font-bold">{Math.round(h.signalScore)}</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                <tr><td colSpan={8} className="px-5 py-8 text-center text-muted-foreground">No holdings</td></tr>
+              ) : sortedHoldings.map((h) => {
+                const costBasis = h.quantity * h.avgCost;
+                return (
+                  <tr key={h.id} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <Link href={`/stock/${h.ticker}`} className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <span className="font-[var(--font-mono)] text-[10px] font-bold text-primary">{h.ticker.slice(0, 2)}</span>
+                        </div>
+                        <div>
+                          <p className="font-semibold font-[var(--font-mono)]">{h.ticker}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[120px]">{h.stockName}</p>
+                        </div>
+                      </Link>
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">{h.quantity}</td>
+                    <td className="px-5 py-3.5 text-right font-[var(--font-mono)] text-muted-foreground">${h.avgCost.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">${h.currentPrice.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">
+                      <p>${h.currentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-[10px] text-muted-foreground">cost ${costBasis.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                    </td>
+                    <td className={`px-5 py-3.5 text-right font-[var(--font-mono)] font-semibold ${h.unrealizedPnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                      {h.unrealizedPnl >= 0 ? "+$" : "-$"}{Math.abs(h.unrealizedPnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </td>
+                    <td className={`px-5 py-3.5 text-right font-[var(--font-mono)] font-semibold ${h.unrealizedPnlPct >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                      {h.unrealizedPnlPct >= 0 ? "+" : ""}{h.unrealizedPnlPct.toFixed(1)}%
+                    </td>
+                    <td className="px-5 py-3.5 text-center">
+                      {h.signalScore != null ? (
+                        <span className="font-[var(--font-mono)] text-xs font-bold">{Math.round(h.signalScore)}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

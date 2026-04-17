@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -47,11 +48,7 @@ function LoginForm() {
         {/* Logo */}
         <div className="text-center">
           <Link href="/" className="inline-flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-              <span className="font-[var(--font-heading)] text-lg font-extrabold text-white">
-                F
-              </span>
-            </div>
+            <Image src="/logo-icon.png" alt="Fintrest" width={48} height={48} />
             <span className="font-[var(--font-heading)] text-2xl font-bold tracking-tight">
               Fintrest<span className="text-primary">.ai</span>
             </span>
