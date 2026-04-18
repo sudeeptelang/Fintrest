@@ -21,10 +21,10 @@ export function PortfolioAthenaProfile({ advisor }: { advisor: AdvisorResult | n
         <div className="p-5">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="h-4 w-4 text-[#00b87c]" />
-            <h3 className="font-semibold text-sm">Athena Portfolio Profile</h3>
+            <h3 className="font-semibold text-sm">Lens Portfolio Profile</h3>
           </div>
           <p className="text-sm text-white/60">
-            Add holdings to see your position-weighted factor profile + Athena&apos;s verdict mix.
+            Add holdings to see your position-weighted factor profile + Lens&apos;s signal mix.
           </p>
         </div>
       </AthenaSurface>
@@ -54,7 +54,7 @@ export function PortfolioAthenaProfile({ advisor }: { advisor: AdvisorResult | n
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[#00b87c]" />
-            <h3 className="font-semibold text-sm">Athena Portfolio Profile</h3>
+            <h3 className="font-semibold text-sm">Lens Portfolio Profile</h3>
           </div>
           {regime && (
             <div className="flex items-center gap-2">
@@ -103,7 +103,7 @@ export function PortfolioAthenaProfile({ advisor }: { advisor: AdvisorResult | n
               Verdict Mix
             </p>
             <p className="text-[11px] text-white/70 mb-3">
-              How Athena would classify each of your holdings today.
+              How Lens classifies each of your holdings today.
             </p>
             {verdicts.length === 0 ? (
               <p className="text-xs text-white/60">No verdicts yet — holdings need active signals first.</p>
@@ -135,8 +135,8 @@ export function PortfolioAthenaProfile({ advisor }: { advisor: AdvisorResult | n
         </div>
 
         <p className="text-[10px] text-white/40 leading-relaxed pt-3 mt-4 border-t border-white/10">
-          Factor scores are position-weighted across holdings with active signals. Verdict mix reflects
-          Athena&apos;s classifier run against the current regime. Educational context only — not financial advice.
+          Factor scores are position-weighted across holdings with active signals. Signal mix reflects
+          Lens&apos;s classifier run against the current regime. Research only — not financial advice.
         </p>
       </div>
     </AthenaSurface>

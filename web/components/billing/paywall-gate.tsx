@@ -17,26 +17,26 @@ interface TierCopy {
 const COPY: Record<Tier, TierCopy> = {
   pro: {
     title: "Upgrade to Pro",
-    tagline: "Unlock the full signal board + real-time alerts + Athena chat.",
+    tagline: "Unlock the full signal board + real-time research alerts + Lens chat.",
     price: "$19/mo",
     bullets: [
-      "All 50+ signals with lens chips (Buy the Dip, Momentum Run, …)",
-      "Unlimited Athena thesis + chat",
-      "Real-time alerts on watchlist triggers",
+      "All 50+ signals with Lens filter chips (Buy the Dip, Momentum Run, …)",
+      "Unlimited Lens thesis + chat",
+      "Real-time research alerts on watchlist triggers",
       "Congress + Insider trade feeds",
-      "Portfolio factor profile + verdict mix",
+      "Portfolio factor profile + signal mix",
     ],
   },
   elite: {
     title: "Upgrade to Elite",
-    tagline: "Athena tuned to your portfolio — the institutional-grade tier.",
+    tagline: "Lens tuned to your portfolio — the institutional-grade tier.",
     price: "$45/mo",
     bullets: [
       "Everything in Pro",
-      "Athena Personalized — thesis tuned to your holdings",
-      "Weekly JPM-style portfolio PDF report",
-      "Backtest runner — historical what-if on any lens",
-      "Priority Athena with no rate limits",
+      "Lens Personalized — thesis tuned to your holdings",
+      "Weekly JPM-style portfolio research PDF",
+      "Backtest runner — historical what-if on any Lens filter",
+      "Priority Lens — no rate limits",
     ],
   },
 };

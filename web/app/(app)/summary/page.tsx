@@ -84,7 +84,7 @@ export default function WeeklySummaryPage() {
         <div className="flex items-center gap-2 mb-3">
           <Brain className="h-5 w-5 text-primary" />
           <h2 className="font-[var(--font-heading)] text-lg font-semibold">
-            Athena&apos;s Weekly Take
+            Lens&apos;s Weekly Take
           </h2>
         </div>
         <p className="text-sm text-white/80 leading-relaxed">

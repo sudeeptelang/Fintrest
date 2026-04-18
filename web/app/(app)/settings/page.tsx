@@ -457,7 +457,7 @@ function BillingPanel() {
       {/* Actions */}
       {!isPaid ? (
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-          <p className="text-sm font-medium">Upgrade for full signals + Athena chat + portfolio AI.</p>
+          <p className="text-sm font-medium">Upgrade for full signals + Lens chat + portfolio research.</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             Pro is $19/mo ($199 annual) · Elite is $45/mo ($449 annual).
           </p>

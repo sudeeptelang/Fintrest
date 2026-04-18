@@ -377,7 +377,7 @@ function exportCsv(rows: ScreenerRow[]) {
 export function AthenaBoard({
   defaultLens = "all",
   limit = 50,
-  title = "Athena's Board",
+  title = "Lens Board",
   syncUrl = false,
 }: {
   defaultLens?: string;
@@ -610,7 +610,7 @@ function ThesisRowInline({ ticker }: { ticker: string }) {
       <AthenaSurface rounded="">
         <div className="px-4 py-3 text-white/80 text-xs flex items-center gap-2">
           <Sparkles className="h-3 w-3 text-[#00b87c] animate-pulse" />
-          Athena is preparing the thesis for {ticker}…
+          Lens is preparing the thesis for {ticker}…
         </div>
       </AthenaSurface>
     );
@@ -634,7 +634,7 @@ function ThesisRowInline({ ticker }: { ticker: string }) {
         <div className="flex items-center gap-2 flex-wrap">
           <Sparkles className="h-3.5 w-3.5 text-[#00b87c]" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">
-            Athena Says
+            Lens Says
           </span>
           {data.verdict && (
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#00b87c]">

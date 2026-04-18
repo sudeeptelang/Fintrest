@@ -30,7 +30,7 @@ const sidebarSections = [
     label: "Discover",
     links: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Athena's Picks", href: "/picks", icon: TrendingUp },
+      { label: "Today's Research", href: "/picks", icon: TrendingUp },
       { label: "Markets", href: "/markets", icon: BarChart3 },
     ],
   },

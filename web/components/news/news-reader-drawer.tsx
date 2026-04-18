@@ -105,7 +105,7 @@ export function NewsReaderDrawer({
               <div className="flex items-center gap-2 mb-3">
                 <Sparkles className="h-4 w-4 text-[#00b87c]" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-[#00b87c]">
-                  Athena&apos;s Take
+                  Lens&apos;s Take
                 </span>
                 {item.ticker && (
                   <Link

@@ -22,11 +22,11 @@ export default function PicksPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-[var(--font-heading)] text-2xl font-bold">Athena&apos;s Picks</h1>
+        <h1 className="font-[var(--font-heading)] text-2xl font-bold">Today&apos;s Research</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {isPro
-            ? "Every signal from today's scan, ranked by composite score. Filter by setup type with the lens chips."
-            : "Free preview of today's top 3 signals. Upgrade to Pro for the full board, lens filters, and Athena's thesis on every pick."}
+            ? "Every signal from today's scan, ranked by composite score. Filter by setup type with the Lens chips."
+            : "Free preview of today's top 3 signals. Upgrade to Pro for the full board, Lens filters, and Lens's thesis on every signal."}
         </p>
       </div>
 
@@ -37,13 +37,13 @@ export default function PicksPage() {
           </div>
           <h3 className="font-[var(--font-heading)] text-xl font-bold">See every signal with Pro</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-            You&apos;re seeing a free preview of the top 3 picks. Upgrade to unlock the full scan output,
-            Athena&apos;s thesis on every pick, lens filters, and real-time alerts.
+            You&apos;re seeing a free preview of the top 3 signals. Upgrade to unlock the full scan output,
+            Lens&apos;s thesis on every signal, Lens filters, and real-time research alerts.
           </p>
           <ul className="mt-5 space-y-1.5 text-sm max-w-md mx-auto text-left inline-block">
             <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>All 50+ signals, not just 3</span></li>
-            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Buy the Dip · Breakout · Momentum lens filters</span></li>
-            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Athena AI thesis on every pick</span></li>
+            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Buy the Dip · Breakout · Momentum Lens filters</span></li>
+            <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Lens thesis on every signal</span></li>
             <li className="flex items-start gap-2"><span className="text-primary mt-0.5">✓</span><span>Congress + Insider trade feeds</span></li>
           </ul>
           <div className="mt-6 flex items-center justify-center gap-3">

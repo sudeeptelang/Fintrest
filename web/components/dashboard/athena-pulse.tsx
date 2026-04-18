@@ -60,21 +60,21 @@ export function AthenaPulse() {
           <div className="ml-auto flex items-center gap-2">
             <Sparkles className="h-3.5 w-3.5 text-[#00b87c]" />
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#00b87c]">
-              Athena&apos;s Take
+              Lens&apos;s Take
             </span>
           </div>
         </div>
 
         {/* Narrative row */}
         <p className="mt-4 text-sm leading-relaxed text-white/90 max-w-4xl">
-          {isLoading ? "Athena is reading the tape…" : data?.narrative ?? "Athena is preparing today's read."}
+          {isLoading ? "Lens is reading the tape…" : data?.narrative ?? "Lens is preparing today's read."}
         </p>
 
         {/* Top tickers */}
         {data?.topTickers && data.topTickers.length > 0 && (
           <div className="mt-4 flex items-center gap-2 flex-wrap">
             <span className="text-[9px] font-bold uppercase tracking-widest text-white/50">
-              Top Picks Today
+              Today&apos;s Research
             </span>
             {data.topTickers.map((t) => (
               <Link

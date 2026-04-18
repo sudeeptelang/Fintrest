@@ -66,8 +66,8 @@ export default function AthenaPage() {
             <Bot className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="font-[var(--font-heading)] text-lg font-bold">Ask Athena</h1>
-            <p className="text-xs text-muted-foreground">AI market assistant</p>
+            <h1 className="font-[var(--font-heading)] text-lg font-bold">Ask Lens</h1>
+            <p className="text-xs text-muted-foreground">Research layer</p>
           </div>
         </div>
       </div>
@@ -94,7 +94,7 @@ export default function AthenaPage() {
                   <div className="w-5 h-5 rounded bg-primary/80 flex items-center justify-center">
                     <Bot className="h-3 w-3 text-white" />
                   </div>
-                  <span className="text-xs font-bold text-white/60">Athena</span>
+                  <span className="text-xs font-bold text-white/60">Lens</span>
                 </div>
               )}
               <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -106,7 +106,7 @@ export default function AthenaPage() {
             <div className="bg-[#1E1B4B] text-white/60 rounded-2xl rounded-bl-sm px-4 py-3 border border-primary/20">
               <div className="flex items-center gap-2">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span className="text-xs">Athena is thinking...</span>
+                <span className="text-xs">Lens is thinking...</span>
               </div>
             </div>
           </div>
