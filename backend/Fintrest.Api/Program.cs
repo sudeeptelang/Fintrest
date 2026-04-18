@@ -94,6 +94,20 @@ builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
     Fintrest.Api.Services.Scoring.V3.Features.Volatility.Atr14Feature>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
     Fintrest.Api.Services.Scoring.V3.Features.PriceRange.Week52RangePctFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Momentum.MomentumAccelerationFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Volatility.MeanReversionZScoreFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Trend.BollingerBandWidthFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Trend.Ma50SlopeFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Volume.RelativeVolume30dFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Volume.VolumeZScore30dFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Volume.VolumePriceConfirmationFeature>();
 
 // Orchestrator is a singleton so the Timer lives through the app's lifetime;
 // HostedService auto-registers via AddHostedService and pulls the same instance.
