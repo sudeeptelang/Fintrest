@@ -54,8 +54,12 @@ public class FeatureBulkRepository(IConfiguration config, ILogger<FeatureBulkRep
             catch (Exception ex) when (attempt < maxAttempts && IsTransient(ex))
             {
                 var delayMs = 500 * attempt;
+                // Clear the pool so the next attempt forces a fresh physical TCP
+                // connection. Without this, Npgsql returns the broken connector
+                // to the pool and the retry picks it up again, failing identically.
+                NpgsqlConnection.ClearAllPools();
                 logger.LogWarning(
-                    "FeatureBulkRepository: attempt {Attempt}/{Max} failed ({Type}), retrying in {Ms}ms",
+                    "FeatureBulkRepository: attempt {Attempt}/{Max} failed ({Type}), cleared pool, retrying in {Ms}ms",
                     attempt, maxAttempts, ex.GetType().Name, delayMs);
                 await Task.Delay(delayMs, ct);
             }
@@ -74,12 +78,18 @@ public class FeatureBulkRepository(IConfiguration config, ILogger<FeatureBulkRep
         IReadOnlyList<FeatureRow> rows,
         CancellationToken ct)
     {
-        // Dedicated connection, dedicated transaction. Opens, does its work, disposes.
-        // No sharing with EF — fixes the Npgsql disposed-connector bug seen when
-        // Pooling=false + shared connector across EF and raw commands.
+        // Dedicated connection, dedicated transaction. No CancellationToken is
+        // plumbed into individual Npgsql commands on purpose — there's a known
+        // Npgsql+Supabase interaction where CancellationTokenSource disposal
+        // races with NpgsqlConnector.ResetCancellation and throws
+        // ObjectDisposedException on ManualResetEventSlim. Passing CT.None to
+        // each command sidesteps the bug; the outer retry loop in UpsertAsync
+        // still respects the caller's CT between attempts.
+        ct.ThrowIfCancellationRequested();
+
         await using var conn = new NpgsqlConnection(_connString);
-        await conn.OpenAsync(ct);
-        await using var tx = await conn.BeginTransactionAsync(ct);
+        await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
 
         // 1. Session-temp staging table, auto-dropped at commit.
         await using (var createTemp = new NpgsqlCommand(@"
@@ -92,27 +102,27 @@ public class FeatureBulkRepository(IConfiguration config, ILogger<FeatureBulkRep
                 source        VARCHAR(32)  NOT NULL
             ) ON COMMIT DROP;", conn, tx))
         {
-            await createTemp.ExecuteNonQueryAsync(ct);
+            await createTemp.ExecuteNonQueryAsync();
         }
 
         // 2. COPY BINARY into the staging table.
         await using (var writer = await conn.BeginBinaryImportAsync(
-            "COPY tmp_features (ticker, trade_date, feature_name, value, as_of_ts, source) FROM STDIN (FORMAT BINARY)", ct))
+            "COPY tmp_features (ticker, trade_date, feature_name, value, as_of_ts, source) FROM STDIN (FORMAT BINARY)"))
         {
             foreach (var r in rows)
             {
-                await writer.StartRowAsync(ct);
-                await writer.WriteAsync(r.Ticker,                                NpgsqlDbType.Varchar,     ct);
-                await writer.WriteAsync(r.Date.ToDateTime(TimeOnly.MinValue),    NpgsqlDbType.Date,        ct);
-                await writer.WriteAsync(r.FeatureName,                           NpgsqlDbType.Varchar,     ct);
+                await writer.StartRowAsync();
+                await writer.WriteAsync(r.Ticker,                                NpgsqlDbType.Varchar);
+                await writer.WriteAsync(r.Date.ToDateTime(TimeOnly.MinValue),    NpgsqlDbType.Date);
+                await writer.WriteAsync(r.FeatureName,                           NpgsqlDbType.Varchar);
                 if (r.Value.HasValue)
-                    await writer.WriteAsync(r.Value.Value,                       NpgsqlDbType.Numeric,     ct);
+                    await writer.WriteAsync(r.Value.Value,                       NpgsqlDbType.Numeric);
                 else
-                    await writer.WriteNullAsync(ct);
-                await writer.WriteAsync(EnsureUtc(r.AsOfTs),                     NpgsqlDbType.TimestampTz, ct);
-                await writer.WriteAsync(r.Source ?? "computed",                  NpgsqlDbType.Varchar,     ct);
+                    await writer.WriteNullAsync();
+                await writer.WriteAsync(EnsureUtc(r.AsOfTs),                     NpgsqlDbType.TimestampTz);
+                await writer.WriteAsync(r.Source ?? "computed",                  NpgsqlDbType.Varchar);
             }
-            await writer.CompleteAsync(ct);
+            await writer.CompleteAsync();
         }
 
         // 3. Merge staging → features. Fires the DB-level lookahead trigger per row.
@@ -125,10 +135,10 @@ public class FeatureBulkRepository(IConfiguration config, ILogger<FeatureBulkRep
                   as_of_ts = EXCLUDED.as_of_ts,
                   source   = EXCLUDED.source;", conn, tx))
         {
-            affected = await merge.ExecuteNonQueryAsync(ct);
+            affected = await merge.ExecuteNonQueryAsync();
         }
 
-        await tx.CommitAsync(ct);
+        await tx.CommitAsync();
 
         logger.LogDebug("FeatureBulkRepository: upserted {Count} rows (affected={Affected})", rows.Count, affected);
         return affected;
