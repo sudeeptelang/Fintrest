@@ -156,8 +156,13 @@ public class DataIngestionService(
             .Select(m => m.Ts)
             .FirstOrDefaultAsync(ct);
 
-        // Partitions exist for 2026 Q1+ only — don't fetch data before that
-        var partitionStart = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        // market_data is range-partitioned by ts. After migration 016 we have
+        // annual partitions covering 2023-01-01 onward, which lets ingestion
+        // backfill ~3 years — enough history for v3 features ma_200 (200 bars)
+        // and week52_range_pct (252 bars). If running against a DB that hasn't
+        // applied 016 yet, the INSERT will fail with a "no partition found"
+        // error — apply 016 first.
+        var partitionStart = new DateTime(2023, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var from = latestDate != default
             ? latestDate.AddDays(1)
             : partitionStart;
