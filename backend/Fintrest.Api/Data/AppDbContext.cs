@@ -45,6 +45,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<FeatureRank> FeatureRanks => Set<FeatureRank>();
     public DbSet<TickerEarningsProfile> TickerEarningsProfiles => Set<TickerEarningsProfile>();
     public DbSet<AlgorithmIcHistory> AlgorithmIcHistory => Set<AlgorithmIcHistory>();
+    public DbSet<FeatureRunLog> FeatureRunLogs => Set<FeatureRunLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -57,10 +57,25 @@ builder.Services.AddScoped<Fintrest.Api.Services.AthenaService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.AthenaThesisService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.AthenaNewsService>();
 
-// Signal Engine v3 foundation (docs/SIGNALS_V3.md). Currently scaffolding only —
-// not yet wired into the live scoring pipeline. Milestone 2+ will connect it.
+// Signal Engine v3 foundation (docs/SIGNALS_V3.md).
+// v2 scoring is still the source of truth for live signals; v3 just populates
+// the feature store in parallel so we can validate before any scoring cutover.
 builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.V3.SectorMap>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.FeatureStore>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.FeatureBulkRepository>();
+
+// v3 feature implementations — each registered as IFeature so the orchestrator
+// can iterate them via IEnumerable<IFeature>. Add new features here as they land.
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Momentum.Roc20dFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Momentum.Rsi14Feature>();
+
+// Orchestrator is a singleton so the Timer lives through the app's lifetime;
+// HostedService auto-registers via AddHostedService and pulls the same instance.
+builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.V3.FeaturePopulationJob>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<Fintrest.Api.Services.Scoring.V3.FeaturePopulationJob>());
 
 builder.Services.AddSingleton<Fintrest.Api.Services.Email.EmailService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Billing.StripeService>();
