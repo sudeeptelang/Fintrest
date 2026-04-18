@@ -2,9 +2,9 @@ import Link from "next/link";
 
 const footerLinks = {
   Product: [
-    { label: "Athena's Picks", href: "/picks" },
+    { label: "Today's Research", href: "/picks" },
     { label: "Sector Heatmap", href: "/heatmap" },
-    { label: "Performance", href: "/performance" },
+    { label: "Audit Log", href: "/performance" },
     { label: "Pricing", href: "/pricing" },
   ],
   Company: [
@@ -16,8 +16,9 @@ const footerLinks = {
   Legal: [
     { label: "Terms of Use", href: "/terms" },
     { label: "Privacy Policy", href: "/privacy" },
+    { label: "Not Financial Advice", href: "/disclaimer" },
     { label: "Risk Disclosure", href: "/risk-disclosure" },
-    { label: "Disclaimer", href: "/disclaimer" },
+    { label: "Regulatory Status", href: "/disclaimer#who-we-are" },
     { label: "Refund Policy", href: "/refund" },
   ],
 };
@@ -25,6 +26,17 @@ const footerLinks = {
 export function Footer() {
   return (
     <footer className="bg-navy text-white/70">
+      {/* Persistent compliance strip — visible on every page above the main
+          footer content. Short, declarative, unavoidable. */}
+      <div className="border-b border-white/10 bg-black/30">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
+          <p className="text-center text-[11px] sm:text-xs text-white/60 tracking-wide">
+            Fintrest publishes research, not recommendations. Not a Registered
+            Investment Adviser. Trading involves risk of loss.
+          </p>
+        </div>
+      </div>
+
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
           {/* Brand */}
@@ -40,8 +52,9 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-sm leading-relaxed max-w-xs">
-              AI-powered swing trade discovery. Explainable signals,
-              transparent scoring, daily research delivered before the open.
+              The research layer for self-directed traders. Explainable
+              signals, transparent scoring, a public audit log. Research, not
+              recommendations.
             </p>
           </div>
 
@@ -65,15 +78,36 @@ export function Footer() {
           ))}
         </div>
 
-        {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-white/40">
-            &copy; {new Date().getFullYear()} Fintrest.ai. All rights reserved.
+        {/* Full disclaimer block — replaces the old one-liner. Kept on the
+            homepage footer so any first-time visitor sees it without drilling. */}
+        <div className="mt-12 pt-8 border-t border-white/10 space-y-4 text-xs text-white/45 leading-relaxed">
+          <p>
+            Fintrest.ai is a stock research and data-analytics platform
+            operated by DSYS Inc. We are <span className="text-white/70 font-medium">not a Registered Investment Adviser</span>,
+            a broker-dealer, a financial planner, or a licensed portfolio
+            manager. We do not manage money, hold customer funds, or execute
+            trades.
           </p>
-          <p className="text-xs text-white/40 max-w-lg text-center sm:text-right">
-            Fintrest.ai provides educational research signals and data-driven
-            stock analytics. This is not financial advice. Past performance does
-            not guarantee future results.
+          <p>
+            Nothing on this website, in any email, in any alert, or in any
+            chat with Lens constitutes investment advice, a personal
+            recommendation, a solicitation to buy or sell any security, or an
+            offer to enter into an investment advisory relationship. All
+            signals, scores, theses, reference levels, and commentary are
+            educational research outputs derived from public market data. They
+            do not take your personal financial situation, objectives, or risk
+            tolerance into account.
+          </p>
+          <p>
+            Past performance — including backtested and hypothetical
+            performance — does not guarantee future results. Trading stocks
+            involves substantial risk of loss, including the total loss of
+            your investment. You are solely responsible for your own
+            investment decisions. Consult a licensed financial professional
+            before acting on any information you see on this site.
+          </p>
+          <p className="pt-2 text-white/40">
+            &copy; {new Date().getFullYear()} DSYS Inc. All rights reserved.
           </p>
         </div>
       </div>

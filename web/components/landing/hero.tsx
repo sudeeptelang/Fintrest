@@ -46,7 +46,7 @@ export function Hero() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
               </span>
               <span className="text-sm font-medium text-primary">
-                Live signals updated daily
+                Research layer · Updated every morning before the open
               </span>
             </motion.div>
 
@@ -57,8 +57,8 @@ export function Hero() {
               variants={fadeUp}
               className="font-[var(--font-heading)] text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] tracking-tight"
             >
-              Pick Winning Stocks{" "}
-              <span className="gradient-text">Before The Market Does</span>
+              Every stock idea,{" "}
+              <span className="gradient-text">stress-tested before the open.</span>
             </motion.h1>
 
             <motion.p
@@ -68,9 +68,10 @@ export function Hero() {
               variants={fadeUp}
               className="mt-6 text-lg text-white/60 max-w-lg leading-relaxed"
             >
-              AI-powered swing trade discovery with explainable signals.
-              Transparent scoring, daily research delivered before the open.
-              No black boxes.
+              Fintrest runs 500+ US stocks through a 7-factor research engine
+              every morning. You see which setups passed the test, exactly why
+              they passed, and the full audit trail — including the losers.
+              Research, not recommendations.
             </motion.p>
 
             <motion.div
@@ -85,7 +86,7 @@ export function Hero() {
                   size="lg"
                   className="bg-primary hover:bg-primary/90 text-white h-12 px-8 text-base font-semibold shadow-lg shadow-primary/25"
                 >
-                  Start Free Today
+                  Start free
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -96,7 +97,7 @@ export function Hero() {
                   className="border-white/20 text-white hover:bg-white/10 h-12 px-8 text-base"
                 >
                   <Play className="mr-2 h-4 w-4" />
-                  How it works
+                  See how the engine works
                 </Button>
               </Link>
             </motion.div>
@@ -114,7 +115,11 @@ export function Hero() {
               </span>
               <span className="flex items-center gap-1.5">
                 <Zap className="h-4 w-4 text-primary" />
-                Setup in 30 seconds
+                30-second setup
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Shield className="h-4 w-4 text-primary" />
+                Cancel anytime
               </span>
             </motion.div>
           </div>
@@ -138,36 +143,36 @@ function CapabilityInfographic() {
       label: "Scan",
       color: "#00b87c",
       chips: [
-        { icon: Radar,    text: "500+ stocks scanned daily" },
-        { icon: Database, text: "Prices · fundamentals · news" },
-        { icon: Activity, text: "Regime-aware · intraday drift" },
+        { icon: Radar,    text: "500+ US stocks scanned every morning" },
+        { icon: Database, text: "Prices · fundamentals · news · options flow" },
+        { icon: Activity, text: "Regime-aware · intraday drift correction" },
       ],
     },
     {
       label: "Score",
       color: "#3b6fd4",
       chips: [
-        { icon: TrendingUp, text: "7-factor quant scoring" },
-        { icon: Target,     text: "Cross-sectional percentile rank" },
-        { icon: Shield,     text: "Bull / Bear weight sets" },
+        { icon: TrendingUp, text: "7-factor quant scoring · 0–100 per factor" },
+        { icon: Target,     text: "Cross-sectional percentile rank within sector" },
+        { icon: Shield,     text: "Regime-gated weights · bull · bear · chop" },
       ],
     },
     {
       label: "Narrate",
       color: "#00b87c",
       chips: [
-        { icon: Brain,     text: "Athena thesis · plain English" },
-        { icon: Sparkles,  text: "Setup type · Buy the Dip · Breakout" },
-        { icon: Landmark,  text: "Congress · Insider · Ownership" },
+        { icon: Brain,     text: "Lens thesis · plain English" },
+        { icon: Sparkles,  text: "Setup type · dip · breakout · trend continuation" },
+        { icon: Landmark,  text: "Catalysts · congress · insider · ownership" },
       ],
     },
     {
-      label: "Trade",
+      label: "Review",
       color: "#00b87c",
       chips: [
-        { icon: Target,  text: "Entry · Stop · Target · R:R" },
-        { icon: Zap,     text: "Real-time alerts" },
-        { icon: Users,   text: "Portfolio factor profile" },
+        { icon: Target,  text: "Reference levels: entry · stop · target · R:R" },
+        { icon: Zap,     text: "Real-time research alerts" },
+        { icon: Users,   text: "Portfolio factor profile · you decide what to do" },
       ],
     },
   ];
@@ -200,10 +205,10 @@ function CapabilityInfographic() {
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-              Athena AI
+              Lens
             </p>
             <p className="text-[11px] text-white/50">
-              The editorial brain at the center
+              The research layer at the center
             </p>
           </div>
         </motion.div>
@@ -247,7 +252,7 @@ function CapabilityInfographic() {
         {/* Footer */}
         <div className="mt-5 pt-4 border-t border-white/[0.06] text-center">
           <p className="text-[10px] text-white/40">
-            Know what to do — not just what&apos;s happening.
+            See what passed the test — and exactly why.
           </p>
         </div>
       </div>

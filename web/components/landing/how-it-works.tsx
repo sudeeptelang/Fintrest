@@ -16,15 +16,16 @@ export function HowItWorks() {
           className="text-center max-w-2xl mx-auto mb-16"
         >
           <span className="inline-block text-sm font-semibold text-primary mb-4 tracking-wide uppercase">
-            How It Works
+            How it works
           </span>
           <h2 className="font-[var(--font-heading)] text-3xl sm:text-4xl font-bold tracking-tight">
             From raw data to{" "}
-            <span className="gradient-text">actionable signals</span>
+            <span className="gradient-text">stress-tested research</span>
           </h2>
           <p className="mt-4 text-muted-foreground text-lg">
-            A transparent, four-step process that turns market data into ranked
-            trade ideas — delivered to you every morning.
+            A transparent four-step process that runs every morning before the
+            open. Market data goes in; a ranked, stress-tested research set
+            comes out.
           </p>
         </motion.div>
 

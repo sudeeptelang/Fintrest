@@ -90,8 +90,8 @@ export function Pricing() {
             <span className="gradient-text">pricing</span>
           </h2>
           <p className="mt-4 text-muted-foreground text-lg">
-            Start free. Upgrade when you&apos;re ready for more signals, earlier
-            alerts, and deeper analysis.
+            Start free. Upgrade when you want the full research board,
+            unlimited Lens, and the full audit log.
           </p>
         </motion.div>
 

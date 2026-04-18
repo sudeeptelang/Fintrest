@@ -33,15 +33,16 @@ export function Features() {
           className="text-center max-w-2xl mx-auto mb-16"
         >
           <span className="inline-block text-sm font-semibold text-primary mb-4 tracking-wide uppercase">
-            Features
+            Research engine
           </span>
           <h2 className="font-[var(--font-heading)] text-3xl sm:text-4xl font-bold tracking-tight">
-            Everything you need to{" "}
-            <span className="gradient-text">trade smarter</span>
+            A research layer for{" "}
+            <span className="gradient-text">self-directed traders</span>
           </h2>
           <p className="mt-4 text-muted-foreground text-lg">
-            Data-driven signals with full transparency. Every score is
-            explainable, every pick is auditable.
+            Data-driven research with a full audit trail. Every score is
+            explainable, every signal is traceable, every outcome is logged —
+            losers included.
           </p>
         </motion.div>
 

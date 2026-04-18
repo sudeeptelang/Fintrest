@@ -19,19 +19,19 @@ export function CTA() {
           transition={{ duration: 0.6 }}
         >
           <h2 className="font-[var(--font-heading)] text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
-            Ready to trade with{" "}
-            <span className="gradient-text">an edge?</span>
+            Ready to see{" "}
+            <span className="gradient-text">what passed the test?</span>
           </h2>
           <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto">
-            Join thousands of traders who start their day with Fintrest.ai
-            signals. Free to start, no credit card required.
+            Join self-directed traders who start their day with Fintrest
+            research. Free to begin. No credit card required.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
             <Button
               size="lg"
               className="bg-primary hover:bg-primary/90 text-white h-12 px-8 text-base font-semibold shadow-lg shadow-primary/25"
             >
-              Get Started Free
+              Start free
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button
@@ -39,7 +39,7 @@ export function CTA() {
               size="lg"
               className="h-12 px-8 text-base"
             >
-              View Today&apos;s Picks
+              See today&apos;s research
             </Button>
           </div>
         </motion.div>
