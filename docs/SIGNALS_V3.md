@@ -162,10 +162,20 @@ momentum, volume, fundamentals, and revisions. Rewards stocks that look strong
 Every feature row carries an `as_of_ts` = the timestamp at which the value would
 have been knowable in real time.
 
-- Fundamentals from FMP → `as_of_ts` = filing date (NOT fiscal period end)
-- News sentiment → `as_of_ts` = publish timestamp
-- Analyst revisions → `as_of_ts` = revision date
-- OHLCV → `as_of_ts` = 16:00 ET on the bar date
+**Canonical rules per source** (implemented in
+`backend/Fintrest.Api/Services/Scoring/V3/AsOfTsResolver.cs` — do not sprinkle
+this logic at call sites):
+
+- **FMP `/stable/income-statement` + `/stable/balance-sheet-statement`**:
+  1. Use `fillingDate` when present → `source = "fmp"`
+  2. Missing `fillingDate` (older filings) → fall back to `period_end + 45d` →
+     `source = "fmp_estimated_lag"` so audits can flag these rows later
+  3. **Never** use `period_end` as the knowable timestamp — the filing wasn't
+     publicly available until the filing date, typically 30-45 days later
+- **News sentiment** → `as_of_ts` = publish timestamp
+- **Analyst revisions** → `as_of_ts` = revision date
+- **OHLCV / technical indicators** → `as_of_ts` = 16:00 America/New_York on the
+  bar's date (converted to UTC)
 
 Backtests must filter on `as_of_ts <= backtest_date` or the backtest is lying.
 This is the single most common failure mode in retail signal platforms.
