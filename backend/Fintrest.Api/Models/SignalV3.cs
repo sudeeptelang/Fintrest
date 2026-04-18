@@ -22,7 +22,10 @@ public class FeatureRow
     [Column("ticker")]
     public string Ticker { get; set; } = "";
 
-    [Column("date")]
+    /// <summary>The trade date this feature applies to. Column is <c>trade_date</c>
+    /// in Postgres; the C# property stays <c>Date</c> for backwards compatibility
+    /// with code written before the column was renamed in migration 014.</summary>
+    [Column("trade_date")]
     public DateOnly Date { get; set; }
 
     /// <summary>Feature identifier (e.g. "momentum_roc_20", "eps_revision_breadth_30d").</summary>
@@ -53,7 +56,7 @@ public class FeatureRank
     [Column("ticker")]
     public string Ticker { get; set; } = "";
 
-    [Column("date")]
+    [Column("trade_date")]
     public DateOnly Date { get; set; }
 
     [Column("feature_name")]
@@ -118,7 +121,7 @@ public class TickerEarningsProfile
 [Table("algorithm_ic_history")]
 public class AlgorithmIcHistory
 {
-    [Column("date")]
+    [Column("trade_date")]
     public DateOnly Date { get; set; }
 
     /// <summary>Algorithm identifier (e.g. "momentum_roc_20").</summary>
