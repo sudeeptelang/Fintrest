@@ -79,9 +79,21 @@ builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.FeatureBulkRepositor
 // v3 feature implementations — each registered as IFeature so the orchestrator
 // can iterate them via IEnumerable<IFeature>. Add new features here as they land.
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Momentum.Roc5dFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
     Fintrest.Api.Services.Scoring.V3.Features.Momentum.Roc20dFeature>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Momentum.Roc60dFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
     Fintrest.Api.Services.Scoring.V3.Features.Momentum.Rsi14Feature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Trend.Ma50Feature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Trend.Ma200Feature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Volatility.Atr14Feature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.PriceRange.Week52RangePctFeature>();
 
 // Orchestrator is a singleton so the Timer lives through the app's lifetime;
 // HostedService auto-registers via AddHostedService and pulls the same instance.
