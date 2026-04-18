@@ -108,6 +108,12 @@ builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
     Fintrest.Api.Services.Scoring.V3.Features.Volume.VolumeZScore30dFeature>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
     Fintrest.Api.Services.Scoring.V3.Features.Volume.VolumePriceConfirmationFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Trend.Adx14Feature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Volume.AccumulationDistributionFeature>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Trend.CloseVsMa50PctFeature>();
 
 // Orchestrator is a singleton so the Timer lives through the app's lifetime;
 // HostedService auto-registers via AddHostedService and pulls the same instance.
