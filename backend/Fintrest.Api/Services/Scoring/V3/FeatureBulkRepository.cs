@@ -39,45 +39,40 @@ public class FeatureBulkRepository(AppDbContext db, ILogger<FeatureBulkRepositor
     {
         if (rows.Count == 0) return 0;
 
-        // Establish the slice we're rewriting: one trade_date + the set of
-        // feature_names present in this batch. Each nightly run typically
-        // writes the same (date, features) slice anyway, so delete-and-insert
-        // is idempotent.
         var tradeDate    = rows[0].Date;
-        var featureNames = rows.Select(r => r.FeatureName).Distinct().ToList();
+        var featureNames = rows.Select(r => r.FeatureName).Distinct().ToArray();
 
-        // Delete + insert inside a single execution strategy block so retries
-        // replay the whole thing atomically.
-        var strategy = db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        // STEP 1: Delete the slice. Raw SQL goes through a simpler Npgsql path
+        // than ExecuteDeleteAsync, sidestepping the NpgsqlConnector.ResetCancellation
+        // disposal bug we keep hitting with the linq-to-delete translator.
+        // EF's NpgsqlExecutionStrategy (registered in Program.cs) wraps this in
+        // a retry loop automatically.
+        var deleted = await db.Database.ExecuteSqlInterpolatedAsync($@"
+            DELETE FROM features
+            WHERE trade_date = {tradeDate.ToDateTime(TimeOnly.MinValue)}
+              AND feature_name = ANY({featureNames})", ct);
+
+        // STEP 2: AddRange + SaveChanges. EF's retry strategy handles transient
+        // errors on SaveChanges automatically. No explicit transaction — delete +
+        // insert don't need atomicity here (a partial failure on step 2 leaves
+        // the slice deleted but empty, and the next nightly run refills it).
+        await db.Features.AddRangeAsync(rows.Select(r => new FeatureRow
         {
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            Ticker      = r.Ticker,
+            Date        = r.Date,
+            FeatureName = r.FeatureName,
+            Value       = r.Value,
+            AsOfTs      = EnsureUtc(r.AsOfTs),
+            Source      = r.Source ?? "computed",
+        }), ct);
 
-            // Scoped delete — only the features we're about to rewrite.
-            var deleted = await db.Features
-                .Where(f => f.Date == tradeDate && featureNames.Contains(f.FeatureName))
-                .ExecuteDeleteAsync(ct);
+        var inserted = await db.SaveChangesAsync(ct);
 
-            // AddRange is fine for 1000–30000 rows; SaveChangesAsync batches internally.
-            await db.Features.AddRangeAsync(rows.Select(r => new FeatureRow
-            {
-                Ticker      = r.Ticker,
-                Date        = r.Date,
-                FeatureName = r.FeatureName,
-                Value       = r.Value,
-                AsOfTs      = EnsureUtc(r.AsOfTs),
-                Source      = r.Source ?? "computed",
-            }), ct);
+        logger.LogInformation(
+            "FeatureBulkRepository: slice ({Date}, {FeatureCount} features) — deleted {D}, inserted {I}",
+            tradeDate, featureNames.Length, deleted, inserted);
 
-            var inserted = await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-
-            logger.LogDebug(
-                "FeatureBulkRepository: slice ({Date}, {FeatureCount} features) — deleted {D}, inserted {I}",
-                tradeDate, featureNames.Count, deleted, inserted);
-
-            return inserted;
-        });
+        return inserted;
     }
 
     /// <summary>Coerce DateTime.Kind to UTC for TIMESTAMPTZ columns.</summary>
