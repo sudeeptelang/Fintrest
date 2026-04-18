@@ -16,6 +16,7 @@ public class DataIngestionService(
     IFundamentalsProvider fundamentalsProvider,
     INewsProvider newsProvider,
     IServiceScopeFactory scopeFactory,
+    MarketDataBulkRepository barWriter,
     ILogger<DataIngestionService> logger)
 {
     /// <summary>Default parallelism for the bulk ingestion run. Tuned to be friendly to free-tier
@@ -191,21 +192,15 @@ public class DataIngestionService(
         if (from.Date >= DateTime.UtcNow.Date) return 0; // Already up to date
 
         var bars = await marketProvider.GetDailyBarsAsync(stock.Ticker, from, DateTime.UtcNow, ct);
+        if (bars.Count == 0) return 0;
 
-        foreach (var bar in bars)
-        {
-            db.MarketData.Add(new MarketData
-            {
-                StockId = stock.Id,
-                Timeframe = "1d",
-                Ts = bar.Date,
-                Open = bar.Open,
-                High = bar.High,
-                Low = bar.Low,
-                Close = bar.Close,
-                Volume = bar.Volume,
-            });
-        }
+        // Write bars via Dapper on a dedicated connection. EF + Supabase pgbouncer
+        // hits ObjectDisposedException on ManualResetEventSlim under concurrent
+        // SaveChanges with ~400 bars per batch × 6 parallel slots. Dapper with a
+        // connection we own end-to-end + pool-clearing retry sidesteps the race.
+        var rows = bars.Select(b => new MarketDataBulkRepository.BarRow(
+            stock.Id, b.Date, b.Open, b.High, b.Low, b.Close, b.Volume)).ToList();
+        await barWriter.InsertBarsAsync(rows, ct);
 
         return bars.Count;
     }

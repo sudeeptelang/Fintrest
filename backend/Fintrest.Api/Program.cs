@@ -54,6 +54,7 @@ builder.Services.Configure<Fintrest.Api.Services.Scoring.ScoringOptions>(
     builder.Configuration.GetSection(Fintrest.Api.Services.Scoring.ScoringOptions.SectionName));
 
 // Services
+builder.Services.AddScoped<Fintrest.Api.Services.Ingestion.MarketDataBulkRepository>();
 builder.Services.AddScoped<Fintrest.Api.Services.Ingestion.DataIngestionService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Pipeline.ScanOrchestrator>();
 builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.PortfolioService>();
