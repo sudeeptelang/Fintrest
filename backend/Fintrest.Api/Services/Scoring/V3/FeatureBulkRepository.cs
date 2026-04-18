@@ -45,12 +45,16 @@ public class FeatureBulkRepository(AppDbContext db, ILogger<FeatureBulkRepositor
         // STEP 1: Delete the slice. Raw SQL goes through a simpler Npgsql path
         // than ExecuteDeleteAsync, sidestepping the NpgsqlConnector.ResetCancellation
         // disposal bug we keep hitting with the linq-to-delete translator.
-        // EF's NpgsqlExecutionStrategy (registered in Program.cs) wraps this in
-        // a retry loop automatically.
-        var deleted = await db.Database.ExecuteSqlInterpolatedAsync($@"
-            DELETE FROM features
-            WHERE trade_date = {tradeDate.ToDateTime(TimeOnly.MinValue)}
-              AND feature_name = ANY({featureNames})", ct);
+        //
+        // Format the trade_date as ISO literal (not a parameter) because Npgsql 10
+        // rejects DateTime parameters with Kind=Unspecified against TIMESTAMPTZ/DATE,
+        // and DateOnly as a parameter via interpolation isn't reliably typed either.
+        // Interpolating the string is safe here — we built tradeDate from our own
+        // rows[0].Date, not user input.
+        var dateLiteral = tradeDate.ToString("yyyy-MM-dd");
+        var deleted = await db.Database.ExecuteSqlRawAsync(
+            $"DELETE FROM features WHERE trade_date = '{dateLiteral}'::date AND feature_name = ANY(@p0)",
+            new object[] { featureNames }, ct);
 
         // STEP 2: AddRange + SaveChanges. EF's retry strategy handles transient
         // errors on SaveChanges automatically. No explicit transaction — delete +
