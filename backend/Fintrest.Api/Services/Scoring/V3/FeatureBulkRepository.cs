@@ -1,42 +1,37 @@
+using Fintrest.Api.Data;
 using Fintrest.Api.Models;
-using Npgsql;
-using NpgsqlTypes;
+using Microsoft.EntityFrameworkCore;
 
 namespace Fintrest.Api.Services.Scoring.V3;
 
 /// <summary>
-/// Bulk writer for <c>features</c> using Npgsql <c>COPY BINARY</c> — 10–50× faster
-/// than EF Core <c>SaveChanges</c> on the 28k-row nightly workload. The DB-level
-/// <c>check_features_as_of_ts</c> trigger still fires during COPY, so lookahead
-/// protection is preserved.
+/// Writer for <c>features</c> using EF Core. The DB-level
+/// <c>check_features_as_of_ts</c> trigger still fires on every INSERT so
+/// lookahead protection is preserved.
 ///
 /// <para>
-/// Upsert strategy: COPY-insert into a session-temp table, then a single
-/// <c>INSERT ... ON CONFLICT ... DO UPDATE</c> merges into <c>features</c>. This
-/// is the standard Postgres "fast upsert" pattern and keeps the hot table's
-/// indexes happy.
+/// <b>Why EF Core and not Npgsql COPY?</b> We started with <c>COPY BINARY</c>
+/// because it's 10–50× faster, but hit a known Npgsql+Supabase interaction
+/// where <c>NpgsqlConnector.ResetCancellation</c> throws
+/// <c>ObjectDisposedException</c> on the very first command of a fresh
+/// connection — no amount of pool clearing or CT manipulation fixes it.
+/// EF Core's <c>NpgsqlExecutionStrategy</c> handles the retry dance
+/// transparently. At 1000–30000 rows per nightly run, the perf difference
+/// (≈1s vs ≈5s) is irrelevant for a batch that runs once a day.
 /// </para>
 ///
 /// <para>
-/// <b>Connection ownership:</b> opens its OWN <see cref="NpgsqlConnection"/>
-/// from the configured connection string rather than riding on EF Core's
-/// tracked connection. This isolates the bulk COPY from EF's connection
-/// lifecycle, avoiding the <c>ObjectDisposedException</c> on
-/// <c>NpgsqlConnector.ResetCancellation</c> that we hit when <c>Pooling=false</c>
-/// and EF and raw commands share a connector.
+/// <b>Upsert strategy</b>: delete-and-insert. For the given trade date, we
+/// delete all rows for the feature names being written, then insert the new
+/// batch. Simple, avoids N+1 reads, and leaves the feature_ranks downstream
+/// job with a clean slice per day.
 /// </para>
 /// </summary>
-public class FeatureBulkRepository(IConfiguration config, ILogger<FeatureBulkRepository> logger)
+public class FeatureBulkRepository(AppDbContext db, ILogger<FeatureBulkRepository> logger)
 {
-    private readonly string _connString =
-        config.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection not configured");
-
     /// <summary>
-    /// Insert or update a batch of feature rows. Returns the number of rows affected
-    /// by the final merge statement. Retries up to 3 times on transient connection
-    /// errors — Supabase PgBouncer can occasionally time out during SSL setup when
-    /// <c>Pooling=false</c> forces a fresh TCP connection per command.
+    /// Insert or overwrite a batch of feature rows for a given trade date.
+    /// Returns the number of rows inserted.
     /// </summary>
     public async Task<int> UpsertAsync(
         IReadOnlyList<FeatureRow> rows,
@@ -44,110 +39,48 @@ public class FeatureBulkRepository(IConfiguration config, ILogger<FeatureBulkRep
     {
         if (rows.Count == 0) return 0;
 
-        const int maxAttempts = 3;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        // Establish the slice we're rewriting: one trade_date + the set of
+        // feature_names present in this batch. Each nightly run typically
+        // writes the same (date, features) slice anyway, so delete-and-insert
+        // is idempotent.
+        var tradeDate    = rows[0].Date;
+        var featureNames = rows.Select(r => r.FeatureName).Distinct().ToList();
+
+        // Delete + insert inside a single execution strategy block so retries
+        // replay the whole thing atomically.
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            try
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+            // Scoped delete — only the features we're about to rewrite.
+            var deleted = await db.Features
+                .Where(f => f.Date == tradeDate && featureNames.Contains(f.FeatureName))
+                .ExecuteDeleteAsync(ct);
+
+            // AddRange is fine for 1000–30000 rows; SaveChangesAsync batches internally.
+            await db.Features.AddRangeAsync(rows.Select(r => new FeatureRow
             {
-                return await UpsertCoreAsync(rows, ct);
-            }
-            catch (Exception ex) when (attempt < maxAttempts && IsTransient(ex))
-            {
-                var delayMs = 500 * attempt;
-                // Clear the pool so the next attempt forces a fresh physical TCP
-                // connection. Without this, Npgsql returns the broken connector
-                // to the pool and the retry picks it up again, failing identically.
-                NpgsqlConnection.ClearAllPools();
-                logger.LogWarning(
-                    "FeatureBulkRepository: attempt {Attempt}/{Max} failed ({Type}), cleared pool, retrying in {Ms}ms",
-                    attempt, maxAttempts, ex.GetType().Name, delayMs);
-                await Task.Delay(delayMs, ct);
-            }
-        }
-        // Unreachable — the loop either returns or the final attempt rethrows.
-        throw new InvalidOperationException("unreachable");
+                Ticker      = r.Ticker,
+                Date        = r.Date,
+                FeatureName = r.FeatureName,
+                Value       = r.Value,
+                AsOfTs      = EnsureUtc(r.AsOfTs),
+                Source      = r.Source ?? "computed",
+            }), ct);
+
+            var inserted = await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+
+            logger.LogDebug(
+                "FeatureBulkRepository: slice ({Date}, {FeatureCount} features) — deleted {D}, inserted {I}",
+                tradeDate, featureNames.Count, deleted, inserted);
+
+            return inserted;
+        });
     }
 
-    private static bool IsTransient(Exception ex) =>
-        ex is TimeoutException
-            || ex is ObjectDisposedException
-            || ex is NpgsqlException
-            || (ex.InnerException is not null && IsTransient(ex.InnerException));
-
-    private async Task<int> UpsertCoreAsync(
-        IReadOnlyList<FeatureRow> rows,
-        CancellationToken ct)
-    {
-        // Dedicated connection, dedicated transaction. No CancellationToken is
-        // plumbed into individual Npgsql commands on purpose — there's a known
-        // Npgsql+Supabase interaction where CancellationTokenSource disposal
-        // races with NpgsqlConnector.ResetCancellation and throws
-        // ObjectDisposedException on ManualResetEventSlim. Passing CT.None to
-        // each command sidesteps the bug; the outer retry loop in UpsertAsync
-        // still respects the caller's CT between attempts.
-        ct.ThrowIfCancellationRequested();
-
-        await using var conn = new NpgsqlConnection(_connString);
-        await conn.OpenAsync();
-        await using var tx = await conn.BeginTransactionAsync();
-
-        // 1. Session-temp staging table, auto-dropped at commit.
-        await using (var createTemp = new NpgsqlCommand(@"
-            CREATE TEMP TABLE tmp_features (
-                ticker        VARCHAR(10)  NOT NULL,
-                trade_date    DATE         NOT NULL,
-                feature_name  VARCHAR(64)  NOT NULL,
-                value         NUMERIC,
-                as_of_ts      TIMESTAMPTZ  NOT NULL,
-                source        VARCHAR(32)  NOT NULL
-            ) ON COMMIT DROP;", conn, tx))
-        {
-            await createTemp.ExecuteNonQueryAsync();
-        }
-
-        // 2. COPY BINARY into the staging table.
-        await using (var writer = await conn.BeginBinaryImportAsync(
-            "COPY tmp_features (ticker, trade_date, feature_name, value, as_of_ts, source) FROM STDIN (FORMAT BINARY)"))
-        {
-            foreach (var r in rows)
-            {
-                await writer.StartRowAsync();
-                await writer.WriteAsync(r.Ticker,                                NpgsqlDbType.Varchar);
-                await writer.WriteAsync(r.Date.ToDateTime(TimeOnly.MinValue),    NpgsqlDbType.Date);
-                await writer.WriteAsync(r.FeatureName,                           NpgsqlDbType.Varchar);
-                if (r.Value.HasValue)
-                    await writer.WriteAsync(r.Value.Value,                       NpgsqlDbType.Numeric);
-                else
-                    await writer.WriteNullAsync();
-                await writer.WriteAsync(EnsureUtc(r.AsOfTs),                     NpgsqlDbType.TimestampTz);
-                await writer.WriteAsync(r.Source ?? "computed",                  NpgsqlDbType.Varchar);
-            }
-            await writer.CompleteAsync();
-        }
-
-        // 3. Merge staging → features. Fires the DB-level lookahead trigger per row.
-        int affected;
-        await using (var merge = new NpgsqlCommand(@"
-            INSERT INTO features (ticker, trade_date, feature_name, value, as_of_ts, source)
-            SELECT ticker, trade_date, feature_name, value, as_of_ts, source FROM tmp_features
-            ON CONFLICT (ticker, trade_date, feature_name) DO UPDATE
-              SET value    = EXCLUDED.value,
-                  as_of_ts = EXCLUDED.as_of_ts,
-                  source   = EXCLUDED.source;", conn, tx))
-        {
-            affected = await merge.ExecuteNonQueryAsync();
-        }
-
-        await tx.CommitAsync();
-
-        logger.LogDebug("FeatureBulkRepository: upserted {Count} rows (affected={Affected})", rows.Count, affected);
-        return affected;
-    }
-
-    /// <summary>
-    /// Npgsql <c>TIMESTAMPTZ</c> requires the DateTime to be UTC-kinded. Feature
-    /// implementations sometimes hand us Unspecified or Local values — coerce.
-    /// </summary>
+    /// <summary>Coerce DateTime.Kind to UTC for TIMESTAMPTZ columns.</summary>
     private static DateTime EnsureUtc(DateTime ts) =>
         ts.Kind switch
         {

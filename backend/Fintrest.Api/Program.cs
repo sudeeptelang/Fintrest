@@ -6,9 +6,17 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Database — Supabase PostgreSQL
+// Database — Supabase PostgreSQL.
+// EnableRetryOnFailure wraps every SaveChanges / query in Npgsql's
+// NpgsqlExecutionStrategy, which absorbs transient errors (connection drops,
+// the ObjectDisposedException race between Npgsql + Supabase PgBouncer, etc.).
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+    options.UseNpgsql(
+            builder.Configuration.GetConnectionString("DefaultConnection"),
+            npgsql => npgsql.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(5),
+                errorCodesToAdd: null))
            .UseSnakeCaseNamingConvention());
 
 // Auth — Validate Supabase JWT tokens
@@ -62,6 +70,7 @@ builder.Services.AddScoped<Fintrest.Api.Services.Scoring.AthenaNewsService>();
 // the feature store in parallel so we can validate before any scoring cutover.
 builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.V3.SectorMap>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.FeatureStore>();
+// FeatureBulkRepository now takes AppDbContext directly — scoped.
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.FeatureBulkRepository>();
 
 // v3 feature implementations — each registered as IFeature so the orchestrator
