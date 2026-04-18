@@ -44,12 +44,28 @@ public class FeatureStoreController(FeaturePopulationJob job, ILogger<FeatureSto
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new { error = ex.Message });
+            return Conflict(new
+            {
+                error = ex.Message,
+                hint  = "If this persists after a backend restart, POST /api/v1/admin/v3/features/force-reset to clear the flag.",
+            });
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Manual feature populate failed");
             return StatusCode(500, new { error = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Emergency reset of the running flag. Use only when a previous run got
+    /// stuck in a way that blocks further attempts. Does NOT interrupt a
+    /// genuinely-running job.
+    /// </summary>
+    [HttpPost("features/force-reset")]
+    public IActionResult ForceReset()
+    {
+        job.ForceResetRunningFlag();
+        return Ok(new { message = "running flag cleared" });
     }
 }

@@ -34,7 +34,9 @@ public class FeatureBulkRepository(IConfiguration config, ILogger<FeatureBulkRep
 
     /// <summary>
     /// Insert or update a batch of feature rows. Returns the number of rows affected
-    /// by the final merge statement.
+    /// by the final merge statement. Retries up to 3 times on transient connection
+    /// errors — Supabase PgBouncer can occasionally time out during SSL setup when
+    /// <c>Pooling=false</c> forces a fresh TCP connection per command.
     /// </summary>
     public async Task<int> UpsertAsync(
         IReadOnlyList<FeatureRow> rows,
@@ -42,6 +44,36 @@ public class FeatureBulkRepository(IConfiguration config, ILogger<FeatureBulkRep
     {
         if (rows.Count == 0) return 0;
 
+        const int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                return await UpsertCoreAsync(rows, ct);
+            }
+            catch (Exception ex) when (attempt < maxAttempts && IsTransient(ex))
+            {
+                var delayMs = 500 * attempt;
+                logger.LogWarning(
+                    "FeatureBulkRepository: attempt {Attempt}/{Max} failed ({Type}), retrying in {Ms}ms",
+                    attempt, maxAttempts, ex.GetType().Name, delayMs);
+                await Task.Delay(delayMs, ct);
+            }
+        }
+        // Unreachable — the loop either returns or the final attempt rethrows.
+        throw new InvalidOperationException("unreachable");
+    }
+
+    private static bool IsTransient(Exception ex) =>
+        ex is TimeoutException
+            || ex is ObjectDisposedException
+            || ex is NpgsqlException
+            || (ex.InnerException is not null && IsTransient(ex.InnerException));
+
+    private async Task<int> UpsertCoreAsync(
+        IReadOnlyList<FeatureRow> rows,
+        CancellationToken ct)
+    {
         // Dedicated connection, dedicated transaction. Opens, does its work, disposes.
         // No sharing with EF — fixes the Npgsql disposed-connector bug seen when
         // Pooling=false + shared connector across EF and raw commands.

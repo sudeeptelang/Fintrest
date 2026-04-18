@@ -3,6 +3,7 @@ using System.Text.Json;
 using Fintrest.Api.Data;
 using Fintrest.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace Fintrest.Api.Services.Scoring.V3;
 
@@ -24,7 +25,10 @@ public class FeaturePopulationJob(
     ILogger<FeaturePopulationJob> logger) : IHostedService, IDisposable
 {
     private Timer? _timer;
-    private bool _running;
+    // Interlocked-backed mutex around the job body. 0 = idle, 1 = running.
+    // Using int not bool because Interlocked.CompareExchange doesn't support bool.
+    private int _runningFlag;
+    private bool _running => Volatile.Read(ref _runningFlag) == 1;
     private DateOnly _lastRunDate;
     private static readonly TimeZoneInfo EasternZone =
         TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
@@ -68,25 +72,25 @@ public class FeaturePopulationJob(
     /// <summary>Manual-trigger entry point — used by the admin controller for dry runs.</summary>
     public async Task<FeatureRunLog> RunOnceAsync(DateOnly tradeDate, CancellationToken ct)
     {
-        if (_running) throw new InvalidOperationException("FeaturePopulationJob already running");
-        _running = true;
+        // Atomic compare-exchange: only one caller wins the _running flag.
+        if (Interlocked.CompareExchange(ref _runningFlag, 1, 0) == 1)
+            throw new InvalidOperationException("FeaturePopulationJob already running");
+
         var sw = Stopwatch.StartNew();
-
-        using var scope = scopeFactory.CreateScope();
-        var db      = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var bulk    = scope.ServiceProvider.GetRequiredService<FeatureBulkRepository>();
-        var features = scope.ServiceProvider.GetRequiredService<IEnumerable<IFeature>>().ToList();
-
         var log = new FeatureRunLog { TradeDate = tradeDate };
-        db.Set<FeatureRunLog>().Add(log);
-        await db.SaveChangesAsync(ct);
-
         var rowsWritten = new Dictionary<string, int>();
         var errorCount  = new Dictionary<string, int>();
         var allRows     = new List<FeatureRow>();
 
         try
         {
+            using var scope = scopeFactory.CreateScope();
+            var db       = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bulk     = scope.ServiceProvider.GetRequiredService<FeatureBulkRepository>();
+            var features = scope.ServiceProvider.GetRequiredService<IEnumerable<IFeature>>().ToList();
+
+            db.Set<FeatureRunLog>().Add(log);
+            await db.SaveChangesAsync(ct);
             // 1. Load the active universe + last 300 bars per ticker (covers RSI / ROC / MA200).
             var stocks = await db.Stocks
                 .Where(s => s.Active)
@@ -182,15 +186,32 @@ public class FeaturePopulationJob(
             log.EndedAt = DateTime.UtcNow;
             log.Status  = "red";
             log.ErrorCountJson = JsonSerializer.Serialize(new { fatal = ex.Message });
-            try { await db.SaveChangesAsync(ct); } catch { /* best effort */ }
+            // Best-effort fail-status save on a FRESH scope — the original scope's
+            // DbContext may be in a broken state after the primary error.
+            try
+            {
+                using var recoveryScope = scopeFactory.CreateScope();
+                var recoveryDb = recoveryScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                recoveryDb.Attach(log);
+                recoveryDb.Entry(log).State = EntityState.Modified;
+                await recoveryDb.SaveChangesAsync(ct);
+            }
+            catch { /* best effort */ }
             logger.LogError(ex, "FeaturePopulationJob failed after {Ms}ms", sw.ElapsedMilliseconds);
             throw;
         }
         finally
         {
-            _running = false;
+            Interlocked.Exchange(ref _runningFlag, 0);
         }
     }
+
+    /// <summary>
+    /// Emergency reset for the running flag, exposed so an admin endpoint can
+    /// clear a stuck state if a previous run crashed in a way that somehow
+    /// skipped the finally block. Does NOT interrupt an actually-running job.
+    /// </summary>
+    public void ForceResetRunningFlag() => Interlocked.Exchange(ref _runningFlag, 0);
 
     /// <summary>Green = every feature covered ≥ 98% with ≤ 5 errors. Yellow = partial. Red = fatal.</summary>
     private static string ClassifyRun(
