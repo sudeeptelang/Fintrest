@@ -38,7 +38,7 @@ public class DataIngestionService(
     /// <summary>Run full ingestion for all tracked stocks. Parallelism is bounded by
     /// <paramref name="maxParallel"/>; each parallel slot creates its own DI scope so it gets
     /// a fresh DbContext (DbContext is not thread-safe).</summary>
-    public async Task<IngestionResult> IngestAllAsync(int maxParallel = DefaultMaxParallel, CancellationToken ct = default)
+    public async Task<IngestionResult> IngestAllAsync(int maxParallel = DefaultMaxParallel, CancellationToken ct = default, bool backfill = false)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -75,7 +75,7 @@ public class DataIngestionService(
                         // connector.
                         using var scope = scopeFactory.CreateScope();
                         var svc = scope.ServiceProvider.GetRequiredService<DataIngestionService>();
-                        var counts = await svc.IngestStockAsync(ticker, token);
+                        var counts = await svc.IngestStockAsync(ticker, token, backfill);
 
                         Interlocked.Add(ref totalBars, counts.Bars);
                         Interlocked.Add(ref totalFundamentals, counts.Fundamentals);
@@ -110,7 +110,7 @@ public class DataIngestionService(
 
     /// <summary>Ingest a single stock (for on-demand refresh). Returns per-source counts
     /// so the bulk runner can aggregate telemetry.</summary>
-    public async Task<StockIngestCounts> IngestStockAsync(string ticker, CancellationToken ct = default)
+    public async Task<StockIngestCounts> IngestStockAsync(string ticker, CancellationToken ct = default, bool backfill = false)
     {
         var stock = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker.ToUpper() == ticker.ToUpper(), ct);
         if (stock is null)
@@ -120,7 +120,9 @@ public class DataIngestionService(
             if (stock is null) return new StockIngestCounts(0, 0, 0);
         }
 
-        var bars = await IngestMarketDataAsync(stock, ct);
+        var bars = backfill
+            ? await BackfillMarketDataAsync(stock, ct)
+            : await IngestMarketDataAsync(stock, ct);
         var funds = await IngestFundamentalsAsync(stock, ct);
         var news = await IngestNewsAsync(stock, ct);
         await db.SaveChangesAsync(ct);
@@ -198,6 +200,45 @@ public class DataIngestionService(
         // hits ObjectDisposedException on ManualResetEventSlim under concurrent
         // SaveChanges with ~400 bars per batch × 6 parallel slots. Dapper with a
         // connection we own end-to-end + pool-clearing retry sidesteps the race.
+        var rows = bars.Select(b => new MarketDataBulkRepository.BarRow(
+            stock.Id, b.Date, b.Open, b.High, b.Low, b.Close, b.Volume)).ToList();
+        await barWriter.InsertBarsAsync(rows, ct);
+
+        return bars.Count;
+    }
+
+    /// <summary>Pull historical bars *before* the earliest existing row. One-shot
+    /// operation used to seed enough history for v3 features (ma_200 needs 200 bars,
+    /// week52_range_pct needs 252). Range is [2023-01-01, earliestExistingDate − 1].
+    /// If no bars exist yet, falls through to a full pull from 2023-01-01 to now.</summary>
+    private async Task<int> BackfillMarketDataAsync(Stock stock, CancellationToken ct)
+    {
+        var partitionStart = new DateTime(2023, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var earliestDate = await db.MarketData
+            .Where(m => m.StockId == stock.Id)
+            .OrderBy(m => m.Ts)
+            .Select(m => m.Ts)
+            .FirstOrDefaultAsync(ct);
+
+        DateTime from = partitionStart;
+        DateTime to;
+        if (earliestDate == default)
+        {
+            to = DateTime.UtcNow;
+        }
+        else if (earliestDate > partitionStart)
+        {
+            to = earliestDate.AddDays(-1);
+        }
+        else
+        {
+            return 0; // already backfilled
+        }
+
+        var bars = await marketProvider.GetDailyBarsAsync(stock.Ticker, from, to, ct);
+        if (bars.Count == 0) return 0;
+
         var rows = bars.Select(b => new MarketDataBulkRepository.BarRow(
             stock.Id, b.Date, b.Open, b.High, b.Low, b.Close, b.Volume)).ToList();
         await barWriter.InsertBarsAsync(rows, ct);

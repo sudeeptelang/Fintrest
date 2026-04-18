@@ -64,9 +64,9 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
     /// <summary>Ingest market data for all stocks.
     /// <paramref name="maxParallel"/> caps concurrent stock fetches (default 6).</summary>
     [HttpPost("ingest")]
-    public async Task<IActionResult> SeedIngest([FromQuery] int maxParallel = 6, CancellationToken ct = default)
+    public async Task<IActionResult> SeedIngest([FromQuery] int maxParallel = 6, [FromQuery] bool backfill = false, CancellationToken ct = default)
     {
-        var result = await ingestion.IngestAllAsync(maxParallel, ct);
+        var result = await ingestion.IngestAllAsync(maxParallel, ct, backfill);
 
         return Ok(new
         {
