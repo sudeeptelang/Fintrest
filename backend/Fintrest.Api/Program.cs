@@ -68,9 +68,12 @@ builder.Services.AddScoped<Fintrest.Api.Services.Scoring.AthenaNewsService>();
 // Signal Engine v3 foundation (docs/SIGNALS_V3.md).
 // v2 scoring is still the source of truth for live signals; v3 just populates
 // the feature store in parallel so we can validate before any scoring cutover.
+// Dapper doesn't ship DateOnly/TimeOnly handlers as of 2.1.35 — register once.
+Fintrest.Api.Services.Scoring.V3.DapperTypeHandlers.Register();
+
 builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.V3.SectorMap>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.FeatureStore>();
-// FeatureBulkRepository now takes AppDbContext directly — scoped.
+// FeatureBulkRepository uses Dapper on a dedicated NpgsqlConnection — scoped.
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.FeatureBulkRepository>();
 
 // v3 feature implementations — each registered as IFeature so the orchestrator
