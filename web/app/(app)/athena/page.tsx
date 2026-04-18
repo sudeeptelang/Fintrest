@@ -12,10 +12,10 @@ interface Message {
 }
 
 const QUICK_PROMPTS = [
-  "Top buys today",
-  "Review my portfolio",
-  "Best low-risk picks",
-  "Market outlook",
+  "What passed the test today",
+  "Break down a ticker's 7-factor score",
+  "What does the research say about my portfolio",
+  "Explain the current market regime",
 ];
 
 export default function AthenaPage() {
@@ -23,7 +23,7 @@ export default function AthenaPage() {
     {
       role: "assistant",
       content:
-        "Hi! I'm Athena, your AI market assistant. I can explain signals, review your portfolio, or discuss market concepts. What's on your mind?",
+        "Hi — I'm Lens, Fintrest's research layer. I can walk you through today's signals, break down the 7-factor score on any ticker, explain what the research says about your watchlist or portfolio, or show you why a setup passed or failed the bar. I don't recommend trades — I explain the research. What do you want to look at?",
     },
   ]);
   const [input, setInput] = useState("");
@@ -128,14 +128,28 @@ export default function AthenaPage() {
         ))}
       </div>
 
+      {/* Research/Not-Advice chip — FTC/SEC compliance: reminds every user
+          that Lens outputs are research, not recommendations. Persistent. */}
+      <div className="px-1 pt-3 pb-2 border-t border-border">
+        <div className="inline-flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-[11px] leading-snug text-foreground/75">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary mt-1 flex-shrink-0" />
+          <p>
+            <span className="font-semibold text-foreground">
+              Lens publishes research, not recommendations.
+            </span>{" "}
+            It explains what the model saw and why — not what to buy.
+          </p>
+        </div>
+      </div>
+
       {/* Input */}
-      <div className="flex items-center gap-3 py-3 px-1 border-t border-border">
+      <div className="flex items-center gap-3 py-3 px-1">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-          placeholder="Ask anything about stocks, signals, markets..."
+          placeholder="Ask Lens about a signal, a 7-factor score, or a setup..."
           disabled={sending}
           className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
