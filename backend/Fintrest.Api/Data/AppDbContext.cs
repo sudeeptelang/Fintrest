@@ -39,9 +39,31 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PortfolioAiRecommendation> PortfolioAiRecommendations => Set<PortfolioAiRecommendation>();
     public DbSet<PortfolioRiskMetric> PortfolioRiskMetrics => Set<PortfolioRiskMetric>();
 
+    // Signal Engine v3 foundation (see docs/SIGNALS_V3.md + Migrations/014).
+    // Empty until Milestone 2+ populates them — v2 scoring continues unchanged.
+    public DbSet<FeatureRow> Features => Set<FeatureRow>();
+    public DbSet<FeatureRank> FeatureRanks => Set<FeatureRank>();
+    public DbSet<TickerEarningsProfile> TickerEarningsProfiles => Set<TickerEarningsProfile>();
+    public DbSet<AlgorithmIcHistory> AlgorithmIcHistory => Set<AlgorithmIcHistory>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // ─── Signal Engine v3 foundation ──────────────────────────────────
+        // Composite keys for the feature store. EF Core needs these declared
+        // explicitly since the models use [Column] but no [Key] attributes.
+        modelBuilder.Entity<FeatureRow>()
+            .HasKey(f => new { f.Ticker, f.Date, f.FeatureName });
+
+        modelBuilder.Entity<FeatureRank>()
+            .HasKey(f => new { f.Ticker, f.Date, f.FeatureName });
+
+        modelBuilder.Entity<TickerEarningsProfile>()
+            .HasKey(t => t.Ticker);
+
+        modelBuilder.Entity<AlgorithmIcHistory>()
+            .HasKey(a => new { a.Date, a.Algorithm, a.Regime });
 
         // User — Plan is stored as lowercase text to match the DB's
         // `users_plan_check` constraint (free / starter / pro / premium).

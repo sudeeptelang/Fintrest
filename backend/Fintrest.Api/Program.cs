@@ -56,6 +56,12 @@ builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.ClaudeFinancialAdviso
 builder.Services.AddScoped<Fintrest.Api.Services.AthenaService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.AthenaThesisService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.AthenaNewsService>();
+
+// Signal Engine v3 foundation (docs/SIGNALS_V3.md). Currently scaffolding only —
+// not yet wired into the live scoring pipeline. Milestone 2+ will connect it.
+builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.V3.SectorMap>();
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.FeatureStore>();
+
 builder.Services.AddSingleton<Fintrest.Api.Services.Email.EmailService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Billing.StripeService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Email.AlertDispatcher>();

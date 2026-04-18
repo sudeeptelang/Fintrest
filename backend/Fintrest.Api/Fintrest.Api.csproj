@@ -7,6 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Signal v3 foundation config files — copy to output so the services can read
+         them at runtime regardless of working directory. -->
+    <None Update="Config\sector_map.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Config\scoring_weights_v3.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Anthropic.SDK" Version="5.10.0" />
     <PackageReference Include="Azure.Communication.Email" Version="1.0.1" />
     <PackageReference Include="Stripe.net" Version="47.0.0" />

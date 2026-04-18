@@ -1,0 +1,82 @@
+{
+  "_comment": "Maps S&P 500 tickers to the SPDR sector ETF that represents their sector. Used by algo #14 (sector-relative strength) and by the cross-sectional ranking layer. Unknown tickers fall through to the 'default' key's ETF — update the map as the universe grows.",
+
+  "_etfs": {
+    "XLK":  "Technology",
+    "XLF":  "Financials",
+    "XLV":  "Health Care",
+    "XLY":  "Consumer Discretionary",
+    "XLP":  "Consumer Staples",
+    "XLE":  "Energy",
+    "XLI":  "Industrials",
+    "XLB":  "Materials",
+    "XLU":  "Utilities",
+    "XLRE": "Real Estate",
+    "XLC":  "Communication Services"
+  },
+
+  "default": "SPY",
+
+  "tickers": {
+    "AAPL": "XLK", "MSFT": "XLK", "NVDA": "XLK", "AVGO": "XLK", "ORCL": "XLK",
+    "CRM": "XLK", "ADBE": "XLK", "CSCO": "XLK", "AMD": "XLK", "INTC": "XLK",
+    "QCOM": "XLK", "TXN": "XLK", "IBM": "XLK", "NOW": "XLK", "INTU": "XLK",
+    "AMAT": "XLK", "MU": "XLK", "LRCX": "XLK", "KLAC": "XLK", "ADI": "XLK",
+    "PANW": "XLK", "CRWD": "XLK", "SNOW": "XLK", "MDB": "XLK", "DDOG": "XLK",
+    "NET": "XLK", "ZS": "XLK", "SHOP": "XLK", "WDAY": "XLK", "ANET": "XLK",
+
+    "GOOGL": "XLC", "GOOG": "XLC", "META": "XLC", "NFLX": "XLC", "DIS": "XLC",
+    "TMUS": "XLC", "VZ": "XLC", "T": "XLC", "CMCSA": "XLC", "CHTR": "XLC",
+    "EA": "XLC", "ROKU": "XLC", "SPOT": "XLC", "PINS": "XLC", "SNAP": "XLC",
+
+    "AMZN": "XLY", "TSLA": "XLY", "HD": "XLY", "MCD": "XLY", "NKE": "XLY",
+    "LOW": "XLY", "SBUX": "XLY", "TJX": "XLY", "BKNG": "XLY", "CMG": "XLY",
+    "ORLY": "XLY", "MAR": "XLY", "ABNB": "XLY", "HLT": "XLY", "GM": "XLY",
+    "F": "XLY", "LULU": "XLY", "ROST": "XLY", "AZO": "XLY", "DHI": "XLY",
+
+    "WMT": "XLP", "PG": "XLP", "KO": "XLP", "PEP": "XLP", "COST": "XLP",
+    "PM": "XLP", "MO": "XLP", "MDLZ": "XLP", "CL": "XLP", "KMB": "XLP",
+    "GIS": "XLP", "STZ": "XLP", "TGT": "XLP", "KDP": "XLP", "SYY": "XLP",
+
+    "UNH": "XLV", "JNJ": "XLV", "LLY": "XLV", "ABBV": "XLV", "MRK": "XLV",
+    "PFE": "XLV", "TMO": "XLV", "ABT": "XLV", "DHR": "XLV", "BMY": "XLV",
+    "AMGN": "XLV", "CVS": "XLV", "ISRG": "XLV", "SYK": "XLV", "GILD": "XLV",
+    "VRTX": "XLV", "REGN": "XLV", "BSX": "XLV", "MDT": "XLV", "HUM": "XLV",
+    "CI": "XLV", "ELV": "XLV", "HCA": "XLV", "MRNA": "XLV", "BIIB": "XLV",
+
+    "JPM": "XLF", "V": "XLF", "MA": "XLF", "BAC": "XLF", "WFC": "XLF",
+    "MS": "XLF", "GS": "XLF", "C": "XLF", "AXP": "XLF", "SCHW": "XLF",
+    "BLK": "XLF", "SPGI": "XLF", "CB": "XLF", "CME": "XLF", "ICE": "XLF",
+    "PGR": "XLF", "PNC": "XLF", "USB": "XLF", "MMC": "XLF", "AON": "XLF",
+    "TFC": "XLF", "BK": "XLF", "COF": "XLF", "AMP": "XLF",
+
+    "XOM": "XLE", "CVX": "XLE", "COP": "XLE", "SLB": "XLE", "EOG": "XLE",
+    "OXY": "XLE", "MPC": "XLE", "PSX": "XLE", "VLO": "XLE", "HES": "XLE",
+    "WMB": "XLE", "KMI": "XLE", "OKE": "XLE", "PXD": "XLE", "DVN": "XLE",
+    "BKR": "XLE", "HAL": "XLE",
+
+    "CAT": "XLI", "BA": "XLI", "GE": "XLI", "HON": "XLI", "UNP": "XLI",
+    "UPS": "XLI", "RTX": "XLI", "LMT": "XLI", "DE": "XLI", "ETN": "XLI",
+    "MMM": "XLI", "FDX": "XLI", "NSC": "XLI", "CSX": "XLI", "EMR": "XLI",
+    "ITW": "XLI", "PCAR": "XLI", "NOC": "XLI", "GD": "XLI", "PH": "XLI",
+    "WM": "XLI", "RSG": "XLI",
+
+    "LIN": "XLB", "SHW": "XLB", "APD": "XLB", "ECL": "XLB", "FCX": "XLB",
+    "NEM": "XLB", "DD": "XLB", "DOW": "XLB", "NUE": "XLB", "VMC": "XLB",
+    "MLM": "XLB", "CTVA": "XLB", "IFF": "XLB",
+
+    "NEE": "XLU", "SO": "XLU", "DUK": "XLU", "AEP": "XLU", "D": "XLU",
+    "SRE": "XLU", "XEL": "XLU", "PCG": "XLU", "EXC": "XLU", "PEG": "XLU",
+    "ED": "XLU", "WEC": "XLU", "AWK": "XLU", "ES": "XLU", "EIX": "XLU",
+
+    "PLD": "XLRE", "AMT": "XLRE", "EQIX": "XLRE", "CCI": "XLRE", "PSA": "XLRE",
+    "O": "XLRE", "WELL": "XLRE", "SPG": "XLRE", "DLR": "XLRE", "EQR": "XLRE",
+    "AVB": "XLRE", "VTR": "XLRE", "EXR": "XLRE", "INVH": "XLRE", "SBAC": "XLRE",
+
+    "IBIT": "XLK", "ETHA": "XLK",
+    "SPY": "SPY", "QQQ": "XLK", "DIA": "SPY", "IWM": "SPY",
+    "GLD": "SPY", "SLV": "SPY", "USO": "XLE", "UNG": "XLE",
+    "TLT": "SPY", "IEF": "SPY", "SHY": "SPY", "HYG": "SPY",
+    "EFA": "SPY", "VWO": "SPY", "FXI": "SPY", "EWJ": "SPY", "EWG": "SPY", "EWU": "SPY"
+  }
+}

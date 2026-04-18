@@ -1,0 +1,125 @@
+# ════════════════════════════════════════════════════════════════════════════
+# Signal Engine v3 — Regime-Gated Factor Weights
+# ════════════════════════════════════════════════════════════════════════════
+#
+# Ten factors, weights sum to 1.00 per regime column. See docs/SIGNALS_V3.md §2.
+#
+# Regime classifier (§4) picks the active column each scan based on:
+#   - SPY trend (MA50 vs MA200)
+#   - VIX level + VIX/VIX9D term structure
+#   - Market breadth (% S&P 500 above 50d MA)
+#   - HY credit spread trend (Phase B)
+#
+# Regimes:
+#   - trending_bull:  SPY uptrend + low VIX + positive breadth
+#   - trending_bear:  SPY downtrend + elevated VIX
+#   - chop_low_vol:   Sideways + quiet (<15 VIX)
+#   - chop_high_vol:  Sideways + noisy (>22 VIX)
+#
+# Config-driven so tuning doesn't require a code release. The scoring engine
+# reads this at startup; changes take effect on next scan.
+# ════════════════════════════════════════════════════════════════════════════
+
+factors:
+  # ── Existing v2 factors (re-weighted for v3) ────────────────────────────
+  momentum:
+    base:          0.18
+    trending_bull: 0.22
+    trending_bear: 0.10
+    chop_low_vol:  0.16
+    chop_high_vol: 0.16
+
+  volume:
+    base:          0.10
+    trending_bull: 0.12
+    trending_bear: 0.08
+    chop_low_vol:  0.10
+    chop_high_vol: 0.10
+
+  news_catalyst:
+    base:          0.12
+    trending_bull: 0.13
+    trending_bear: 0.10
+    chop_low_vol:  0.14
+    chop_high_vol: 0.14
+
+  fundamentals:
+    base:          0.15
+    trending_bull: 0.12
+    trending_bear: 0.20
+    chop_low_vol:  0.16
+    chop_high_vol: 0.16
+
+  sentiment:
+    base:          0.08
+    trending_bull: 0.09
+    trending_bear: 0.08
+    chop_low_vol:  0.08
+    chop_high_vol: 0.08
+
+  trend:
+    base:          0.10
+    trending_bull: 0.12
+    trending_bear: 0.06
+    chop_low_vol:  0.08
+    chop_high_vol: 0.08
+
+  risk:
+    base:          0.10
+    trending_bull: 0.06
+    trending_bear: 0.16
+    chop_low_vol:  0.12
+    chop_high_vol: 0.12
+
+  # ── New in v3 ───────────────────────────────────────────────────────────
+  cross_sectional_rank:
+    base:          0.07
+    trending_bull: 0.07
+    trending_bear: 0.08
+    chop_low_vol:  0.08
+    chop_high_vol: 0.08
+
+  estimate_revisions:
+    base:          0.06
+    trending_bull: 0.05
+    trending_bear: 0.08
+    chop_low_vol:  0.05
+    chop_high_vol: 0.05
+
+  macro_context:
+    base:          0.04
+    trending_bull: 0.02
+    trending_bear: 0.06
+    chop_low_vol:  0.03
+    chop_high_vol: 0.03
+
+# ─── Publication thresholds (regime-aware) ────────────────────────────────
+thresholds:
+  buy_today:
+    default:       80
+    trending_bear: 82   # Raise the bar in weak markets
+    chop_high_vol: 82
+  watch_min: 60
+  # Must also rank in the top 30% of sector (cross-sectional gate)
+  min_sector_rank: 0.70
+  # Minimum R:R ratio for BUY_TODAY publication
+  min_risk_reward: 1.5
+  # Confidence penalty applied for signals emitted within 3 trading days of
+  # a regime transition (most failures cluster here).
+  regime_transition_confidence_penalty: -0.15
+
+# ─── Trade zone (v3 target ladders) ───────────────────────────────────────
+trade_zone:
+  entry_atr_multiplier: 0.25
+  stop_atr_multiplier:  1.5
+  # Conviction-based R:R multiplier for the T1 target
+  rr_multiplier:
+    score_95: 3.0
+    score_90: 2.5
+    score_85: 2.2
+    default:  2.0
+  # T1 / T2 / T3 ladder as multiples of risk
+  target_ladder:
+    t1: 1.0
+    t2: 2.0
+    t3: 3.0
