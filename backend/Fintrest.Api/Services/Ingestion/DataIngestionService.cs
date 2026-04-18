@@ -2,6 +2,7 @@ using Fintrest.Api.Data;
 using Fintrest.Api.Models;
 using Fintrest.Api.Services.Providers.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Fintrest.Api.Services.Ingestion;
 
@@ -58,22 +59,42 @@ public class DataIngestionService(
             new ParallelOptions { MaxDegreeOfParallelism = maxParallel, CancellationToken = ct },
             async (ticker, token) =>
             {
-                try
+                // Npgsql 10 + Supabase pgbouncer hits an ObjectDisposedException on
+                // ManualResetEventSlim under concurrent load. EF's EnableRetryOnFailure
+                // doesn't classify it as transient, so we retry at this layer with a
+                // fresh scope + cleared pool. Three attempts is enough in practice.
+                const int maxAttempts = 3;
+                for (int attempt = 1; attempt <= maxAttempts; attempt++)
                 {
-                    // Each parallel slot needs its own scope → its own DbContext + provider
-                    // instances, since DbContext is not thread-safe.
-                    using var scope = scopeFactory.CreateScope();
-                    var svc = scope.ServiceProvider.GetRequiredService<DataIngestionService>();
-                    var counts = await svc.IngestStockAsync(ticker, token);
+                    try
+                    {
+                        // Each parallel slot needs its own scope → its own DbContext +
+                        // provider instances, since DbContext is not thread-safe. A
+                        // retry also gets a *new* scope so we never re-use a broken
+                        // connector.
+                        using var scope = scopeFactory.CreateScope();
+                        var svc = scope.ServiceProvider.GetRequiredService<DataIngestionService>();
+                        var counts = await svc.IngestStockAsync(ticker, token);
 
-                    Interlocked.Add(ref totalBars, counts.Bars);
-                    Interlocked.Add(ref totalFundamentals, counts.Fundamentals);
-                    Interlocked.Add(ref totalNews, counts.News);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Ingestion failed for {Ticker}", ticker);
-                    Interlocked.Increment(ref errors);
+                        Interlocked.Add(ref totalBars, counts.Bars);
+                        Interlocked.Add(ref totalFundamentals, counts.Fundamentals);
+                        Interlocked.Add(ref totalNews, counts.News);
+                        break;
+                    }
+                    catch (Exception ex) when (attempt < maxAttempts && IsTransientConnectorError(ex))
+                    {
+                        logger.LogWarning(
+                            "Transient DB error on {Ticker} (attempt {Attempt}/{Max}); clearing pool and retrying",
+                            ticker, attempt, maxAttempts);
+                        NpgsqlConnection.ClearAllPools();
+                        await Task.Delay(TimeSpan.FromSeconds(1 * attempt), token);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Ingestion failed for {Ticker}", ticker);
+                        Interlocked.Increment(ref errors);
+                        break;
+                    }
                 }
             });
 
@@ -270,5 +291,21 @@ public class DataIngestionService(
         }
 
         return newArticles.Count;
+    }
+
+    private static bool IsTransientConnectorError(Exception ex)
+    {
+        // The specific pattern we see with Npgsql 10 + Supabase pgbouncer:
+        // DbUpdateException → ObjectDisposedException on ManualResetEventSlim.
+        // Also surface raw NpgsqlException/SocketException which are the usual
+        // pool-churn suspects.
+        for (var e = ex; e is not null; e = e.InnerException!)
+        {
+            if (e is ObjectDisposedException) return true;
+            if (e is NpgsqlException) return true;
+            if (e is System.Net.Sockets.SocketException) return true;
+            if (e is TimeoutException) return true;
+        }
+        return false;
     }
 }
