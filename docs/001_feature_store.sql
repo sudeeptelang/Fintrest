@@ -1,9 +1,8 @@
 -- ============================================================================
 -- Fintrest Signal Engine v3 — Milestone 1: Feature Store Foundation
--- Migration: 014_signal_v3_foundation
+-- Migration: 001_feature_store
 -- Target:    PostgreSQL 14+ (Supabase-compatible)
 -- Applies:   additive only, no changes to existing v2 tables
--- Rollback:  see 014_signal_v3_foundation_rollback.sql
 -- ============================================================================
 
 BEGIN;
@@ -139,16 +138,18 @@ CREATE TRIGGER trg_features_asof_check
     BEFORE INSERT OR UPDATE ON features
     FOR EACH ROW EXECUTE FUNCTION check_features_as_of_ts();
 
-
--- ----------------------------------------------------------------------------
--- RLS lockdown — matches the project policy from Migration 013. Backend
--- connects as postgres superuser and bypasses RLS; the anon key gets zero
--- access to these tables.
--- ----------------------------------------------------------------------------
-ALTER TABLE features                ENABLE ROW LEVEL SECURITY;
-ALTER TABLE feature_ranks           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE algorithm_ic_history    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ticker_earnings_profile ENABLE ROW LEVEL SECURITY;
-ALTER TABLE regime_history          ENABLE ROW LEVEL SECURITY;
-
 COMMIT;
+
+-- ============================================================================
+-- Rollback (save separately as 001_feature_store_rollback.sql):
+--
+-- BEGIN;
+-- DROP TRIGGER IF EXISTS trg_features_asof_check ON features;
+-- DROP FUNCTION IF EXISTS check_features_as_of_ts();
+-- DROP TABLE IF EXISTS regime_history;
+-- DROP TABLE IF EXISTS ticker_earnings_profile;
+-- DROP TABLE IF EXISTS algorithm_ic_history;
+-- DROP TABLE IF EXISTS feature_ranks;
+-- DROP TABLE IF EXISTS features;
+-- COMMIT;
+-- ============================================================================
