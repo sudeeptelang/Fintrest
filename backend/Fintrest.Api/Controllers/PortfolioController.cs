@@ -148,9 +148,12 @@ public class PortfolioController(
 
         var holdings = await portfolioService.GetHoldings(userId, id);
 
-        // Batch-load the last 2 bars per stock so we can surface today's % move on the holdings table
-        // without an N+1 price lookup.
+        // Batch-load recent bars once so we can compute BOTH the fresh current price and
+        // today's % move without N+1 lookups. We don't want to trust `holding.CurrentPrice`
+        // from the DB — it's only refreshed by the 6:30 AM cron, so any holding added
+        // mid-day shows a stale price until the next run.
         var stockIds = holdings.Select(h => h.StockId).Distinct().ToList();
+        var latestPriceByStock = new Dictionary<long, double>();
         var dayChangeByStock = new Dictionary<long, double>();
         if (stockIds.Count > 0)
         {
@@ -164,6 +167,8 @@ public class PortfolioController(
             {
                 var sorted = grp.OrderByDescending(b => b.Ts).Take(2).ToList();
                 var latest = sorted[0];
+                latestPriceByStock[grp.Key] = latest.Close;
+
                 double? prev = latest.PrevClose;
                 if (prev is null or 0 && sorted.Count > 1) prev = sorted[1].Close;
                 if (prev is > 0)
@@ -176,10 +181,22 @@ public class PortfolioController(
         {
             var signalScore = await portfolioService.GetLatestSignalScore(h.StockId);
             double? dayChange = dayChangeByStock.TryGetValue(h.StockId, out var d) ? d : null;
+
+            // Prefer the fresh price from the latest bar. Fall back to the persisted
+            // CurrentPrice only if we have no market data for this ticker at all.
+            double currentPrice = latestPriceByStock.TryGetValue(h.StockId, out var live) && live > 0
+                ? live
+                : h.CurrentPrice;
+            double currentValue    = h.Quantity * currentPrice;
+            double unrealizedPnl   = currentValue - h.Quantity * h.AvgCost;
+            double unrealizedPnlPct = h.AvgCost > 0
+                ? (currentPrice - h.AvgCost) / h.AvgCost * 100
+                : 0;
+
             responses.Add(new HoldingResponse(
                 h.Id, h.StockId, h.Stock.Ticker, h.Stock.Name,
-                h.Quantity, h.AvgCost, h.CurrentPrice, h.CurrentValue,
-                h.UnrealizedPnl, h.UnrealizedPnlPct, signalScore, dayChange
+                h.Quantity, h.AvgCost, currentPrice, currentValue,
+                unrealizedPnl, unrealizedPnlPct, signalScore, dayChange
             ));
         }
 
