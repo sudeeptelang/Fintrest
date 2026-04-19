@@ -283,19 +283,28 @@ public class PortfolioController(
             .FirstOrDefaultAsync(p => p.Id == id && p.UserId == _uid);
         if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
 
-        var latestRisk = await db.Set<Models.PortfolioRiskMetric>()
-            .Where(r => r.PortfolioId == id)
-            .OrderByDescending(r => r.Date)
-            .FirstOrDefaultAsync();
-
-        var riskResponse = latestRisk is not null
-            ? new RiskMetricsResponse(
-                latestRisk.Date, latestRisk.SharpeRatio, latestRisk.SortinoRatio,
-                latestRisk.MaxDrawdown, latestRisk.Beta, latestRisk.Var95,
-                latestRisk.Volatility, latestRisk.TotalReturn)
-            : null;
-
         var holdings = portfolio.Holdings.ToList();
+
+        // Prefer fresh on-demand metrics (90-day window from market_data × holdings)
+        // over the cron-persisted row, which may be days stale or entirely absent for
+        // portfolios that haven't cycled through the daily job yet.
+        var riskResponse = await ComputeRiskMetricsAsync(holdings, windowDays: 90);
+        if (riskResponse is null)
+        {
+            // Fallback to last persisted metric if on-demand compute had too little data
+            // (tiny portfolio, missing bars).
+            var latestRisk = await db.Set<Models.PortfolioRiskMetric>()
+                .Where(r => r.PortfolioId == id)
+                .OrderByDescending(r => r.Date)
+                .FirstOrDefaultAsync();
+            if (latestRisk is not null)
+            {
+                riskResponse = new RiskMetricsResponse(
+                    latestRisk.Date, latestRisk.SharpeRatio, latestRisk.SortinoRatio,
+                    latestRisk.MaxDrawdown, latestRisk.Beta, latestRisk.Var95,
+                    latestRisk.Volatility, latestRisk.TotalReturn);
+            }
+        }
         var sectorAllocation = riskAnalytics.GetSectorAllocation(holdings);
 
         var topHoldings = holdings
@@ -573,6 +582,114 @@ public class PortfolioController(
 
         var analysis = await claudeAdvisor.AnalyzePortfolioAsync(id, ct);
         return Ok(analysis);
+    }
+
+    /// <summary>
+    /// Compute Sharpe / Sortino / drawdown / beta / VaR / volatility on-demand from
+    /// market_data. Rebuilds the portfolio value series day-by-day using current
+    /// holdings × each day's closing price (so the returned metrics reflect the
+    /// CURRENT book — historical rebalancing is ignored on purpose; the user wants
+    /// "how risky is what I'm holding right now"). Beta is measured against SPY.
+    /// Returns null when there's too little data (&lt; 20 trading days) so the UI
+    /// shows an empty state rather than misleading numbers.
+    /// </summary>
+    private async Task<RiskMetricsResponse?> ComputeRiskMetricsAsync(
+        List<Models.PortfolioHolding> holdings, int windowDays)
+    {
+        if (holdings.Count == 0) return null;
+
+        var stockIds = holdings.Select(h => h.StockId).Distinct().ToList();
+        var fromDate = DateTime.UtcNow.AddDays(-windowDays);
+
+        var bars = await db.MarketData
+            .Where(m => stockIds.Contains(m.StockId) && m.Ts >= fromDate)
+            .Select(m => new { m.StockId, m.Ts, m.Close })
+            .ToListAsync();
+
+        // Pivot: barsByDay[date][stockId] = close.
+        var barsByDay = bars
+            .GroupBy(b => b.Ts.Date)
+            .OrderBy(g => g.Key)
+            .Select(g => new
+            {
+                Date = g.Key,
+                Closes = g.ToDictionary(b => b.StockId, b => b.Close),
+            })
+            .ToList();
+
+        if (barsByDay.Count < 20) return null;
+
+        // Portfolio value per day = sum(qty × close); skip days where any holding's
+        // bar is missing so we don't create phantom daily returns.
+        var portfolioValues = new List<double>();
+        foreach (var day in barsByDay)
+        {
+            double value = 0;
+            bool complete = true;
+            foreach (var h in holdings)
+            {
+                if (!day.Closes.TryGetValue(h.StockId, out var close))
+                {
+                    complete = false;
+                    break;
+                }
+                value += h.Quantity * close;
+            }
+            if (complete && value > 0) portfolioValues.Add(value);
+        }
+        if (portfolioValues.Count < 20) return null;
+
+        // Daily log-return-ish (simple pct return). Array of length N-1.
+        var dailyReturns = new List<double>();
+        for (int i = 1; i < portfolioValues.Count; i++)
+        {
+            var prev = portfolioValues[i - 1];
+            if (prev > 0) dailyReturns.Add((portfolioValues[i] - prev) / prev);
+        }
+
+        // Beta vs SPY over the same window, aligned on dates.
+        List<double>? spyReturns = null;
+        var spyStock = await db.Stocks.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Ticker == "SPY");
+        if (spyStock is not null)
+        {
+            var spyBars = await db.MarketData
+                .Where(m => m.StockId == spyStock.Id && m.Ts >= fromDate)
+                .OrderBy(m => m.Ts)
+                .Select(m => m.Close)
+                .ToListAsync();
+            if (spyBars.Count >= 2)
+            {
+                spyReturns = new List<double>();
+                for (int i = 1; i < spyBars.Count; i++)
+                {
+                    var prev = spyBars[i - 1];
+                    if (prev > 0) spyReturns.Add((spyBars[i] - prev) / prev);
+                }
+            }
+        }
+
+        var sharpe     = riskAnalytics.CalculateSharpeRatio(dailyReturns);
+        var sortino    = riskAnalytics.CalculateSortinoRatio(dailyReturns);
+        var maxDd      = riskAnalytics.CalculateMaxDrawdown(portfolioValues);
+        var var95      = riskAnalytics.CalculateVar95(dailyReturns);
+        var volatility = riskAnalytics.CalculateVolatility(dailyReturns);
+        var beta       = spyReturns is not null
+            ? riskAnalytics.CalculateBeta(dailyReturns, spyReturns)
+            : null;
+
+        // Total return over the window — for the UI, same convention as Sharpe numerator.
+        var totalRet = portfolioValues[^1] / portfolioValues[0] - 1;
+
+        return new RiskMetricsResponse(
+            Date:          DateTime.UtcNow.Date,
+            SharpeRatio:   sharpe,
+            SortinoRatio:  sortino,
+            MaxDrawdown:   maxDd,
+            Beta:          beta,
+            Var95:         var95,
+            Volatility:    volatility,
+            TotalReturn:   totalRet);
     }
 }
 

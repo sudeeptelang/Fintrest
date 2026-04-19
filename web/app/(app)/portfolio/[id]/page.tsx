@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api, type Holding, type PortfolioReturnBreakdown } from "@/lib/api";
+import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics } from "@/lib/api";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-profile";
 
@@ -181,6 +181,13 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
           hidden on the demo portfolio (no txns) and while loading. */}
       {!usingDemoData && returns && returns.costBasis > 0 && (
         <ReturnBreakdownCard data={returns} />
+      )}
+
+      {/* Risk metrics — pillar #2. Sharpe / Sortino / drawdown / beta /
+          volatility / VaR as a 6-cell grid. Only renders when the analytics
+          endpoint returned metrics. */}
+      {!usingDemoData && analytics?.riskMetrics && (
+        <RiskMetricsCard metrics={analytics.riskMetrics} />
       )}
 
       {/* Lens profile — factor radar + signal mix + regime. Only renders when the advisor
@@ -396,6 +403,97 @@ function ReturnBreakdownCard({ data }: { data: PortfolioReturnBreakdown }) {
             ${data.currentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </span>
         </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Risk metrics grid (pillar #2). Surfaces the numbers the backend already computes
+ * — Sharpe, Sortino, Max drawdown, Beta, Volatility, VaR 95% — so users don't have
+ * to take our "health score" on faith. Color coding is directional, not diagnostic:
+ * a higher Sharpe is usually better, a higher drawdown is usually worse, Beta near
+ * 1.0 means "moves with the market."
+ */
+function RiskMetricsCard({ metrics }: { metrics: RiskMetrics }) {
+  const cells: Array<{
+    label: string;
+    value: string;
+    hint: string;
+    good: boolean | null;
+  }> = [
+    {
+      label: "Sharpe Ratio",
+      value: metrics.sharpeRatio != null ? metrics.sharpeRatio.toFixed(2) : "—",
+      hint: "Return per unit of total risk · higher is better",
+      good: metrics.sharpeRatio != null ? metrics.sharpeRatio >= 1.0 : null,
+    },
+    {
+      label: "Sortino Ratio",
+      value: metrics.sortinoRatio != null ? metrics.sortinoRatio.toFixed(2) : "—",
+      hint: "Return per unit of downside risk · higher is better",
+      good: metrics.sortinoRatio != null ? metrics.sortinoRatio >= 1.5 : null,
+    },
+    {
+      label: "Max Drawdown",
+      value: metrics.maxDrawdown != null ? `-${(metrics.maxDrawdown * 100).toFixed(1)}%` : "—",
+      hint: "Worst peak-to-trough loss · lower is better",
+      good: metrics.maxDrawdown != null ? metrics.maxDrawdown < 0.20 : null,
+    },
+    {
+      label: "Beta (vs SPY)",
+      value: metrics.beta != null ? metrics.beta.toFixed(2) : "—",
+      hint: "Sensitivity to S&P 500 · 1.0 = market · >1 = amplified",
+      good: null, // directional, not judgmental
+    },
+    {
+      label: "Volatility",
+      value: metrics.volatility != null ? `${(metrics.volatility * 100).toFixed(1)}%` : "—",
+      hint: "Annualized standard deviation of returns",
+      good: metrics.volatility != null ? metrics.volatility < 0.25 : null,
+    },
+    {
+      label: "VaR 95%",
+      value: metrics.var95 != null ? `${(metrics.var95 * 100).toFixed(2)}%` : "—",
+      hint: "Expected worst daily loss 95% of the time",
+      good: null,
+    },
+  ];
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+      <div className="flex items-baseline justify-between gap-4 mb-5 flex-wrap">
+        <div>
+          <h3 className="font-[var(--font-heading)] text-base font-semibold">Risk profile</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Measured over the last 90 trading days · recomputed each request
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        {cells.map((cell) => (
+          <div
+            key={cell.label}
+            className="rounded-lg border border-border bg-background/50 p-3.5"
+          >
+            <p className="text-[11px] text-muted-foreground">{cell.label}</p>
+            <p
+              className={`font-[var(--font-mono)] text-xl font-semibold mt-1 ${
+                cell.good === true
+                  ? "text-emerald-500"
+                  : cell.good === false
+                  ? "text-amber-500"
+                  : "text-foreground"
+              }`}
+            >
+              {cell.value}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
+              {cell.hint}
+            </p>
+          </div>
+        ))}
       </div>
     </div>
   );
