@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics, type PortfolioRating } from "@/lib/api";
+import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics, type PortfolioRating, type AdvisorResult } from "@/lib/api";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-profile";
 
@@ -159,6 +159,17 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
     enabled: !usingDemoData,
   });
 
+  // Tab state — Holdings / Returns / Narratives. Holdings is default since
+  // that's the operational view; Returns is the analysis; Narratives surfaces
+  // advisor text + Lens AI write-ups.
+  type PortfolioTab = "holdings" | "returns" | "narratives";
+  const [activeTab, setActiveTab] = useState<PortfolioTab>("holdings");
+
+  // Unify demo + live sources so the rest of the render branches on one variable.
+  const activeReturns = usingDemoData ? DEMO_RETURNS : returns;
+  const activeRating  = usingDemoData ? DEMO_RATING  : rating;
+  const activeRisk    = usingDemoData ? DEMO_RISK    : analytics?.riskMetrics;
+
   // Sortable holdings
   type HoldingSortKey = "ticker" | "shares" | "avgCost" | "price" | "fairValue" | "dayChange" | "value" | "pnl" | "signal";
   type SortDir = "asc" | "desc";
@@ -219,75 +230,73 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
         </Link>
       </div>
 
-      {/* Summary row */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground mb-1">Total Value</p>
-          <p className="font-[var(--font-mono)] text-2xl font-bold">${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground mb-1">Unrealized P&L</p>
-          <p className={`font-[var(--font-mono)] text-2xl font-bold ${totalPnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-            {totalPnl >= 0 ? "+" : ""}${totalPnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-          </p>
-          <p className={`text-xs font-medium mt-0.5 ${totalPnlPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}%
-          </p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground mb-1">Health Score</p>
-          <div className="flex items-center gap-2">
-            <p className="font-[var(--font-heading)] text-2xl font-bold">
-              {usingDemoData
-                ? 78
-                : Math.round(analytics?.healthScore ?? advisorData?.healthScore ?? 0)}
-            </p>
-            <span className="text-xs text-muted-foreground">/ 100</span>
-          </div>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground mb-1">Recommendations</p>
-          <p className="font-[var(--font-heading)] text-2xl font-bold">
-            {usingDemoData ? 4 : (advisorData?.recommendations?.length ?? 0)}
-          </p>
-          {usingDemoData ? (
-            <p className="text-[10px] text-muted-foreground mt-0.5">sample · rebalance + tax-loss</p>
-          ) : (advisorData?.alerts?.length ?? 0) > 0 && (
-            <p className="text-xs text-amber-400 mt-0.5 flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> {advisorData!.alerts.length} alerts
-            </p>
-          )}
-        </div>
+      {/* SimplyWall.st-style 6-card KPI strip. Each card shows $ + % in the
+          same footprint so the whole header tells the full lifetime story at
+          a glance. Falls back to "—" on cards we can't fill for a new
+          portfolio (e.g. no SPY alpha until 7 days of history). */}
+      <PortfolioKpiStrip
+        totalValue={totalValue}
+        holdingsCount={holdings?.length ?? 0}
+        returns={activeReturns}
+        advisorData={advisorData}
+      />
+
+      {/* Tabs: Holdings / Returns / Narratives */}
+      <div className="border-b border-border">
+        <nav className="flex gap-1 -mb-px">
+          {([
+            ["holdings",   "Holdings"],
+            ["returns",    "Returns"],
+            ["narratives", "Narratives"],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === key
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
       </div>
 
-      {/* Letter-grade rating card. Real portfolios pull from the advisor compute;
-          demo uses fixed sample data so the layout + color treatment is always
-          visible. */}
-      {(() => {
-        const r = usingDemoData ? DEMO_RATING : rating;
-        return r && r.coverage > 0 ? <PortfolioRatingCard rating={r} /> : null;
-      })()}
-
-      {/* Return breakdown — three-source split + SPY alpha. */}
-      {(() => {
-        const r = usingDemoData ? DEMO_RETURNS : returns;
-        return r && r.costBasis > 0 ? <ReturnBreakdownCard data={r} /> : null;
-      })()}
-
-      {/* Risk metrics — 6-cell grid. */}
-      {(() => {
-        const m = usingDemoData ? DEMO_RISK : analytics?.riskMetrics;
-        return m ? <RiskMetricsCard metrics={m} /> : null;
-      })()}
-
-      {/* Lens profile — factor radar + signal mix + regime. Only renders when the advisor
-          call succeeds; if it errored (known Npgsql disposed-connector issue during scans,
-          or stale advisor record), we skip it rather than crash the whole page. */}
-      {!advisorErrored && advisorData && (
-        <PortfolioAthenaProfile advisor={advisorData} />
+      {/* --- Returns tab: analysis cards --- */}
+      {activeTab === "returns" && (
+        <div className="space-y-6">
+          {activeRating && activeRating.coverage > 0 && (
+            <PortfolioRatingCard rating={activeRating} />
+          )}
+          {activeReturns && activeReturns.costBasis > 0 && (
+            <ReturnBreakdownCard data={activeReturns} />
+          )}
+          {activeRisk && <RiskMetricsCard metrics={activeRisk} />}
+          {!advisorErrored && advisorData && (
+            <PortfolioAthenaProfile advisor={advisorData} />
+          )}
+          {!activeRating && !activeReturns && !activeRisk && !advisorData && (
+            <EmptyTabState
+              title="No analysis yet"
+              body="Analysis populates once the daily scan runs against your holdings. Check back after 6:30 AM ET."
+            />
+          )}
+        </div>
       )}
 
-      {/* Holdings table */}
+      {/* --- Narratives tab: advisor recommendations + AI analysis --- */}
+      {activeTab === "narratives" && (
+        <NarrativesPanel
+          advisorData={advisorData}
+          advisorErrored={advisorErrored}
+          usingDemoData={usingDemoData}
+        />
+      )}
+
+      {/* --- Holdings tab --- */}
+      {activeTab === "holdings" && (
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="p-5 border-b border-border flex items-center justify-between">
           <h2 className="font-[var(--font-heading)] text-lg font-semibold">Holdings</h2>
@@ -407,6 +416,215 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
           </table>
         </div>
       </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 6-card KPI strip that sits under the page title. Compact per-card footprint
+ * (label top, big number middle, secondary metric small underneath) so the
+ * full return story fits at a glance on one row. Cards gracefully fall back
+ * to "—" when data is missing (new portfolio, short history, no SPY bars).
+ */
+function PortfolioKpiStrip({
+  totalValue,
+  holdingsCount,
+  returns,
+  advisorData,
+}: {
+  totalValue: number;
+  holdingsCount: number;
+  returns: PortfolioReturnBreakdown | null | undefined;
+  advisorData: AdvisorResult | null | undefined;
+}) {
+  const fmt$ = (n: number, sign = true) => {
+    const s = n >= 0 ? (sign ? "+" : "") : "−";
+    return `${s}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  };
+  const fmtPct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+
+  const unrealizedPct = returns && returns.costBasis > 0
+    ? (returns.unrealizedPnl / returns.costBasis) * 100
+    : null;
+  const realizedPct = returns && returns.costBasis > 0
+    ? (returns.realizedPnl / returns.costBasis) * 100
+    : null;
+  const divYieldPct = returns && returns.costBasis > 0
+    ? (returns.dividendsReceived / returns.costBasis) * 100
+    : null;
+
+  const cards: Array<{
+    label: string;
+    value: string;
+    sub?: string;
+    tone?: "pos" | "neg" | "neutral" | "primary";
+  }> = [
+    {
+      label: "Total Value",
+      value: `$${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+      sub: `${holdingsCount} ${holdingsCount === 1 ? "holding" : "holdings"}`,
+      tone: "neutral",
+    },
+    {
+      label: "Total Return",
+      value: returns ? fmtPct(returns.totalReturnPct) : "—",
+      sub: returns?.annualizedReturnPct != null
+        ? `${fmtPct(returns.annualizedReturnPct)} CAGR`
+        : "awaiting 30d",
+      tone: returns ? (returns.totalReturnPct >= 0 ? "pos" : "neg") : "neutral",
+    },
+    {
+      label: "Unrealized",
+      value: returns ? fmt$(returns.unrealizedPnl) : "—",
+      sub: unrealizedPct != null ? fmtPct(unrealizedPct) : undefined,
+      tone: returns ? (returns.unrealizedPnl >= 0 ? "pos" : "neg") : "neutral",
+    },
+    {
+      label: "Realized",
+      value: returns ? fmt$(returns.realizedPnl) : "—",
+      sub: realizedPct != null ? fmtPct(realizedPct) : undefined,
+      tone: returns ? (returns.realizedPnl >= 0 ? "pos" : "neg") : "neutral",
+    },
+    {
+      label: "Dividends",
+      value: returns ? `$${returns.dividendsReceived.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—",
+      sub: divYieldPct != null ? `${divYieldPct.toFixed(1)}% yield` : undefined,
+      tone: "neutral",
+    },
+    {
+      label: "Alpha vs SPY",
+      value: returns?.alphaPct != null ? fmtPct(returns.alphaPct) : "—",
+      sub: returns?.benchmarkReturnPct != null
+        ? `SPY ${fmtPct(returns.benchmarkReturnPct)}`
+        : "awaiting history",
+      tone: returns?.alphaPct != null
+        ? (returns.alphaPct >= 0 ? "primary" : "neg")
+        : "neutral",
+    },
+  ];
+
+  // Silence lint: advisorData available for future "alerts" pill but not used
+  // on every card — intentional, keeping the hook for when we add "Alerts" card.
+  void advisorData;
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {cards.map((c) => {
+        const valueColor =
+          c.tone === "pos"     ? "text-emerald-500" :
+          c.tone === "neg"     ? "text-red-500"     :
+          c.tone === "primary" ? "text-primary"     :
+                                 "text-foreground";
+        return (
+          <div key={c.label} className="rounded-xl border border-border bg-card p-4">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{c.label}</p>
+            <p className={`font-[var(--font-mono)] text-xl font-bold mt-1 ${valueColor}`}>
+              {c.value}
+            </p>
+            {c.sub && <p className="text-[11px] text-muted-foreground mt-1">{c.sub}</p>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Narratives tab content. Shows the Lens thesis write-ups, advisor
+ * recommendations, and alerts together — the "why things look the way they
+ * look" narrative layer on top of the Returns tab's numbers.
+ */
+function NarrativesPanel({
+  advisorData,
+  advisorErrored,
+  usingDemoData,
+}: {
+  advisorData: AdvisorResult | null | undefined;
+  advisorErrored: boolean;
+  usingDemoData: boolean;
+}) {
+  const recs = advisorData?.recommendations ?? [];
+  const alerts = advisorData?.alerts ?? [];
+
+  if (usingDemoData) {
+    return (
+      <EmptyTabState
+        title="Narratives are a live-portfolio feature"
+        body="Upload your own portfolio to see Lens's research on each holding + rebalance guidance."
+      />
+    );
+  }
+
+  if (advisorErrored && recs.length === 0 && alerts.length === 0) {
+    return (
+      <EmptyTabState
+        title="Narrative write-ups not available"
+        body="The advisor run didn't complete for this portfolio. Try again after the next scan."
+      />
+    );
+  }
+
+  if (recs.length === 0 && alerts.length === 0) {
+    return (
+      <EmptyTabState
+        title="No narratives yet"
+        body="Lens generates a narrative for each holding after the daily scan. Check back after 6:30 AM ET."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {alerts.length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <h3 className="font-semibold text-sm">Alerts</h3>
+          </div>
+          <ul className="space-y-2 text-sm">
+            {alerts.map((a, i) => (
+              <li key={i} className="text-foreground/80 leading-relaxed">• {a}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {recs.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="font-semibold text-sm mb-4">Recommendations</h3>
+          <div className="space-y-3">
+            {recs.map((r) => (
+              <div key={r.id} className="rounded-lg border border-border bg-background/50 p-3">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                    {r.type}
+                  </span>
+                  {r.ticker && (
+                    <span className="font-[var(--font-mono)] text-xs font-semibold">
+                      {r.ticker}
+                    </span>
+                  )}
+                  <span className="text-xs font-medium text-foreground/75">{r.action}</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">
+                    {Math.round(r.confidence * 100)}% confidence
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{r.reasoning}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmptyTabState({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-card/50 p-10 text-center">
+      <p className="font-semibold text-sm">{title}</p>
+      <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">{body}</p>
     </div>
   );
 }
@@ -415,7 +633,6 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
  * Total-return decomposition card. Shows the three sources of a portfolio's
  * lifetime return side-by-side (price appreciation / realized gains / dividends)
  * plus annualized CAGR so large absolute returns are contextualized by time held.
- * Mirrors SimplyWall.st's demo portfolio header pattern.
  */
 function ReturnBreakdownCard({ data }: { data: PortfolioReturnBreakdown }) {
   const fmt$ = (n: number) => {
