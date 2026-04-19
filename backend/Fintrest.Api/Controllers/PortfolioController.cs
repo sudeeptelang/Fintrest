@@ -148,16 +148,17 @@ public class PortfolioController(
 
         var holdings = await portfolioService.GetHoldings(userId, id);
 
-        // Batch-load recent bars once so we can compute BOTH the fresh current price and
-        // today's % move without N+1 lookups. We don't want to trust `holding.CurrentPrice`
-        // from the DB — it's only refreshed by the 6:30 AM cron, so any holding added
-        // mid-day shows a stale price until the next run.
+        // Batch-load ~90 days of bars once so we can compute the fresh current price,
+        // today's % move, AND build the 60-day sparkline in a single query. Can't trust
+        // holding.CurrentPrice from the DB — it's only refreshed by the 6:30 AM cron,
+        // so any holding added mid-day shows a stale price until the next run.
         var stockIds = holdings.Select(h => h.StockId).Distinct().ToList();
-        var latestPriceByStock = new Dictionary<long, double>();
-        var dayChangeByStock = new Dictionary<long, double>();
+        var latestPriceByStock   = new Dictionary<long, double>();
+        var dayChangeByStock     = new Dictionary<long, double>();
+        var priceHistoryByStock  = new Dictionary<long, double[]>();
         if (stockIds.Count > 0)
         {
-            var cutoff = DateTime.UtcNow.AddDays(-14);
+            var cutoff = DateTime.UtcNow.AddDays(-90);
             var recentBars = await db.MarketData
                 .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
                 .Select(m => new { m.StockId, m.Ts, m.Close, m.PrevClose })
@@ -165,14 +166,20 @@ public class PortfolioController(
 
             foreach (var grp in recentBars.GroupBy(b => b.StockId))
             {
-                var sorted = grp.OrderByDescending(b => b.Ts).Take(2).ToList();
-                var latest = sorted[0];
+                var sortedAsc = grp.OrderBy(b => b.Ts).ToList();
+                if (sortedAsc.Count == 0) continue;
+
+                var latest = sortedAsc[^1];
                 latestPriceByStock[grp.Key] = latest.Close;
 
                 double? prev = latest.PrevClose;
-                if (prev is null or 0 && sorted.Count > 1) prev = sorted[1].Close;
+                if ((prev is null or 0) && sortedAsc.Count > 1) prev = sortedAsc[^2].Close;
                 if (prev is > 0)
                     dayChangeByStock[grp.Key] = Math.Round((latest.Close - prev.Value) / prev.Value * 100, 2);
+
+                // Sparkline: take the last 60 closes, already ordered ascending.
+                var history = sortedAsc.TakeLast(60).Select(b => b.Close).ToArray();
+                if (history.Length >= 2) priceHistoryByStock[grp.Key] = history;
             }
         }
 
@@ -201,11 +208,14 @@ public class PortfolioController(
             if (fairValue is > 0 && currentPrice > 0)
                 fairValueDiscountPct = (fairValue.Value - currentPrice) / currentPrice * 100;
 
+            priceHistoryByStock.TryGetValue(h.StockId, out var priceHistory);
+
             responses.Add(new HoldingResponse(
                 h.Id, h.StockId, h.Stock.Ticker, h.Stock.Name,
                 h.Quantity, h.AvgCost, currentPrice, currentValue,
                 unrealizedPnl, unrealizedPnlPct, signalScore, dayChange,
-                fairValue, fairValueDiscountPct
+                fairValue, fairValueDiscountPct,
+                priceHistory
             ));
         }
 

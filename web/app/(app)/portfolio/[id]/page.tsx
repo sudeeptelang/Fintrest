@@ -14,16 +14,87 @@ import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-
 // holdings (empty or error), so the page never renders blank for a demo link. Values are
 // calibrated for April 2026: NVDA reflects the June 2024 10:1 split (~$52 cost basis,
 // not the pre-split $520), and prices approximate quote levels on the backfill cutoff.
+// Synthetic sparkline — smooth 60-point random walk starting from a given base
+// and ending near a given multiplier, so it visually matches the holding's
+// actual gain/loss. Seeded by ticker so each row renders the same chart on
+// re-renders (not cryptographically random, just stable).
+function makeSparkline(seed: string, startClose: number, endClose: number): number[] {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const rnd = () => {
+    h = (h * 1664525 + 1013904223) >>> 0;
+    return (h & 0xffffffff) / 0xffffffff;
+  };
+  const n = 60;
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const drift = startClose + (endClose - startClose) * t;
+    const noise = (rnd() - 0.5) * startClose * 0.04;
+    out.push(Math.max(0.01, drift + noise));
+  }
+  out[0] = startClose;
+  out[n - 1] = endClose;
+  return out;
+}
+
 const DEMO_HOLDINGS: Holding[] = [
-  { id: 1001, stockId: 1, ticker: "AAPL",  stockName: "Apple Inc.",              quantity: 50,  avgCost: 165.20, currentPrice: 215.40, currentValue: 10770.0, unrealizedPnl: 2510.0,  unrealizedPnlPct: 30.39, signalScore: 74, dayChangePct: 0.85,  fairValue: 228.00, fairValueDiscountPct: 5.85   },
-  { id: 1002, stockId: 2, ticker: "MSFT",  stockName: "Microsoft Corp.",         quantity: 25,  avgCost: 380.50, currentPrice: 455.30, currentValue: 11382.5, unrealizedPnl: 1870.0,  unrealizedPnlPct: 19.66, signalScore: 82, dayChangePct: 1.20,  fairValue: 495.00, fairValueDiscountPct: 8.72   },
-  { id: 1003, stockId: 3, ticker: "NVDA",  stockName: "NVIDIA Corp.",            quantity: 300, avgCost: 52.00,  currentPrice: 142.60, currentValue: 42780.0, unrealizedPnl: 27180.0, unrealizedPnlPct: 174.23, signalScore: 89, dayChangePct: 2.40, fairValue: 165.00, fairValueDiscountPct: 15.71  },
-  { id: 1004, stockId: 4, ticker: "GOOGL", stockName: "Alphabet Inc. Class A",   quantity: 20,  avgCost: 138.80, currentPrice: 178.20, currentValue: 3564.0,  unrealizedPnl: 788.0,   unrealizedPnlPct: 28.39, signalScore: 68, dayChangePct: -0.25, fairValue: 195.00, fairValueDiscountPct: 9.43   },
-  { id: 1005, stockId: 5, ticker: "AMZN",  stockName: "Amazon.com Inc.",         quantity: 15,  avgCost: 142.50, currentPrice: 205.90, currentValue: 3088.5,  unrealizedPnl: 951.0,   unrealizedPnlPct: 44.49, signalScore: 76, dayChangePct: 1.50,  fairValue: 235.00, fairValueDiscountPct: 14.13  },
-  { id: 1006, stockId: 6, ticker: "META",  stockName: "Meta Platforms Inc.",     quantity: 12,  avgCost: 420.00, currentPrice: 575.10, currentValue: 6901.2,  unrealizedPnl: 1861.2,  unrealizedPnlPct: 36.93, signalScore: 80, dayChangePct: 0.95,  fairValue: 610.00, fairValueDiscountPct: 6.07   },
-  { id: 1007, stockId: 7, ticker: "TSLA",  stockName: "Tesla Inc.",              quantity: 20,  avgCost: 280.00, currentPrice: 234.50, currentValue: 4690.0,  unrealizedPnl: -910.0,  unrealizedPnlPct: -16.25, signalScore: 46, dayChangePct: -1.80, fairValue: 210.00, fairValueDiscountPct: -10.45 },
-  { id: 1008, stockId: 8, ticker: "JPM",   stockName: "JPMorgan Chase & Co.",    quantity: 25,  avgCost: 175.40, currentPrice: 238.80, currentValue: 5970.0,  unrealizedPnl: 1585.0,  unrealizedPnlPct: 36.15, signalScore: 72, dayChangePct: 0.35,  fairValue: 252.00, fairValueDiscountPct: 5.53   },
+  { id: 1001, stockId: 1, ticker: "AAPL",  stockName: "Apple Inc.",              quantity: 50,  avgCost: 165.20, currentPrice: 215.40, currentValue: 10770.0, unrealizedPnl: 2510.0,  unrealizedPnlPct: 30.39, signalScore: 74, dayChangePct: 0.85,  fairValue: 228.00, fairValueDiscountPct: 5.85,   priceHistory60d: makeSparkline("AAPL", 195.00, 215.40) },
+  { id: 1002, stockId: 2, ticker: "MSFT",  stockName: "Microsoft Corp.",         quantity: 25,  avgCost: 380.50, currentPrice: 455.30, currentValue: 11382.5, unrealizedPnl: 1870.0,  unrealizedPnlPct: 19.66, signalScore: 82, dayChangePct: 1.20,  fairValue: 495.00, fairValueDiscountPct: 8.72,   priceHistory60d: makeSparkline("MSFT", 420.00, 455.30) },
+  { id: 1003, stockId: 3, ticker: "NVDA",  stockName: "NVIDIA Corp.",            quantity: 300, avgCost: 52.00,  currentPrice: 142.60, currentValue: 42780.0, unrealizedPnl: 27180.0, unrealizedPnlPct: 174.23, signalScore: 89, dayChangePct: 2.40, fairValue: 165.00, fairValueDiscountPct: 15.71,  priceHistory60d: makeSparkline("NVDA", 118.00, 142.60) },
+  { id: 1004, stockId: 4, ticker: "GOOGL", stockName: "Alphabet Inc. Class A",   quantity: 20,  avgCost: 138.80, currentPrice: 178.20, currentValue: 3564.0,  unrealizedPnl: 788.0,   unrealizedPnlPct: 28.39, signalScore: 68, dayChangePct: -0.25, fairValue: 195.00, fairValueDiscountPct: 9.43,   priceHistory60d: makeSparkline("GOOGL", 165.00, 178.20) },
+  { id: 1005, stockId: 5, ticker: "AMZN",  stockName: "Amazon.com Inc.",         quantity: 15,  avgCost: 142.50, currentPrice: 205.90, currentValue: 3088.5,  unrealizedPnl: 951.0,   unrealizedPnlPct: 44.49, signalScore: 76, dayChangePct: 1.50,  fairValue: 235.00, fairValueDiscountPct: 14.13,  priceHistory60d: makeSparkline("AMZN", 185.00, 205.90) },
+  { id: 1006, stockId: 6, ticker: "META",  stockName: "Meta Platforms Inc.",     quantity: 12,  avgCost: 420.00, currentPrice: 575.10, currentValue: 6901.2,  unrealizedPnl: 1861.2,  unrealizedPnlPct: 36.93, signalScore: 80, dayChangePct: 0.95,  fairValue: 610.00, fairValueDiscountPct: 6.07,   priceHistory60d: makeSparkline("META", 530.00, 575.10) },
+  { id: 1007, stockId: 7, ticker: "TSLA",  stockName: "Tesla Inc.",              quantity: 20,  avgCost: 280.00, currentPrice: 234.50, currentValue: 4690.0,  unrealizedPnl: -910.0,  unrealizedPnlPct: -16.25, signalScore: 46, dayChangePct: -1.80, fairValue: 210.00, fairValueDiscountPct: -10.45, priceHistory60d: makeSparkline("TSLA", 265.00, 234.50) },
+  { id: 1008, stockId: 8, ticker: "JPM",   stockName: "JPMorgan Chase & Co.",    quantity: 25,  avgCost: 175.40, currentPrice: 238.80, currentValue: 5970.0,  unrealizedPnl: 1585.0,  unrealizedPnlPct: 36.15, signalScore: 72, dayChangePct: 0.35,  fairValue: 252.00, fairValueDiscountPct: 5.53,   priceHistory60d: makeSparkline("JPM", 220.00, 238.80) },
 ];
+
+// Sample rating / returns / risk so /portfolio/4 showcases every new card the
+// real page has. Numbers consistent with DEMO_HOLDINGS: ~$89k portfolio value,
+// ~$35k unrealized PnL, ~67% return — roughly what a 3yr Mag7-tilted book looks
+// like after the AI rally.
+const DEMO_RATING: PortfolioRating = {
+  overall: "A",
+  overallScore: 80,
+  categories: {
+    Momentum:    { grade: "A", score: 86, label: "Strong" },
+    Volume:      { grade: "B", score: 72, label: "Good" },
+    Catalyst:    { grade: "B", score: 68, label: "Good" },
+    Fundamental: { grade: "A", score: 84, label: "Strong" },
+    Sentiment:   { grade: "A", score: 82, label: "Strong" },
+    Trend:       { grade: "A", score: 85, label: "Strong" },
+    Risk:        { grade: "C", score: 58, label: "Mixed" },
+  },
+  strengths: ["Momentum", "Fundamental", "Sentiment", "Trend"],
+  watchouts: [],
+  coverage: 8,
+};
+
+const DEMO_RETURNS: PortfolioReturnBreakdown = {
+  costBasis: 53311,
+  currentValue: 89146.2,
+  unrealizedPnl: 35835.2,
+  realizedPnl: 0,
+  dividendsReceived: 1240,
+  totalReturn: 37075.2,
+  totalReturnPct: 69.54,
+  annualizedReturnPct: 19.3,
+  inceptionDate: new Date(Date.now() - 3 * 365 * 86400 * 1000).toISOString(),
+  daysSinceInception: 3 * 365,
+  benchmarkReturnPct: 41.8,
+  alphaPct: 27.74,
+};
+
+const DEMO_RISK: RiskMetrics = {
+  date: new Date().toISOString(),
+  sharpeRatio: 1.42,
+  sortinoRatio: 1.98,
+  maxDrawdown: 0.186,
+  beta: 1.24,
+  var95: -0.021,
+  volatility: 0.214,
+  totalReturn: 0.695,
+};
 
 interface PortfolioDetailPageProps {
   params: Promise<{ id: string }>;
@@ -189,26 +260,25 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
         </div>
       </div>
 
-      {/* WSZ-style letter-grade rating card. Only renders when the advisor
-          succeeded and returned a factor profile — otherwise skipped so we
-          don't show a blank rating. */}
-      {!usingDemoData && rating && rating.coverage > 0 && (
-        <PortfolioRatingCard rating={rating} />
-      )}
+      {/* Letter-grade rating card. Real portfolios pull from the advisor compute;
+          demo uses fixed sample data so the layout + color treatment is always
+          visible. */}
+      {(() => {
+        const r = usingDemoData ? DEMO_RATING : rating;
+        return r && r.coverage > 0 ? <PortfolioRatingCard rating={r} /> : null;
+      })()}
 
-      {/* Return breakdown — pillar #1. Three-source split of lifetime return
-          plus annualized CAGR. Only meaningful when transactions exist, so
-          hidden on the demo portfolio (no txns) and while loading. */}
-      {!usingDemoData && returns && returns.costBasis > 0 && (
-        <ReturnBreakdownCard data={returns} />
-      )}
+      {/* Return breakdown — three-source split + SPY alpha. */}
+      {(() => {
+        const r = usingDemoData ? DEMO_RETURNS : returns;
+        return r && r.costBasis > 0 ? <ReturnBreakdownCard data={r} /> : null;
+      })()}
 
-      {/* Risk metrics — pillar #2. Sharpe / Sortino / drawdown / beta /
-          volatility / VaR as a 6-cell grid. Only renders when the analytics
-          endpoint returned metrics. */}
-      {!usingDemoData && analytics?.riskMetrics && (
-        <RiskMetricsCard metrics={analytics.riskMetrics} />
-      )}
+      {/* Risk metrics — 6-cell grid. */}
+      {(() => {
+        const m = usingDemoData ? DEMO_RISK : analytics?.riskMetrics;
+        return m ? <RiskMetricsCard metrics={m} /> : null;
+      })()}
 
       {/* Lens profile — factor radar + signal mix + regime. Only renders when the advisor
           call succeeds; if it errored (known Npgsql disposed-connector issue during scans,
@@ -279,7 +349,12 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
                     </td>
                     <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">{h.quantity}</td>
                     <td className="px-5 py-3.5 text-right font-[var(--font-mono)] text-muted-foreground">${h.avgCost.toFixed(2)}</td>
-                    <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">${h.currentPrice.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-2.5">
+                        <MiniSparkline data={h.priceHistory60d} />
+                        <span className="font-[var(--font-mono)]">${h.currentPrice.toFixed(2)}</span>
+                      </div>
+                    </td>
                     <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">
                       {h.fairValue == null ? (
                         <span className="text-xs text-muted-foreground">—</span>
@@ -468,7 +543,39 @@ function ReturnBreakdownCard({ data }: { data: PortfolioReturnBreakdown }) {
 }
 
 /**
- * WallStreetZen-style letter-grade rating card. Big letter on the left,
+ * Lightweight inline sparkline. Renders 40 × 14 px SVG polyline normalized to
+ * the min/max of the series. Green if the series ended higher than it started,
+ * red otherwise. Returns an em-dash when there's no series (fresh ticker, bars
+ * missing, etc.) so the cell never renders empty.
+ */
+function MiniSparkline({ data }: { data: number[] | null }) {
+  if (!data || data.length < 2) {
+    return <span className="text-xs text-muted-foreground w-10 text-center">—</span>;
+  }
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const W = 40, H = 14;
+  const step = W / (data.length - 1);
+  const points = data
+    .map((v, i) => `${(i * step).toFixed(1)},${(H - ((v - min) / range) * H).toFixed(1)}`)
+    .join(" ");
+  const up = data[data.length - 1] >= data[0];
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="flex-shrink-0">
+      <polyline
+        points={points}
+        fill="none"
+        stroke={up ? "rgb(16 185 129)" : "rgb(239 68 68)"}
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Letter-grade portfolio rating card. Big letter on the left,
  * 7 category cells on the right, strengths/watch-outs below. The underlying
  * numeric scores come from the position-weighted factor profile so the
  * rating stays consistent with the radar chart in PortfolioAthenaProfile.

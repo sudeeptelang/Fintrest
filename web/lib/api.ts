@@ -615,6 +615,7 @@ export interface Holding {
   dayChangePct: number | null;
   fairValue: number | null;
   fairValueDiscountPct: number | null;
+  priceHistory60d: number[] | null;
 }
 
 export interface Transaction {
