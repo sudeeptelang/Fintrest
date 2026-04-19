@@ -113,8 +113,27 @@ public record ReturnBreakdownResponse(
     double TotalReturnPct,        // TotalReturn / CostBasis * 100
     double? AnnualizedReturnPct,  // CAGR — null if < 30 days of history (annualizing noise)
     DateTime? InceptionDate,      // date of the earliest transaction
-    int DaysSinceInception
+    int DaysSinceInception,
+    double? BenchmarkReturnPct,   // SPY simple return over the inception window (same start/end)
+    double? AlphaPct              // TotalReturnPct - BenchmarkReturnPct; positive = beating the market
 );
+
+/// <summary>
+/// Letter-graded portfolio rating, WSZ-style. Maps our 0-100 factor profile to
+/// A/B/C/D/F on each axis + an overall grade. UI uses this for the coarse "how
+/// does my portfolio look" read; the underlying numeric score is still available
+/// via <see cref="PortfolioFactorProfile"/> for the advanced view.
+/// </summary>
+public record PortfolioRatingResponse(
+    string Overall,               // "A"..."F" — weighted avg of component grades
+    int OverallScore,             // 0-100, the number the letter is derived from
+    Dictionary<string, CategoryGrade> Categories,
+    List<string> Strengths,       // categories at A/B
+    List<string> Watchouts,       // categories at D/F
+    int Coverage                  // holdings contributing (= had an active signal)
+);
+
+public record CategoryGrade(string Grade, int Score, string Label);
 
 public record AdvisorResponse(
     double HealthScore,

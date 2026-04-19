@@ -431,6 +431,29 @@ public class PortfolioController(
             if (ratio > 0) cagr = (Math.Pow(ratio, 1.0 / years) - 1) * 100;
         }
 
+        // Benchmark = SPY over the same window. "If you'd put the same money into
+        // SPY on your inception date, you'd be up/down X%." Alpha = portfolio − SPY.
+        double? benchmarkPct = null;
+        double? alphaPct = null;
+        if (inceptionDate is not null && daysSinceInception >= 7)
+        {
+            var spyStock = await db.Stocks.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Ticker == "SPY");
+            if (spyStock is not null)
+            {
+                var spyBars = await db.MarketData
+                    .Where(m => m.StockId == spyStock.Id && m.Ts >= inceptionDate.Value.Date)
+                    .OrderBy(m => m.Ts)
+                    .Select(m => m.Close)
+                    .ToListAsync();
+                if (spyBars.Count >= 2 && spyBars[0] > 0)
+                {
+                    benchmarkPct = (spyBars[^1] - spyBars[0]) / spyBars[0] * 100;
+                    alphaPct     = totalReturnPct - benchmarkPct;
+                }
+            }
+        }
+
         return Ok(new ReturnBreakdownResponse(
             CostBasis:           costBasisAllTime,
             CurrentValue:        currentValue,
@@ -441,8 +464,88 @@ public class PortfolioController(
             TotalReturnPct:      totalReturnPct,
             AnnualizedReturnPct: cagr,
             InceptionDate:       inceptionDate,
-            DaysSinceInception:  daysSinceInception
+            DaysSinceInception:  daysSinceInception,
+            BenchmarkReturnPct:  benchmarkPct,
+            AlphaPct:            alphaPct
         ));
+    }
+
+    /// <summary>
+    /// WallStreetZen-style letter-grade rating for the portfolio. Maps our 7-factor
+    /// position-weighted profile to A–F on each axis, computes an overall grade,
+    /// and derives strengths/watch-outs from the category grades so the UI has
+    /// ready-made action copy.
+    /// </summary>
+    [HttpGet("{id}/rating")]
+    public async Task<ActionResult<PortfolioRatingResponse>> GetRating(long id, CancellationToken ct)
+    {
+        var userId = await GetUserId();
+        var portfolio = await db.Portfolios
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId, ct);
+        if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
+
+        // Reuse the advisor's factor profile compute — it already position-weights
+        // the 7 factors across every holding with an active signal.
+        var advisorResult = await advisor.AnalyzePortfolio(id);
+        var profile = advisorResult.FactorProfile;
+        if (profile is null)
+        {
+            return Ok(new PortfolioRatingResponse(
+                Overall:      "—",
+                OverallScore: 0,
+                Categories:   new Dictionary<string, CategoryGrade>(),
+                Strengths:    [],
+                Watchouts:    [],
+                Coverage:     0
+            ));
+        }
+
+        var categories = new Dictionary<string, CategoryGrade>
+        {
+            ["Momentum"]    = ScoreToGrade(profile.Momentum),
+            ["Volume"]      = ScoreToGrade(profile.Volume),
+            ["Catalyst"]    = ScoreToGrade(profile.Catalyst),
+            ["Fundamental"] = ScoreToGrade(profile.Fundamental),
+            ["Sentiment"]   = ScoreToGrade(profile.Sentiment),
+            ["Trend"]       = ScoreToGrade(profile.Trend),
+            ["Risk"]        = ScoreToGrade(profile.Risk),
+        };
+
+        // Overall = straight avg of the 7 axes. Weighted-by-impact could come later
+        // once we have an IC-based weighting set; for now an equal-weighted avg is
+        // the honest default.
+        var overallScore = (int)Math.Round(categories.Values.Average(c => (double)c.Score));
+        var overallLetter = ScoreToGrade(overallScore).Grade;
+
+        var strengths  = categories.Where(kv => kv.Value.Grade is "A" or "B")
+                                   .Select(kv => kv.Key).ToList();
+        var watchouts  = categories.Where(kv => kv.Value.Grade is "D" or "F")
+                                   .Select(kv => kv.Key).ToList();
+
+        return Ok(new PortfolioRatingResponse(
+            Overall:      overallLetter,
+            OverallScore: overallScore,
+            Categories:   categories,
+            Strengths:    strengths,
+            Watchouts:    watchouts,
+            Coverage:     profile.Coverage
+        ));
+    }
+
+    /// <summary>0-100 → letter grade. Bands chosen to match how we talk about the
+    /// score verbally: 80+ "strong", 65+ "ok", 50+ "mixed", 35+ "weak", else "poor".</summary>
+    private static CategoryGrade ScoreToGrade(double score)
+    {
+        var s = (int)Math.Round(score);
+        var (grade, label) = s switch
+        {
+            >= 80 => ("A", "Strong"),
+            >= 65 => ("B", "Good"),
+            >= 50 => ("C", "Mixed"),
+            >= 35 => ("D", "Weak"),
+            _     => ("F", "Poor"),
+        };
+        return new CategoryGrade(grade, s, label);
     }
 
     /// <summary>Get AI advisor recommendations and alerts.</summary>

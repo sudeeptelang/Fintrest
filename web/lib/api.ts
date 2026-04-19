@@ -552,6 +552,7 @@ export const api = {
   portfolioTransactions: (id: number) => authFetchApi<Transaction[]>(`/portfolios/${id}/transactions`).catch(() => []),
   portfolioAnalytics: (id: number) => authFetchApi<PortfolioAnalytics>(`/portfolios/${id}/analytics`).catch(() => null),
   portfolioReturns: (id: number) => authFetchApi<PortfolioReturnBreakdown>(`/portfolios/${id}/returns`).catch(() => null),
+  portfolioRating: (id: number) => authFetchApi<PortfolioRating>(`/portfolios/${id}/rating`).catch(() => null),
   portfolioAdvisor: (id: number) => authFetchApi<AdvisorResult>(`/portfolios/${id}/advisor`),
   addTransaction: (portfolioId: number, req: { stockTicker: string; type: string; quantity: number; price: number; fees?: number }) =>
     authFetchApi<Transaction>(`/portfolios/${portfolioId}/transactions`, {
@@ -654,6 +655,23 @@ export interface PortfolioReturnBreakdown {
   annualizedReturnPct: number | null;
   inceptionDate: string | null;
   daysSinceInception: number;
+  benchmarkReturnPct: number | null;
+  alphaPct: number | null;
+}
+
+export interface PortfolioCategoryGrade {
+  grade: string;    // "A" | "B" | "C" | "D" | "F" | "—"
+  score: number;
+  label: string;
+}
+
+export interface PortfolioRating {
+  overall: string;
+  overallScore: number;
+  categories: Record<string, PortfolioCategoryGrade>;
+  strengths: string[];
+  watchouts: string[];
+  coverage: number;
 }
 
 export interface AdvisorResult {

@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics } from "@/lib/api";
+import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics, type PortfolioRating } from "@/lib/api";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-profile";
 
@@ -72,6 +72,17 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
   const { data: returns } = useQuery({
     queryKey: ["portfolio-returns", portfolioId],
     queryFn: () => api.portfolioReturns(portfolioId),
+    retry: false,
+    throwOnError: false,
+    enabled: !usingDemoData,
+  });
+
+  // WSZ-style letter-grade rating. Separate endpoint because it piggybacks on
+  // the advisor compute (which is slow) and we don't want to block the page
+  // on it — renders as soon as ready, degrades to skeleton if it fails.
+  const { data: rating } = useQuery({
+    queryKey: ["portfolio-rating", portfolioId],
+    queryFn: () => api.portfolioRating(portfolioId),
     retry: false,
     throwOnError: false,
     enabled: !usingDemoData,
@@ -176,6 +187,13 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
           )}
         </div>
       </div>
+
+      {/* WSZ-style letter-grade rating card. Only renders when the advisor
+          succeeded and returned a factor profile — otherwise skipped so we
+          don't show a blank rating. */}
+      {!usingDemoData && rating && rating.coverage > 0 && (
+        <PortfolioRatingCard rating={rating} />
+      )}
 
       {/* Return breakdown — pillar #1. Three-source split of lifetime return
           plus annualized CAGR. Only meaningful when transactions exist, so
@@ -390,6 +408,25 @@ function ReturnBreakdownCard({ data }: { data: PortfolioReturnBreakdown }) {
         ))}
       </div>
 
+      {/* Benchmark + alpha — if you'd put the same money in SPY over the same
+          window, this is what you'd have done; alpha is the gap. */}
+      {data.benchmarkReturnPct != null && data.alphaPct != null && (
+        <div className="mt-4 pt-3 border-t border-border grid grid-cols-2 gap-3 text-xs">
+          <div className="rounded-lg border border-border bg-background/50 px-3 py-2.5">
+            <p className="text-[11px] text-muted-foreground mb-0.5">SPY over same window</p>
+            <p className={`font-[var(--font-mono)] text-base font-semibold ${data.benchmarkReturnPct >= 0 ? "text-foreground" : "text-red-500"}`}>
+              {fmtPct(data.benchmarkReturnPct)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
+            <p className="text-[11px] text-primary/80 mb-0.5">Alpha vs SPY</p>
+            <p className={`font-[var(--font-mono)] text-base font-semibold ${data.alphaPct >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+              {fmtPct(data.alphaPct)}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Cost basis + current value footnote */}
       <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground flex-wrap gap-2">
         <span>
@@ -405,6 +442,111 @@ function ReturnBreakdownCard({ data }: { data: PortfolioReturnBreakdown }) {
           </span>
         </span>
       </div>
+    </div>
+  );
+}
+
+/**
+ * WallStreetZen-style letter-grade rating card. Big letter on the left,
+ * 7 category cells on the right, strengths/watch-outs below. The underlying
+ * numeric scores come from the position-weighted factor profile so the
+ * rating stays consistent with the radar chart in PortfolioAthenaProfile.
+ */
+function PortfolioRatingCard({ rating }: { rating: PortfolioRating }) {
+  const gradeColor = (g: string) => {
+    switch (g) {
+      case "A": return "text-emerald-500 bg-emerald-500/10 border-emerald-500/30";
+      case "B": return "text-teal-500 bg-teal-500/10 border-teal-500/30";
+      case "C": return "text-amber-500 bg-amber-500/10 border-amber-500/30";
+      case "D": return "text-orange-500 bg-orange-500/10 border-orange-500/30";
+      case "F": return "text-red-500 bg-red-500/10 border-red-500/30";
+      default:  return "text-muted-foreground bg-muted border-border";
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
+        <div>
+          <h3 className="font-[var(--font-heading)] text-base font-semibold">Portfolio rating</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Letter grade across the 7-factor research model ·{" "}
+            {rating.coverage} {rating.coverage === 1 ? "holding" : "holdings"} with active signals
+          </p>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-[auto_1fr] gap-5 items-start">
+        {/* Giant overall grade */}
+        <div className={`w-32 flex flex-col items-center justify-center rounded-xl border ${gradeColor(rating.overall)} py-5`}>
+          <p className="font-[var(--font-heading)] text-5xl font-extrabold leading-none">
+            {rating.overall}
+          </p>
+          <p className="font-[var(--font-mono)] text-xs mt-1 opacity-75">
+            {rating.overallScore}/100
+          </p>
+          <p className="text-[10px] uppercase tracking-widest mt-2 opacity-60">Overall</p>
+        </div>
+
+        {/* 7 category grades */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {Object.entries(rating.categories).map(([name, c]) => (
+            <div
+              key={name}
+              className={`rounded-lg border px-3 py-2.5 ${gradeColor(c.grade)}`}
+              title={`${c.label} · ${c.score}/100`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-0.5">
+                <p className="text-[10px] uppercase tracking-wider opacity-70">{name}</p>
+                <p className="font-[var(--font-heading)] text-lg font-extrabold leading-none">
+                  {c.grade}
+                </p>
+              </div>
+              <p className="font-[var(--font-mono)] text-xs opacity-75">{c.score}/100</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Strengths / watch-outs chips */}
+      {(rating.strengths.length > 0 || rating.watchouts.length > 0) && (
+        <div className="mt-5 pt-4 border-t border-border grid sm:grid-cols-2 gap-3">
+          {rating.strengths.length > 0 && (
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-emerald-500 mb-2">
+                Strengths
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {rating.strengths.map((s) => (
+                  <span
+                    key={s}
+                    className="text-[11px] px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-500"
+                  >
+                    ✓ {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {rating.watchouts.length > 0 && (
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-amber-500 mb-2">
+                Watch-outs
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {rating.watchouts.map((w) => (
+                  <span
+                    key={w}
+                    className="text-[11px] px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500"
+                  >
+                    ! {w}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
