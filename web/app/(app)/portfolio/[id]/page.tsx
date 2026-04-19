@@ -11,17 +11,18 @@ import { ScoreRing } from "@/components/charts/score-ring";
 import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-profile";
 
 // Sample holdings for the /portfolio/4 demo. Falls back in when the live portfolio has no
-// holdings (empty or error), so the page never renders blank for a demo link. Values
-// approximate reasonable entry prices vs current; day % is cosmetic.
+// holdings (empty or error), so the page never renders blank for a demo link. Values are
+// calibrated for April 2026: NVDA reflects the June 2024 10:1 split (~$52 cost basis,
+// not the pre-split $520), and prices approximate quote levels on the backfill cutoff.
 const DEMO_HOLDINGS: Holding[] = [
-  { id: 1001, stockId: 1, ticker: "AAPL",  stockName: "Apple Inc.",              quantity: 50, avgCost: 175.20, currentPrice: 189.40, currentValue: 9470,   unrealizedPnl: 710,    unrealizedPnlPct: 8.10,  signalScore: 72, dayChangePct: 1.24  },
-  { id: 1002, stockId: 2, ticker: "MSFT",  stockName: "Microsoft Corp.",         quantity: 25, avgCost: 378.50, currentPrice: 421.30, currentValue: 10532.5, unrealizedPnl: 1070,   unrealizedPnlPct: 11.31, signalScore: 81, dayChangePct: 0.82  },
-  { id: 1003, stockId: 3, ticker: "NVDA",  stockName: "NVIDIA Corp.",            quantity: 30, avgCost: 520.00, currentPrice: 875.60, currentValue: 26268,   unrealizedPnl: 10668,  unrealizedPnlPct: 68.38, signalScore: 88, dayChangePct: 2.45  },
-  { id: 1004, stockId: 4, ticker: "GOOGL", stockName: "Alphabet Inc. Class A",   quantity: 20, avgCost: 138.80, currentPrice: 164.20, currentValue: 3284,    unrealizedPnl: 508,    unrealizedPnlPct: 18.30, signalScore: 66, dayChangePct: -0.34 },
-  { id: 1005, stockId: 5, ticker: "AMZN",  stockName: "Amazon.com Inc.",         quantity: 15, avgCost: 142.50, currentPrice: 178.90, currentValue: 2683.5,  unrealizedPnl: 546,    unrealizedPnlPct: 25.54, signalScore: 74, dayChangePct: 1.12  },
-  { id: 1006, stockId: 6, ticker: "META",  stockName: "Meta Platforms Inc.",     quantity: 12, avgCost: 320.00, currentPrice: 498.10, currentValue: 5977.2,  unrealizedPnl: 2137.2, unrealizedPnlPct: 55.66, signalScore: 79, dayChangePct: 1.88  },
-  { id: 1007, stockId: 7, ticker: "TSLA",  stockName: "Tesla Inc.",              quantity: 20, avgCost: 240.00, currentPrice: 214.50, currentValue: 4290,    unrealizedPnl: -510,   unrealizedPnlPct: -10.63, signalScore: 48, dayChangePct: -2.15 },
-  { id: 1008, stockId: 8, ticker: "JPM",   stockName: "JPMorgan Chase & Co.",    quantity: 25, avgCost: 165.40, currentPrice: 201.80, currentValue: 5045,    unrealizedPnl: 910,    unrealizedPnlPct: 22.01, signalScore: 69, dayChangePct: 0.42  },
+  { id: 1001, stockId: 1, ticker: "AAPL",  stockName: "Apple Inc.",              quantity: 50,  avgCost: 165.20, currentPrice: 215.40, currentValue: 10770.0, unrealizedPnl: 2510.0,  unrealizedPnlPct: 30.39, signalScore: 74, dayChangePct: 0.85  },
+  { id: 1002, stockId: 2, ticker: "MSFT",  stockName: "Microsoft Corp.",         quantity: 25,  avgCost: 380.50, currentPrice: 455.30, currentValue: 11382.5, unrealizedPnl: 1870.0,  unrealizedPnlPct: 19.66, signalScore: 82, dayChangePct: 1.20  },
+  { id: 1003, stockId: 3, ticker: "NVDA",  stockName: "NVIDIA Corp.",            quantity: 300, avgCost: 52.00,  currentPrice: 142.60, currentValue: 42780.0, unrealizedPnl: 27180.0, unrealizedPnlPct: 174.23, signalScore: 89, dayChangePct: 2.40 },
+  { id: 1004, stockId: 4, ticker: "GOOGL", stockName: "Alphabet Inc. Class A",   quantity: 20,  avgCost: 138.80, currentPrice: 178.20, currentValue: 3564.0,  unrealizedPnl: 788.0,   unrealizedPnlPct: 28.39, signalScore: 68, dayChangePct: -0.25 },
+  { id: 1005, stockId: 5, ticker: "AMZN",  stockName: "Amazon.com Inc.",         quantity: 15,  avgCost: 142.50, currentPrice: 205.90, currentValue: 3088.5,  unrealizedPnl: 951.0,   unrealizedPnlPct: 44.49, signalScore: 76, dayChangePct: 1.50  },
+  { id: 1006, stockId: 6, ticker: "META",  stockName: "Meta Platforms Inc.",     quantity: 12,  avgCost: 420.00, currentPrice: 575.10, currentValue: 6901.2,  unrealizedPnl: 1861.2,  unrealizedPnlPct: 36.93, signalScore: 80, dayChangePct: 0.95  },
+  { id: 1007, stockId: 7, ticker: "TSLA",  stockName: "Tesla Inc.",              quantity: 20,  avgCost: 280.00, currentPrice: 234.50, currentValue: 4690.0,  unrealizedPnl: -910.0,  unrealizedPnlPct: -16.25, signalScore: 46, dayChangePct: -1.80 },
+  { id: 1008, stockId: 8, ticker: "JPM",   stockName: "JPMorgan Chase & Co.",    quantity: 25,  avgCost: 175.40, currentPrice: 238.80, currentValue: 5970.0,  unrealizedPnl: 1585.0,  unrealizedPnlPct: 36.15, signalScore: 72, dayChangePct: 0.35  },
 ];
 
 interface PortfolioDetailPageProps {
