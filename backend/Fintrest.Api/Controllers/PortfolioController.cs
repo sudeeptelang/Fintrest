@@ -193,10 +193,19 @@ public class PortfolioController(
                 ? (currentPrice - h.AvgCost) / h.AvgCost * 100
                 : 0;
 
+            // Fair value = analyst consensus target price stored on the Stock
+            // row (populated from FMP profile on each ingestion). Discount % is
+            // positive when the stock is trading below fair value.
+            double? fairValue = h.Stock.AnalystTargetPrice;
+            double? fairValueDiscountPct = null;
+            if (fairValue is > 0 && currentPrice > 0)
+                fairValueDiscountPct = (fairValue.Value - currentPrice) / currentPrice * 100;
+
             responses.Add(new HoldingResponse(
                 h.Id, h.StockId, h.Stock.Ticker, h.Stock.Name,
                 h.Quantity, h.AvgCost, currentPrice, currentValue,
-                unrealizedPnl, unrealizedPnlPct, signalScore, dayChange
+                unrealizedPnl, unrealizedPnlPct, signalScore, dayChange,
+                fairValue, fairValueDiscountPct
             ));
         }
 

@@ -31,7 +31,12 @@ public record HoldingResponse(
     double UnrealizedPnl,
     double UnrealizedPnlPct,
     double? SignalScore,
-    double? DayChangePct = null
+    double? DayChangePct = null,
+    // SimplyWall.st signature column — analyst consensus fair value (stocks.analyst_target_price)
+    // and the derived % discount. Positive FairValueDiscountPct means the stock is
+    // trading below fair value ("undervalued"); negative means above ("overvalued").
+    double? FairValue = null,
+    double? FairValueDiscountPct = null
 );
 
 public record TransactionRequest(

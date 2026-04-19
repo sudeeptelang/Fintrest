@@ -613,6 +613,8 @@ export interface Holding {
   unrealizedPnlPct: number;
   signalScore: number | null;
   dayChangePct: number | null;
+  fairValue: number | null;
+  fairValueDiscountPct: number | null;
 }
 
 export interface Transaction {

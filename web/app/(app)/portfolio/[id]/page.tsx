@@ -15,14 +15,14 @@ import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-
 // calibrated for April 2026: NVDA reflects the June 2024 10:1 split (~$52 cost basis,
 // not the pre-split $520), and prices approximate quote levels on the backfill cutoff.
 const DEMO_HOLDINGS: Holding[] = [
-  { id: 1001, stockId: 1, ticker: "AAPL",  stockName: "Apple Inc.",              quantity: 50,  avgCost: 165.20, currentPrice: 215.40, currentValue: 10770.0, unrealizedPnl: 2510.0,  unrealizedPnlPct: 30.39, signalScore: 74, dayChangePct: 0.85  },
-  { id: 1002, stockId: 2, ticker: "MSFT",  stockName: "Microsoft Corp.",         quantity: 25,  avgCost: 380.50, currentPrice: 455.30, currentValue: 11382.5, unrealizedPnl: 1870.0,  unrealizedPnlPct: 19.66, signalScore: 82, dayChangePct: 1.20  },
-  { id: 1003, stockId: 3, ticker: "NVDA",  stockName: "NVIDIA Corp.",            quantity: 300, avgCost: 52.00,  currentPrice: 142.60, currentValue: 42780.0, unrealizedPnl: 27180.0, unrealizedPnlPct: 174.23, signalScore: 89, dayChangePct: 2.40 },
-  { id: 1004, stockId: 4, ticker: "GOOGL", stockName: "Alphabet Inc. Class A",   quantity: 20,  avgCost: 138.80, currentPrice: 178.20, currentValue: 3564.0,  unrealizedPnl: 788.0,   unrealizedPnlPct: 28.39, signalScore: 68, dayChangePct: -0.25 },
-  { id: 1005, stockId: 5, ticker: "AMZN",  stockName: "Amazon.com Inc.",         quantity: 15,  avgCost: 142.50, currentPrice: 205.90, currentValue: 3088.5,  unrealizedPnl: 951.0,   unrealizedPnlPct: 44.49, signalScore: 76, dayChangePct: 1.50  },
-  { id: 1006, stockId: 6, ticker: "META",  stockName: "Meta Platforms Inc.",     quantity: 12,  avgCost: 420.00, currentPrice: 575.10, currentValue: 6901.2,  unrealizedPnl: 1861.2,  unrealizedPnlPct: 36.93, signalScore: 80, dayChangePct: 0.95  },
-  { id: 1007, stockId: 7, ticker: "TSLA",  stockName: "Tesla Inc.",              quantity: 20,  avgCost: 280.00, currentPrice: 234.50, currentValue: 4690.0,  unrealizedPnl: -910.0,  unrealizedPnlPct: -16.25, signalScore: 46, dayChangePct: -1.80 },
-  { id: 1008, stockId: 8, ticker: "JPM",   stockName: "JPMorgan Chase & Co.",    quantity: 25,  avgCost: 175.40, currentPrice: 238.80, currentValue: 5970.0,  unrealizedPnl: 1585.0,  unrealizedPnlPct: 36.15, signalScore: 72, dayChangePct: 0.35  },
+  { id: 1001, stockId: 1, ticker: "AAPL",  stockName: "Apple Inc.",              quantity: 50,  avgCost: 165.20, currentPrice: 215.40, currentValue: 10770.0, unrealizedPnl: 2510.0,  unrealizedPnlPct: 30.39, signalScore: 74, dayChangePct: 0.85,  fairValue: 228.00, fairValueDiscountPct: 5.85   },
+  { id: 1002, stockId: 2, ticker: "MSFT",  stockName: "Microsoft Corp.",         quantity: 25,  avgCost: 380.50, currentPrice: 455.30, currentValue: 11382.5, unrealizedPnl: 1870.0,  unrealizedPnlPct: 19.66, signalScore: 82, dayChangePct: 1.20,  fairValue: 495.00, fairValueDiscountPct: 8.72   },
+  { id: 1003, stockId: 3, ticker: "NVDA",  stockName: "NVIDIA Corp.",            quantity: 300, avgCost: 52.00,  currentPrice: 142.60, currentValue: 42780.0, unrealizedPnl: 27180.0, unrealizedPnlPct: 174.23, signalScore: 89, dayChangePct: 2.40, fairValue: 165.00, fairValueDiscountPct: 15.71  },
+  { id: 1004, stockId: 4, ticker: "GOOGL", stockName: "Alphabet Inc. Class A",   quantity: 20,  avgCost: 138.80, currentPrice: 178.20, currentValue: 3564.0,  unrealizedPnl: 788.0,   unrealizedPnlPct: 28.39, signalScore: 68, dayChangePct: -0.25, fairValue: 195.00, fairValueDiscountPct: 9.43   },
+  { id: 1005, stockId: 5, ticker: "AMZN",  stockName: "Amazon.com Inc.",         quantity: 15,  avgCost: 142.50, currentPrice: 205.90, currentValue: 3088.5,  unrealizedPnl: 951.0,   unrealizedPnlPct: 44.49, signalScore: 76, dayChangePct: 1.50,  fairValue: 235.00, fairValueDiscountPct: 14.13  },
+  { id: 1006, stockId: 6, ticker: "META",  stockName: "Meta Platforms Inc.",     quantity: 12,  avgCost: 420.00, currentPrice: 575.10, currentValue: 6901.2,  unrealizedPnl: 1861.2,  unrealizedPnlPct: 36.93, signalScore: 80, dayChangePct: 0.95,  fairValue: 610.00, fairValueDiscountPct: 6.07   },
+  { id: 1007, stockId: 7, ticker: "TSLA",  stockName: "Tesla Inc.",              quantity: 20,  avgCost: 280.00, currentPrice: 234.50, currentValue: 4690.0,  unrealizedPnl: -910.0,  unrealizedPnlPct: -16.25, signalScore: 46, dayChangePct: -1.80, fairValue: 210.00, fairValueDiscountPct: -10.45 },
+  { id: 1008, stockId: 8, ticker: "JPM",   stockName: "JPMorgan Chase & Co.",    quantity: 25,  avgCost: 175.40, currentPrice: 238.80, currentValue: 5970.0,  unrealizedPnl: 1585.0,  unrealizedPnlPct: 36.15, signalScore: 72, dayChangePct: 0.35,  fairValue: 252.00, fairValueDiscountPct: 5.53   },
 ];
 
 interface PortfolioDetailPageProps {
@@ -89,7 +89,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
   });
 
   // Sortable holdings
-  type HoldingSortKey = "ticker" | "shares" | "avgCost" | "price" | "dayChange" | "value" | "pnl" | "signal";
+  type HoldingSortKey = "ticker" | "shares" | "avgCost" | "price" | "fairValue" | "dayChange" | "value" | "pnl" | "signal";
   type SortDir = "asc" | "desc";
   const [sortKey, setSortKey] = useState<HoldingSortKey>("value");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -103,6 +103,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
         case "shares": diff = a.quantity - b.quantity; break;
         case "avgCost": diff = a.avgCost - b.avgCost; break;
         case "price": diff = a.currentPrice - b.currentPrice; break;
+        case "fairValue": diff = (a.fairValueDiscountPct ?? -Infinity) - (b.fairValueDiscountPct ?? -Infinity); break;
         case "dayChange": diff = (a.dayChangePct ?? 0) - (b.dayChangePct ?? 0); break;
         case "value": diff = a.currentValue - b.currentValue; break;
         case "pnl": diff = a.unrealizedPnlPct - b.unrealizedPnlPct; break;
@@ -230,6 +231,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
                   ["Shares", "shares", "text-right"],
                   ["Avg Cost", "avgCost", "text-right"],
                   ["Price", "price", "text-right"],
+                  ["Fair Value", "fairValue", "text-right"],
                   ["% Today", "dayChange", "text-right"],
                   ["Value", "value", "text-right"],
                   ["Gain/Loss $", "pnl", "text-right"],
@@ -257,9 +259,9 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
             </thead>
             <tbody className="divide-y divide-border">
               {holdingsLoading ? (
-                <tr><td colSpan={9} className="px-5 py-8 text-center text-muted-foreground">Loading...</td></tr>
+                <tr><td colSpan={10} className="px-5 py-8 text-center text-muted-foreground">Loading...</td></tr>
               ) : sortedHoldings.length === 0 ? (
-                <tr><td colSpan={9} className="px-5 py-8 text-center text-muted-foreground">No holdings</td></tr>
+                <tr><td colSpan={10} className="px-5 py-8 text-center text-muted-foreground">No holdings</td></tr>
               ) : sortedHoldings.map((h) => {
                 const costBasis = h.quantity * h.avgCost;
                 return (
@@ -278,6 +280,25 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
                     <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">{h.quantity}</td>
                     <td className="px-5 py-3.5 text-right font-[var(--font-mono)] text-muted-foreground">${h.avgCost.toFixed(2)}</td>
                     <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">${h.currentPrice.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 text-right font-[var(--font-mono)]">
+                      {h.fairValue == null ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <>
+                          <p>${h.fairValue.toFixed(2)}</p>
+                          {h.fairValueDiscountPct != null && (
+                            <p className={`text-[10px] font-semibold ${
+                              h.fairValueDiscountPct >= 15 ? "text-emerald-500"
+                                : h.fairValueDiscountPct >= 0 ? "text-emerald-400"
+                                : h.fairValueDiscountPct >= -10 ? "text-amber-500"
+                                : "text-red-500"
+                            }`}>
+                              {h.fairValueDiscountPct >= 0 ? "+" : ""}{h.fairValueDiscountPct.toFixed(1)}%
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </td>
                     <td className={`px-5 py-3.5 text-right font-[var(--font-mono)] font-semibold ${
                       h.dayChangePct === null
                         ? "text-muted-foreground"
