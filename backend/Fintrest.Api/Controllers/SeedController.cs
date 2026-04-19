@@ -33,8 +33,11 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
         return Ok(new { Added = added, Tickers = tickers });
     }
 
-    /// <summary>Add a major-index constituent set to the universe.
-    /// Supported keys: "sp500" (~503), "nasdaq" (~100), "dowjones" (~30).
+    /// <summary>Add a major-index constituent set (or market-cap band) to the universe.
+    /// Supported keys:
+    ///   sp500 (~503), nasdaq (~100), dowjones (~30),
+    ///   midcap (~400–500, market cap $2B–$20B),
+    ///   russell1k (~900–1100, market cap ≥ $2B).
     /// Idempotent — only inserts new tickers. Always also adds index ETF proxies (SPY/QQQ/DIA/IWM)
     /// so the /market/indices endpoint has data. Does NOT trigger ingestion — call /seed/ingest after.</summary>
     [HttpPost("preset/{key}")]
@@ -42,7 +45,7 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
     {
         var indexTickers = await fundamentalsProvider.GetIndexConstituentsAsync(key, ct);
         if (indexTickers.Count == 0)
-            return BadRequest(new { message = $"No tickers returned for preset '{key}'. Supported: sp500, nasdaq, dowjones" });
+            return BadRequest(new { message = $"No tickers returned for preset '{key}'. Supported: sp500, nasdaq, dowjones, midcap, russell1k" });
 
         // Always include the index ETF proxies so /market/indices has data
         var etfProxies = new[] { "SPY", "QQQ", "DIA", "IWM" };

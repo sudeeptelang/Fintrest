@@ -130,7 +130,9 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
 
     public async Task<List<string>> GetIndexConstituentsAsync(string indexKey, CancellationToken ct = default)
     {
-        // FMP exposes one endpoint per major index. Free tier covers all three.
+        // Hard-coded index endpoints for S&P 500 / Nasdaq 100 / Dow.
+        // For mid-cap expansion ("midcap", "russell1k") we fall through to the
+        // stock-screener with a market-cap band.
         var path = indexKey.ToLowerInvariant() switch
         {
             "sp500" or "s&p500" or "spx" => "sp500-constituent",
@@ -139,28 +141,88 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
             _ => null
         };
 
-        if (path is null)
+        if (path is not null)
+        {
+            var url = $"{_baseUrl}/{path}?apikey={_apiKey}";
+            try
+            {
+                var rows = await TryFetch<List<FmpConstituent>>(url, ct);
+                if (rows is null) return [];
+                return rows
+                    .Where(r => !string.IsNullOrWhiteSpace(r.Symbol))
+                    .Select(r => r.Symbol!.Trim().ToUpperInvariant())
+                    .Distinct()
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "FMP: Failed to fetch index constituents for {IndexKey}", indexKey);
+                return [];
+            }
+        }
+
+        // Screener-backed presets — use FMP's stock-screener to pull a market-cap band.
+        // marketCapMoreThan / marketCapLowerThan are in USD; we restrict to US common
+        // stocks on NYSE/NASDAQ, actively trading, not an ETF or fund.
+        var (minCap, maxCap) = indexKey.ToLowerInvariant() switch
+        {
+            // Russell 1000 approximation — everything ≥ $2B (covers large + mid).
+            // S&P 500 members are already ≥ $14B, so this is additive when merged.
+            "russell1k" or "russell1000" => ((long?)2_000_000_000L, (long?)null),
+            // Pure mid-cap band ($2B–$20B) — the S&P 400 substitute. Excludes most
+            // mega-caps already in the sp500 preset, so combined coverage is
+            // sp500 ∪ midcap ≈ Russell 1000 without the noisy small-cap tail.
+            "midcap" => ((long?)2_000_000_000L, (long?)20_000_000_000L),
+            _ => (null, null)
+        };
+
+        if (minCap is null)
         {
             logger.LogWarning("FMP: Unknown index key {IndexKey}", indexKey);
             return [];
         }
 
-        var url = $"{_baseUrl}/{path}?apikey={_apiKey}";
+        var parts = new List<string>
+        {
+            $"marketCapMoreThan={minCap}",
+            "exchange=NYSE,NASDAQ",
+            "isEtf=false",
+            "isFund=false",
+            "isActivelyTrading=true",
+            "country=US",
+            "limit=2000",
+            $"apikey={_apiKey}",
+        };
+        if (maxCap is not null) parts.Insert(1, $"marketCapLowerThan={maxCap}");
+        var screenerUrl = $"{_baseUrl}/company-screener?{string.Join("&", parts)}";
+
         try
         {
-            var rows = await TryFetch<List<FmpConstituent>>(url, ct);
+            var rows = await TryFetch<List<FmpScreenerRow>>(screenerUrl, ct);
             if (rows is null) return [];
             return rows
                 .Where(r => !string.IsNullOrWhiteSpace(r.Symbol))
                 .Select(r => r.Symbol!.Trim().ToUpperInvariant())
+                // Filter out obvious non-common-stock garbage: preferreds, warrants,
+                // rights, and units usually have a '.', '-W', '-U', or '.PR' suffix.
+                .Where(s => !s.Contains('.')
+                            && !s.EndsWith("-W")
+                            && !s.EndsWith("-U")
+                            && !s.EndsWith("-R"))
                 .Distinct()
                 .ToList();
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "FMP: Failed to fetch index constituents for {IndexKey}", indexKey);
+            logger.LogWarning(ex, "FMP: screener failed for {IndexKey}", indexKey);
             return [];
         }
+    }
+
+    private class FmpScreenerRow
+    {
+        [JsonPropertyName("symbol")] public string? Symbol { get; set; }
+        [JsonPropertyName("marketCap")] public long? MarketCap { get; set; }
     }
 
     public async Task<OwnershipSnapshot?> GetOwnershipAsync(string ticker, CancellationToken ct = default)
