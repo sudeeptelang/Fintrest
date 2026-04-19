@@ -469,6 +469,144 @@ public class PortfolioController(
         ));
     }
 
+    /// <summary>
+    /// Tax-efficiency profile (pillar #10). FIFO-matches BUYs to SELLs to split
+    /// realized gains into short vs long term, then projects unrealized gains
+    /// for each remaining lot. Flags lots within 45 days of the 1-year line
+    /// (hold for lower tax) and underwater lots eligible for tax-loss harvesting.
+    /// </summary>
+    [HttpGet("{id}/tax")]
+    public async Task<ActionResult<TaxProfileResponse>> GetTaxProfile(long id, CancellationToken ct)
+    {
+        var userId = await GetUserId();
+        var portfolio = await db.Portfolios
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId, ct);
+        if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
+
+        var txns = await db.Set<Models.PortfolioTransaction>()
+            .Include(t => t.Stock)
+            .Where(t => t.PortfolioId == id)
+            .OrderBy(t => t.ExecutedAt)
+            .ToListAsync(ct);
+
+        // FIFO lot queue per stock. Each BUY enqueues a lot; each SELL consumes
+        // from the front of the queue, realizing gain on the portion sold.
+        var lotsByStock = new Dictionary<long, LinkedList<Lot>>();
+        var tickerByStockId = new Dictionary<long, string>();
+        double stRealizedYtd = 0, ltRealizedYtd = 0;
+        var yearStart = new DateTime(DateTime.UtcNow.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        foreach (var t in txns)
+        {
+            if (t.Stock is not null) tickerByStockId[t.StockId] = t.Stock.Ticker;
+            var type = (t.Type ?? "").Trim().ToUpperInvariant();
+
+            if (type == "BUY")
+            {
+                if (!lotsByStock.TryGetValue(t.StockId, out var q))
+                {
+                    q = new LinkedList<Lot>();
+                    lotsByStock[t.StockId] = q;
+                }
+                q.AddLast(new Lot { Quantity = t.Quantity, Price = t.Price, BuyDate = t.ExecutedAt });
+            }
+            else if (type == "SELL" && lotsByStock.TryGetValue(t.StockId, out var lots))
+            {
+                double remaining = t.Quantity;
+                while (remaining > 0 && lots.First is not null)
+                {
+                    var head = lots.First.Value;
+                    var used = Math.Min(remaining, head.Quantity);
+                    var costBasisUsed = used * head.Price;
+                    var proceedsUsed  = used * t.Price;
+                    var pnlUsed       = proceedsUsed - costBasisUsed;
+                    var daysHeld      = (t.ExecutedAt - head.BuyDate).TotalDays;
+
+                    if (t.ExecutedAt >= yearStart)
+                    {
+                        if (daysHeld > 365) ltRealizedYtd += pnlUsed;
+                        else                stRealizedYtd += pnlUsed;
+                    }
+                    head.Quantity -= used;
+                    if (head.Quantity <= 0) lots.RemoveFirst();
+                    remaining -= used;
+                }
+            }
+        }
+
+        // Remaining lots = unrealized. Walk each and project the current gain
+        // using the latest bar.
+        double stUnrealized = 0, ltUnrealized = 0;
+        var nearLt = new List<NearLongTermLot>();
+        var tlh    = new List<TaxLossHarvestLot>();
+
+        var stockIds = lotsByStock.Keys.ToList();
+        var priceByStock = new Dictionary<long, double>();
+        if (stockIds.Count > 0)
+        {
+            var bars = await db.MarketData
+                .Where(m => stockIds.Contains(m.StockId))
+                .GroupBy(m => m.StockId)
+                .Select(g => new { StockId = g.Key, Close = g.OrderByDescending(m => m.Ts).First().Close })
+                .ToListAsync(ct);
+            foreach (var b in bars) priceByStock[b.StockId] = b.Close;
+        }
+
+        foreach (var (stockId, lots) in lotsByStock)
+        {
+            if (!priceByStock.TryGetValue(stockId, out var currentPrice) || currentPrice <= 0) continue;
+            var ticker = tickerByStockId.GetValueOrDefault(stockId, $"#{stockId}");
+            foreach (var lot in lots)
+            {
+                var daysHeld   = (DateTime.UtcNow - lot.BuyDate).TotalDays;
+                var costBasis  = lot.Quantity * lot.Price;
+                var currentVal = lot.Quantity * currentPrice;
+                var pnl        = currentVal - costBasis;
+
+                if (daysHeld > 365) ltUnrealized += pnl;
+                else                stUnrealized += pnl;
+
+                // Near long-term: within 45 days of crossing. Only interesting
+                // if the lot has a gain (nothing to preserve otherwise).
+                if (daysHeld < 365 && daysHeld > 320 && pnl > 0)
+                {
+                    nearLt.Add(new NearLongTermLot(
+                        ticker, lot.Quantity, Math.Round(pnl, 2),
+                        Math.Max(1, (int)Math.Ceiling(365 - daysHeld))));
+                }
+
+                // Tax-loss harvest: meaningful loss (more than $250). Harvesting
+                // a $10 loss isn't worth the wash-sale headache.
+                if (pnl < -250)
+                {
+                    tlh.Add(new TaxLossHarvestLot(
+                        ticker, lot.Quantity, Math.Round(pnl, 2),
+                        Math.Max(0, (int)daysHeld),
+                        daysHeld > 365 ? "long" : "short"));
+                }
+            }
+        }
+
+        nearLt.Sort((a, b) => a.DaysUntilLongTerm.CompareTo(b.DaysUntilLongTerm));
+        tlh.Sort((a, b) => a.UnrealizedPnl.CompareTo(b.UnrealizedPnl));
+
+        return Ok(new TaxProfileResponse(
+            ShortTermUnrealizedPnl:  Math.Round(stUnrealized,   2),
+            LongTermUnrealizedPnl:   Math.Round(ltUnrealized,   2),
+            ShortTermRealizedPnlYtd: Math.Round(stRealizedYtd,  2),
+            LongTermRealizedPnlYtd:  Math.Round(ltRealizedYtd,  2),
+            NearLongTerm:            nearLt.Take(5).ToList(),
+            TaxLossHarvest:          tlh.Take(5).ToList()
+        ));
+    }
+
+    private class Lot
+    {
+        public double Quantity { get; set; }
+        public double Price    { get; set; }
+        public DateTime BuyDate { get; set; }
+    }
+
     /// <summary>Get risk metrics and sector allocation analytics.</summary>
     [HttpGet("{id}/analytics")]
     public async Task<ActionResult<PortfolioAnalyticsResponse>> GetAnalytics(long id)

@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics, type PortfolioRating, type AdvisorResult, type PerformanceSeries, type PerformancePoint } from "@/lib/api";
+import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics, type PortfolioRating, type AdvisorResult, type PerformanceSeries, type PerformancePoint, type PortfolioTaxProfile } from "@/lib/api";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-profile";
@@ -97,6 +97,22 @@ const DEMO_RISK: RiskMetrics = {
   totalReturn: 0.695,
 };
 
+// Tax profile demo numbers. The split mirrors DEMO_HOLDINGS — most gains sit
+// in LT territory (3 years in) with TSLA as the harvest candidate and a
+// near-LT AMZN lot included to show the color story on all three panels.
+const DEMO_TAX: PortfolioTaxProfile = {
+  shortTermUnrealizedPnl: 2510,
+  longTermUnrealizedPnl:  33325,
+  shortTermRealizedPnlYtd: 0,
+  longTermRealizedPnlYtd:  1240,
+  nearLongTerm: [
+    { ticker: "AMZN", quantity: 5, unrealizedPnl: 317, daysUntilLongTerm: 28 },
+  ],
+  taxLossHarvest: [
+    { ticker: "TSLA", quantity: 20, unrealizedPnl: -910, daysHeld: 540, holdingType: "long" },
+  ],
+};
+
 interface PortfolioDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -171,6 +187,15 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
     enabled: !usingDemoData,
   });
 
+  // Tax profile (pillar #10). ST vs LT split + harvest + near-LT flags.
+  const { data: taxProfile } = useQuery({
+    queryKey: ["portfolio-tax", portfolioId],
+    queryFn: () => api.portfolioTax(portfolioId),
+    retry: false,
+    throwOnError: false,
+    enabled: !usingDemoData,
+  });
+
   // Tab state — Holdings / Returns / Narratives. Holdings is default since
   // that's the operational view; Returns is the analysis; Narratives surfaces
   // advisor text + Lens AI write-ups.
@@ -182,6 +207,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
   const activeRating      = usingDemoData ? DEMO_RATING       : rating;
   const activeRisk        = usingDemoData ? DEMO_RISK         : analytics?.riskMetrics;
   const activePerformance = usingDemoData ? makeDemoPerformance(perfRange) : performance;
+  const activeTax         = usingDemoData ? DEMO_TAX          : taxProfile;
 
   // Sortable holdings
   type HoldingSortKey = "ticker" | "shares" | "avgCost" | "price" | "fairValue" | "dayChange" | "value" | "pnl" | "signal";
@@ -294,6 +320,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
             <ReturnBreakdownCard data={activeReturns} />
           )}
           {activeRisk && <RiskMetricsCard metrics={activeRisk} />}
+          {activeTax && <TaxProfileCard tax={activeTax} />}
           {!advisorErrored && advisorData && (
             <PortfolioAthenaProfile advisor={advisorData} />
           )}
@@ -861,6 +888,136 @@ function NarrativesPanel({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Tax profile card (pillar #10). A 2×2 grid splits the return into its four
+ * tax buckets — ST/LT realized (YTD) and ST/LT unrealized — because the tax
+ * rate differs materially between them. Two action lists below: lots near
+ * the 1-year line (hold for lower tax), and underwater lots eligible for
+ * harvesting a deductible loss. Empty-state copy when nothing is flagged.
+ */
+function TaxProfileCard({ tax }: { tax: PortfolioTaxProfile }) {
+  const fmt$ = (n: number) => {
+    const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+    return `${sign}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  };
+  const tone = (n: number) =>
+    n > 0 ? "text-emerald-500" : n < 0 ? "text-red-500" : "text-foreground";
+
+  const cells: Array<{ label: string; value: number; hint: string }> = [
+    {
+      label: "Short-term unrealized",
+      value: tax.shortTermUnrealizedPnl,
+      hint: "Would be taxed as ordinary income if sold today",
+    },
+    {
+      label: "Long-term unrealized",
+      value: tax.longTermUnrealizedPnl,
+      hint: "Held > 1 year · qualifies for lower capital-gains rate",
+    },
+    {
+      label: "Short-term realized (YTD)",
+      value: tax.shortTermRealizedPnlYtd,
+      hint: "Already booked this year at ordinary income rate",
+    },
+    {
+      label: "Long-term realized (YTD)",
+      value: tax.longTermRealizedPnlYtd,
+      hint: "Already booked this year at long-term rate",
+    },
+  ];
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <h3 className="font-[var(--font-heading)] text-base font-semibold">Tax profile</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Short-term vs long-term breakdown · FIFO lot matching · not tax advice
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {cells.map((c) => (
+          <div key={c.label} className="rounded-lg border border-border bg-background/50 p-3.5">
+            <p className="text-[11px] text-muted-foreground">{c.label}</p>
+            <p className={`font-[var(--font-mono)] text-xl font-semibold mt-1 ${tone(c.value)}`}>
+              {fmt$(c.value)}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1 leading-snug">{c.hint}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Near-long-term lots — holding action, not selling action */}
+      {tax.nearLongTerm.length > 0 && (
+        <div className="mt-5">
+          <p className="text-[11px] uppercase tracking-widest text-teal-500 mb-2">
+            Crossing to long-term soon
+          </p>
+          <div className="space-y-1.5">
+            {tax.nearLongTerm.map((lot) => (
+              <div
+                key={`${lot.ticker}-${lot.daysUntilLongTerm}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-teal-500/20 bg-teal-500/5 px-3 py-2 text-sm"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-[var(--font-mono)] font-semibold">{lot.ticker}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {lot.quantity} sh · gain {fmt$(lot.unrealizedPnl)}
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-teal-500">
+                  {lot.daysUntilLongTerm}d to LT
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Harvest candidates — action list */}
+      {tax.taxLossHarvest.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[11px] uppercase tracking-widest text-amber-500 mb-2">
+            Tax-loss harvest candidates
+          </p>
+          <div className="space-y-1.5">
+            {tax.taxLossHarvest.map((lot) => (
+              <div
+                key={`${lot.ticker}-${lot.daysHeld}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-[var(--font-mono)] font-semibold">{lot.ticker}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {lot.quantity} sh · {lot.daysHeld}d held · {lot.holdingType === "long" ? "LT" : "ST"}
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-red-500 font-[var(--font-mono)]">
+                  {fmt$(lot.unrealizedPnl)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tax.nearLongTerm.length === 0 && tax.taxLossHarvest.length === 0 && (
+        <p className="mt-4 text-xs text-muted-foreground">
+          No lots flagged. Check back during the year — conversions and
+          harvest candidates surface as the window and market move.
+        </p>
+      )}
+
+      <p className="mt-4 pt-3 border-t border-border text-[10px] text-muted-foreground">
+        Estimate only · FIFO lot matching, 1-year threshold · does not account
+        for wash-sale rules, state tax, or AMT · not tax advice.
+      </p>
     </div>
   );
 }

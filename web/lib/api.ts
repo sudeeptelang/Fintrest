@@ -555,6 +555,8 @@ export const api = {
   portfolioRating: (id: number) => authFetchApi<PortfolioRating>(`/portfolios/${id}/rating`).catch(() => null),
   portfolioPerformance: (id: number, range: string = "3m") =>
     authFetchApi<PerformanceSeries>(`/portfolios/${id}/performance?range=${range}`).catch(() => null),
+  portfolioTax: (id: number) =>
+    authFetchApi<PortfolioTaxProfile>(`/portfolios/${id}/tax`).catch(() => null),
   deletePortfolio: (id: number) =>
     authFetchApi<void>(`/portfolios/${id}`, { method: "DELETE" }),
   portfolioAdvisor: (id: number) => authFetchApi<AdvisorResult>(`/portfolios/${id}/advisor`),
@@ -696,6 +698,26 @@ export interface PerformanceSeries {
   finalPortfolioReturnPct: number | null;
   finalBenchmarkReturnPct: number | null;
   finalAlphaPct: number | null;
+}
+
+export interface PortfolioTaxProfile {
+  shortTermUnrealizedPnl: number;
+  longTermUnrealizedPnl: number;
+  shortTermRealizedPnlYtd: number;
+  longTermRealizedPnlYtd: number;
+  nearLongTerm: Array<{
+    ticker: string;
+    quantity: number;
+    unrealizedPnl: number;
+    daysUntilLongTerm: number;
+  }>;
+  taxLossHarvest: Array<{
+    ticker: string;
+    quantity: number;
+    unrealizedPnl: number;
+    daysHeld: number;
+    holdingType: "short" | "long";
+  }>;
 }
 
 export interface AdvisorResult {

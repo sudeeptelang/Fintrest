@@ -94,6 +94,38 @@ public record PerformanceSeriesResponse(
     double? FinalAlphaPct
 );
 
+/// <summary>
+/// Pillar #10 of the portfolio spec — tax efficiency. Splits realized and
+/// unrealized gains into short-term (≤ 1 year held, taxed as ordinary income)
+/// vs long-term (&gt; 1 year, lower capital-gains rate) using FIFO lot matching.
+/// Surfaces two action lists: lots within 45 days of crossing the 1-year line
+/// (hold for lower tax) and underwater positions that could be harvested for
+/// a tax-deductible loss.
+/// </summary>
+public record TaxProfileResponse(
+    double ShortTermUnrealizedPnl,
+    double LongTermUnrealizedPnl,
+    double ShortTermRealizedPnlYtd,
+    double LongTermRealizedPnlYtd,
+    List<NearLongTermLot> NearLongTerm,
+    List<TaxLossHarvestLot> TaxLossHarvest
+);
+
+public record NearLongTermLot(
+    string Ticker,
+    double Quantity,
+    double UnrealizedPnl,
+    int DaysUntilLongTerm
+);
+
+public record TaxLossHarvestLot(
+    string Ticker,
+    double Quantity,
+    double UnrealizedPnl,
+    int DaysHeld,
+    string HoldingType     // "short" | "long"
+);
+
 public record RecommendationResponse(
     long Id,
     string Type,
