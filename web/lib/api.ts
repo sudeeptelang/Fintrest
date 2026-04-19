@@ -555,6 +555,8 @@ export const api = {
   portfolioRating: (id: number) => authFetchApi<PortfolioRating>(`/portfolios/${id}/rating`).catch(() => null),
   portfolioPerformance: (id: number, range: string = "3m") =>
     authFetchApi<PerformanceSeries>(`/portfolios/${id}/performance?range=${range}`).catch(() => null),
+  deletePortfolio: (id: number) =>
+    authFetchApi<void>(`/portfolios/${id}`, { method: "DELETE" }),
   portfolioAdvisor: (id: number) => authFetchApi<AdvisorResult>(`/portfolios/${id}/advisor`),
   addTransaction: (portfolioId: number, req: { stockTicker: string; type: string; quantity: number; price: number; fees?: number }) =>
     authFetchApi<Transaction>(`/portfolios/${portfolioId}/transactions`, {

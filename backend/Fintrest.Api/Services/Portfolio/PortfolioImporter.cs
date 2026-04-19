@@ -57,7 +57,9 @@ public class PortfolioImporter(
         var parsed = ParseCsv(csvStream);
         logger.LogInformation("Parsed {Count} holdings from CSV", parsed.Count);
 
-        // 2. Create portfolio
+        // 2. Create portfolio. The first SaveChanges is the most likely to hit
+        // the Npgsql+pgbouncer disposed-connector race on a cold connection, so
+        // it runs through the same retry helper as the big batch below.
         var portfolio = new Models.Portfolio
         {
             UserId = userId,
@@ -65,7 +67,7 @@ public class PortfolioImporter(
             CashBalance = cashBalance ?? 0,
         };
         db.Portfolios.Add(portfolio);
-        await db.SaveChangesAsync(ct);
+        await SaveWithRetryAsync(ct);
 
         // 3. Match tickers to stocks, auto-add missing ones
         var notFound = new List<string>();

@@ -114,6 +114,38 @@ public class PortfolioController(
         return Created($"/api/v1/portfolios/{portfolio.Id}", response);
     }
 
+    /// <summary>
+    /// Delete a portfolio and everything attached to it — holdings, transactions,
+    /// snapshots, AI recommendations, risk metrics. Idempotent: 404 only if the
+    /// portfolio doesn't exist or belongs to another user.
+    /// </summary>
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeletePortfolio(long id, CancellationToken ct)
+    {
+        var userId = await GetUserId();
+        var portfolio = await db.Portfolios
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId, ct);
+        if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
+
+        // Bulk-delete children first. Using ExecuteDeleteAsync (EF 7+) so we
+        // don't load the rows into the change tracker just to mark them deleted.
+        await db.Set<Models.PortfolioHolding>()
+            .Where(h => h.PortfolioId == id).ExecuteDeleteAsync(ct);
+        await db.Set<Models.PortfolioTransaction>()
+            .Where(t => t.PortfolioId == id).ExecuteDeleteAsync(ct);
+        await db.Set<Models.PortfolioSnapshot>()
+            .Where(s => s.PortfolioId == id).ExecuteDeleteAsync(ct);
+        await db.Set<Models.PortfolioAiRecommendation>()
+            .Where(r => r.PortfolioId == id).ExecuteDeleteAsync(ct);
+        await db.Set<Models.PortfolioRiskMetric>()
+            .Where(r => r.PortfolioId == id).ExecuteDeleteAsync(ct);
+
+        db.Portfolios.Remove(portfolio);
+        await db.SaveChangesAsync(ct);
+
+        return NoContent();
+    }
+
     /// <summary>Get a single portfolio with summary.</summary>
     [HttpGet("{id}")]
     public async Task<ActionResult<PortfolioResponse>> GetPortfolio(long id)
