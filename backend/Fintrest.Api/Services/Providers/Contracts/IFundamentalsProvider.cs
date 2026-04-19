@@ -48,7 +48,23 @@ public interface IFundamentalsProvider
     /// columns on the analyst consensus widget that Finnhub's free tier doesn't
     /// expose.</summary>
     Task<PriceTargetSummary?> GetPriceTargetSummaryAsync(string ticker, CancellationToken ct = default);
+
+    /// <summary>Recent analyst rating change events (upgrades / downgrades /
+    /// reiterations). Returned newest-first. Drives the v3 breadth feature that
+    /// reads net direction of sentiment changes over rolling windows.</summary>
+    Task<List<AnalystGradeEvent>> GetAnalystGradeEventsAsync(string ticker, DateTime since, CancellationToken ct = default);
 }
+
+/// <summary>One rating-change event from a covering analyst. Action is a
+/// string because FMP surfaces a half-dozen values ("up", "down", "initialize",
+/// "reiterate", "target"); downstream code normalizes to three buckets.</summary>
+public record AnalystGradeEvent(
+    DateTime Date,
+    string? Action,          // "up" | "down" | "reiterate" | "initialize" | "target"
+    string? NewGrade,
+    string? PreviousGrade,
+    string? GradingCompany
+);
 
 public record PriceTargetSummary(
     double? TargetHigh,

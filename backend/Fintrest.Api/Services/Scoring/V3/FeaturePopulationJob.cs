@@ -85,10 +85,12 @@ public class FeaturePopulationJob(
         try
         {
             using var scope = scopeFactory.CreateScope();
-            var db         = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var bulk       = scope.ServiceProvider.GetRequiredService<FeatureBulkRepository>();
-            var features   = scope.ServiceProvider.GetRequiredService<IEnumerable<IFeature>>().ToList();
-            var sectorMap  = scope.ServiceProvider.GetRequiredService<SectorMap>();
+            var db          = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bulk        = scope.ServiceProvider.GetRequiredService<FeatureBulkRepository>();
+            var features    = scope.ServiceProvider.GetRequiredService<IEnumerable<IFeature>>().ToList();
+            var sectorMap   = scope.ServiceProvider.GetRequiredService<SectorMap>();
+            var fundamentals = scope.ServiceProvider
+                .GetRequiredService<Providers.Contracts.IFundamentalsProvider>();
 
             db.Set<FeatureRunLog>().Add(log);
             await db.SaveChangesAsync(ct);
@@ -146,13 +148,39 @@ public class FeaturePopulationJob(
                     string.Join(",", sectorEtfs.Except(sectorBarsByEtf.Keys)));
             }
 
+            // Pre-load analyst rating-change events per ticker. The FMP rate
+            // limiter in-process smooths the burst; parallelism is capped so we
+            // don't exceed Premier's 750/min budget on a cold start.
+            var revisionsSince = DateTime.UtcNow.AddDays(-120);
+            var analystRevisions = new System.Collections.Concurrent.ConcurrentDictionary<
+                string, IReadOnlyList<Providers.Contracts.AnalystGradeEvent>>();
+            await Parallel.ForEachAsync(
+                stocks.Select(s => s.Ticker),
+                new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = ct },
+                async (ticker, token) =>
+                {
+                    try
+                    {
+                        var events = await fundamentals.GetAnalystGradeEventsAsync(ticker, revisionsSince, token);
+                        analystRevisions[ticker] = events;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogDebug(ex, "analyst grade events fetch failed for {Ticker}", ticker);
+                    }
+                });
+            logger.LogInformation(
+                "Loaded analyst grade events for {Count} of {Universe} tickers",
+                analystRevisions.Count, stocks.Count);
+
             var ctx = new FeatureComputationContext
             {
-                TradeDate       = tradeDate,
-                UniverseTickers = stocks.Select(s => s.Ticker).ToList(),
-                BarsByTicker    = barsByTicker,
-                SectorBars      = sectorBarsByEtf,
-                StocksByTicker  = stocks.ToDictionary(s => s.Ticker),
+                TradeDate                 = tradeDate,
+                UniverseTickers           = stocks.Select(s => s.Ticker).ToList(),
+                BarsByTicker              = barsByTicker,
+                SectorBars                = sectorBarsByEtf,
+                StocksByTicker            = stocks.ToDictionary(s => s.Ticker),
+                AnalystRevisionsByTicker  = analystRevisions.ToDictionary(kv => kv.Key, kv => kv.Value),
             };
 
             // 2. For each enabled feature, walk the universe and compute.

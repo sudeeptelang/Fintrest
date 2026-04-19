@@ -1,4 +1,5 @@
 using Fintrest.Api.Models;
+using Fintrest.Api.Services.Providers.Contracts;
 
 namespace Fintrest.Api.Services.Scoring.V3;
 
@@ -34,6 +35,14 @@ public class FeatureComputationContext
     /// One entry per ticker in <see cref="UniverseTickers"/>.</summary>
     public IReadOnlyDictionary<string, Stock> StocksByTicker { get; init; }
         = new Dictionary<string, Stock>();
+
+    /// <summary>Analyst rating-change events (up/down/reiterate) per ticker,
+    /// pre-loaded from FMP over the last ~120 days at the start of each run.
+    /// Empty list means we fetched and got nothing; missing key means we
+    /// didn't fetch (universe skip, rate-limit failure, etc.). The breadth
+    /// feature distinguishes the two.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<AnalystGradeEvent>> AnalystRevisionsByTicker { get; init; }
+        = new Dictionary<string, IReadOnlyList<AnalystGradeEvent>>();
 
     /// <summary>Per-provider call counter. Feature implementations that call an
     /// external API must increment their provider's counter — the run log uses

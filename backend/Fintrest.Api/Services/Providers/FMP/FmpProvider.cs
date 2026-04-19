@@ -357,6 +357,35 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         );
     }
 
+    public async Task<List<AnalystGradeEvent>> GetAnalystGradeEventsAsync(
+        string ticker, DateTime since, CancellationToken ct = default)
+    {
+        // FMP stable: /grades returns the firehose of analyst grade changes for a
+        // symbol (up / down / initialize / reiterate / target). Filter client-side
+        // by date so downstream code doesn't need to know the endpoint quirks.
+        var url = $"{_baseUrl}/grades?symbol={ticker}&apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpGradeEvent>>(url, ct);
+        if (rows is null) return [];
+
+        var sinceUtc = since.Kind == DateTimeKind.Utc ? since : DateTime.SpecifyKind(since, DateTimeKind.Utc);
+        var events = new List<AnalystGradeEvent>();
+        foreach (var r in rows)
+        {
+            if (!DateTime.TryParse(r.Date, out var d)) continue;
+            d = DateTime.SpecifyKind(d, DateTimeKind.Utc);
+            if (d < sinceUtc) continue;
+            events.Add(new AnalystGradeEvent(
+                Date:           d,
+                Action:         r.Action?.Trim().ToLowerInvariant(),
+                NewGrade:       r.NewGrade,
+                PreviousGrade:  r.PreviousGrade,
+                GradingCompany: r.GradingCompany
+            ));
+        }
+        events.Sort((a, b) => b.Date.CompareTo(a.Date));
+        return events;
+    }
+
     public async Task<List<EarningCalendarEntry>> GetEarningCalendarAsync(DateTime from, DateTime to, CancellationToken ct = default)
     {
         // FMP stable: /earning-calendar with date range returns all companies reporting.
@@ -562,6 +591,15 @@ file record FmpGradesConsensus(
     [property: JsonPropertyName("sell")]       int? Sell,
     [property: JsonPropertyName("strongSell")] int? StrongSell,
     [property: JsonPropertyName("consensus")]  string? Consensus
+);
+
+file record FmpGradeEvent(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("date")] string? Date,
+    [property: JsonPropertyName("gradingCompany")] string? GradingCompany,
+    [property: JsonPropertyName("previousGrade")] string? PreviousGrade,
+    [property: JsonPropertyName("newGrade")] string? NewGrade,
+    [property: JsonPropertyName("action")] string? Action
 );
 
 file record FmpPriceTargetSummary(
