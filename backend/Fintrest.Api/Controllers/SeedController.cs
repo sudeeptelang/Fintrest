@@ -69,6 +69,50 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
         });
     }
 
+    /// <summary>Targeted ingest — pulls bars + fundamentals + news for the
+    /// specific tickers only, bypassing the full-universe loop. Useful when you
+    /// just added a handful of new tickers (e.g. sector ETFs) and don't want
+    /// the broader ingest to churn through 1500 rows refreshing data that's
+    /// already fresh.
+    /// Body: <c>{ "tickers": ["XLK", "XLF", ...] }</c>.</summary>
+    [HttpPost("ingest/tickers")]
+    public async Task<IActionResult> SeedIngestTickers(
+        [FromBody] SeedRequest request, CancellationToken ct)
+    {
+        var tickers = (request?.Tickers ?? []).Select(t => t.Trim().ToUpperInvariant()).Distinct().ToList();
+        if (tickers.Count == 0) return BadRequest(new { message = "No tickers supplied" });
+
+        var perTicker = new List<object>();
+        int totalBars = 0, totalFunds = 0, totalNews = 0, errors = 0;
+
+        foreach (var ticker in tickers)
+        {
+            try
+            {
+                var counts = await ingestion.IngestStockAsync(ticker, ct, backfill: true);
+                totalBars  += counts.Bars;
+                totalFunds += counts.Fundamentals;
+                totalNews  += counts.News;
+                perTicker.Add(new { ticker, bars = counts.Bars, funds = counts.Fundamentals, news = counts.News });
+            }
+            catch (Exception ex)
+            {
+                errors++;
+                perTicker.Add(new { ticker, error = ex.Message });
+            }
+        }
+
+        return Ok(new
+        {
+            TickersRequested = tickers.Count,
+            BarsIngested     = totalBars,
+            Fundamentals     = totalFunds,
+            News             = totalNews,
+            Errors           = errors,
+            PerTicker        = perTicker,
+        });
+    }
+
     /// <summary>Ingest market data for all stocks.
     /// <paramref name="maxParallel"/> caps concurrent stock fetches (default 6).</summary>
     [HttpPost("ingest")]
