@@ -109,8 +109,11 @@ public class DataIngestionService(
     }
 
     /// <summary>Ingest a single stock (for on-demand refresh). Returns per-source counts
-    /// so the bulk runner can aggregate telemetry.</summary>
-    public async Task<StockIngestCounts> IngestStockAsync(string ticker, CancellationToken ct = default, bool backfill = false)
+    /// so the bulk runner can aggregate telemetry. Set <paramref name="barsOnly"/> when
+    /// you only need OHLCV (e.g. sector ETFs added for the v3 benchmark feeds) — skips
+    /// the fundamentals + news paths, which generate huge EF batches (80+ inserts per
+    /// ticker for popular ETFs) that frequently trip the Npgsql pgbouncer race.</summary>
+    public async Task<StockIngestCounts> IngestStockAsync(string ticker, CancellationToken ct = default, bool backfill = false, bool barsOnly = false)
     {
         var stock = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker.ToUpper() == ticker.ToUpper(), ct);
         if (stock is null)
@@ -123,6 +126,14 @@ public class DataIngestionService(
         var bars = backfill
             ? await BackfillMarketDataAsync(stock, ct)
             : await IngestMarketDataAsync(stock, ct);
+
+        if (barsOnly)
+        {
+            // Bars land via the Dapper writer inside (Backfill|Ingest)MarketDataAsync,
+            // so there's nothing to flush on the EF side — skip SaveChanges entirely.
+            return new StockIngestCounts(bars, 0, 0);
+        }
+
         var funds = await IngestFundamentalsAsync(stock, ct);
         var news = await IngestNewsAsync(stock, ct);
         await db.SaveChangesAsync(ct);

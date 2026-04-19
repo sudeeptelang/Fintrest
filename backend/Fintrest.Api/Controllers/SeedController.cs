@@ -77,7 +77,9 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
     /// Body: <c>{ "tickers": ["XLK", "XLF", ...] }</c>.</summary>
     [HttpPost("ingest/tickers")]
     public async Task<IActionResult> SeedIngestTickers(
-        [FromBody] SeedRequest request, CancellationToken ct)
+        [FromBody] SeedRequest request,
+        [FromQuery] bool barsOnly = false,
+        CancellationToken ct = default)
     {
         var tickers = (request?.Tickers ?? []).Select(t => t.Trim().ToUpperInvariant()).Distinct().ToList();
         if (tickers.Count == 0) return BadRequest(new { message = "No tickers supplied" });
@@ -89,7 +91,7 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
         {
             try
             {
-                var counts = await ingestion.IngestStockAsync(ticker, ct, backfill: true);
+                var counts = await ingestion.IngestStockAsync(ticker, ct, backfill: true, barsOnly: barsOnly);
                 totalBars  += counts.Bars;
                 totalFunds += counts.Fundamentals;
                 totalNews  += counts.News;
