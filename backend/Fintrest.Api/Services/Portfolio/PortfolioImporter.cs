@@ -5,6 +5,7 @@ using Fintrest.Api.Data;
 using Fintrest.Api.Models;
 using Fintrest.Api.Services.Ingestion;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Fintrest.Api.Services.Portfolio;
 
@@ -140,7 +141,11 @@ public class PortfolioImporter(
             imported++;
         }
 
-        await db.SaveChangesAsync(ct);
+        // Npgsql 10 + Supabase pgbouncer still surface the disposed-connector race
+        // on large SaveChanges batches (the Holdings import SQL is ~140 commands for
+        // an 8-position portfolio). Retry 3x with pool clears — same pattern used in
+        // DataIngestionService / FeatureBulkRepository.
+        await SaveWithRetryAsync(ct);
 
         // Calculate totals
         var holdings = await db.PortfolioHoldings
@@ -380,5 +385,42 @@ public class PortfolioImporter(
         if (joined.Contains("webull")) return "Webull";
         if (joined.Contains("m1")) return "M1";
         return "Generic CSV";
+    }
+
+    /// <summary>Retry the batched SaveChangesAsync on the Npgsql+pgbouncer
+    /// disposed-connector race. 3 attempts, pool clear between retries, linear
+    /// backoff. Only catches transient signatures — real DbUpdateException
+    /// body issues bubble up as before.</summary>
+    private async Task SaveWithRetryAsync(CancellationToken ct)
+    {
+        const int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                return;
+            }
+            catch (Exception ex) when (attempt < maxAttempts && IsTransient(ex))
+            {
+                NpgsqlConnection.ClearAllPools();
+                logger.LogWarning(
+                    "PortfolioImporter.SaveChangesAsync transient error (attempt {Attempt}/{Max}): {Type}: {Msg}",
+                    attempt, maxAttempts, ex.GetType().Name, ex.Message);
+                await Task.Delay(TimeSpan.FromMilliseconds(500 * attempt), ct);
+            }
+        }
+    }
+
+    private static bool IsTransient(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException!)
+        {
+            if (e is ObjectDisposedException) return true;
+            if (e is NpgsqlException) return true;
+            if (e is System.Net.Sockets.SocketException) return true;
+            if (e is TimeoutException) return true;
+        }
+        return false;
     }
 }

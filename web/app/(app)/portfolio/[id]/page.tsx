@@ -6,7 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics, type PortfolioRating, type AdvisorResult } from "@/lib/api";
+import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics, type PortfolioRating, type AdvisorResult, type PerformanceSeries, type PerformancePoint } from "@/lib/api";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-profile";
 
@@ -148,12 +149,23 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
     enabled: !usingDemoData,
   });
 
-  // WSZ-style letter-grade rating. Separate endpoint because it piggybacks on
-  // the advisor compute (which is slow) and we don't want to block the page
-  // on it — renders as soon as ready, degrades to skeleton if it fails.
+  // Letter-grade rating. Separate endpoint because it piggybacks on the advisor
+  // compute (which is slow) and we don't want to block the page on it — renders
+  // as soon as ready, degrades to skeleton if it fails.
   const { data: rating } = useQuery({
     queryKey: ["portfolio-rating", portfolioId],
     queryFn: () => api.portfolioRating(portfolioId),
+    retry: false,
+    throwOnError: false,
+    enabled: !usingDemoData,
+  });
+
+  // Performance-vs-market time series. Range is user-selectable; query refetches
+  // automatically when it changes.
+  const [perfRange, setPerfRange] = useState<"1m" | "3m" | "6m" | "1y" | "ytd" | "all">("3m");
+  const { data: performance } = useQuery({
+    queryKey: ["portfolio-performance", portfolioId, perfRange],
+    queryFn: () => api.portfolioPerformance(portfolioId, perfRange),
     retry: false,
     throwOnError: false,
     enabled: !usingDemoData,
@@ -166,9 +178,10 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
   const [activeTab, setActiveTab] = useState<PortfolioTab>("holdings");
 
   // Unify demo + live sources so the rest of the render branches on one variable.
-  const activeReturns = usingDemoData ? DEMO_RETURNS : returns;
-  const activeRating  = usingDemoData ? DEMO_RATING  : rating;
-  const activeRisk    = usingDemoData ? DEMO_RISK    : analytics?.riskMetrics;
+  const activeReturns     = usingDemoData ? DEMO_RETURNS      : returns;
+  const activeRating      = usingDemoData ? DEMO_RATING       : rating;
+  const activeRisk        = usingDemoData ? DEMO_RISK         : analytics?.riskMetrics;
+  const activePerformance = usingDemoData ? makeDemoPerformance(perfRange) : performance;
 
   // Sortable holdings
   type HoldingSortKey = "ticker" | "shares" | "avgCost" | "price" | "fairValue" | "dayChange" | "value" | "pnl" | "signal";
@@ -267,6 +280,13 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
       {/* --- Returns tab: analysis cards --- */}
       {activeTab === "returns" && (
         <div className="space-y-6">
+          {activePerformance && activePerformance.points.length >= 2 && (
+            <PerformanceChart
+              data={activePerformance}
+              range={perfRange}
+              onRangeChange={setPerfRange}
+            />
+          )}
           {activeRating && activeRating.coverage > 0 && (
             <PortfolioRatingCard rating={activeRating} />
           )}
@@ -277,7 +297,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
           {!advisorErrored && advisorData && (
             <PortfolioAthenaProfile advisor={advisorData} />
           )}
-          {!activeRating && !activeReturns && !activeRisk && !advisorData && (
+          {!activePerformance && !activeRating && !activeReturns && !activeRisk && !advisorData && (
             <EmptyTabState
               title="No analysis yet"
               body="Analysis populates once the daily scan runs against your holdings. Check back after 6:30 AM ET."
@@ -528,6 +548,231 @@ function PortfolioKpiStrip({
       })}
     </div>
   );
+}
+
+/**
+ * Performance-vs-market line chart. Portfolio line + SPY line both indexed to
+ * 100 at t0, which makes their relative growth directly comparable — the chart
+ * users see on SimplyWall.st, Morningstar, etc. Timeframe toggle chips sit in
+ * the card header (1M / 3M / 6M / YTD / 1Y / All).
+ */
+function PerformanceChart({
+  data,
+  range,
+  onRangeChange,
+}: {
+  data: PerformanceSeries;
+  range: string;
+  onRangeChange: (r: "1m" | "3m" | "6m" | "1y" | "ytd" | "all") => void;
+}) {
+  const chartData = data.points.map((p) => ({
+    date: p.date,
+    portfolio: p.portfolioIndex,
+    benchmark: p.benchmarkIndex,
+  }));
+
+  const portfolioFinal = data.finalPortfolioReturnPct;
+  const benchmarkFinal = data.finalBenchmarkReturnPct;
+  const alphaFinal = data.finalAlphaPct;
+
+  const fmtPct = (n: number | null | undefined) =>
+    n == null ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+
+  const ranges: Array<{ key: "1m" | "3m" | "6m" | "1y" | "ytd" | "all"; label: string }> = [
+    { key: "1m",  label: "1M" },
+    { key: "3m",  label: "3M" },
+    { key: "6m",  label: "6M" },
+    { key: "ytd", label: "YTD" },
+    { key: "1y",  label: "1Y" },
+    { key: "all", label: "All" },
+  ];
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+        <div>
+          <h3 className="font-[var(--font-heading)] text-base font-semibold">
+            Performance vs market
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Portfolio indexed to 100 alongside {data.benchmark} over the same window
+          </p>
+        </div>
+        <div className="flex items-center gap-1 flex-wrap">
+          {ranges.map((r) => (
+            <button
+              key={r.key}
+              onClick={() => onRangeChange(r.key)}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-colors ${
+                range === r.key
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Final return summary row — mirrors the chart legend so the value is
+          readable without hovering. */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="rounded-lg border border-border bg-background/50 px-3 py-2">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Portfolio</p>
+          <p className={`font-[var(--font-mono)] text-base font-semibold ${
+            portfolioFinal == null ? "text-foreground"
+            : portfolioFinal >= 0 ? "text-emerald-500" : "text-red-500"
+          }`}>
+            {fmtPct(portfolioFinal)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-background/50 px-3 py-2">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{data.benchmark}</p>
+          <p className={`font-[var(--font-mono)] text-base font-semibold ${
+            benchmarkFinal == null ? "text-foreground"
+            : benchmarkFinal >= 0 ? "text-foreground" : "text-red-500"
+          }`}>
+            {fmtPct(benchmarkFinal)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+          <p className="text-[10px] uppercase tracking-wider text-primary/80">Alpha</p>
+          <p className={`font-[var(--font-mono)] text-base font-semibold ${
+            alphaFinal == null ? "text-foreground"
+            : alphaFinal >= 0 ? "text-emerald-500" : "text-red-500"
+          }`}>
+            {fmtPct(alphaFinal)}
+          </p>
+        </div>
+      </div>
+
+      <div className="h-[260px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+            <CartesianGrid stroke="rgba(0,0,0,.06)" strokeDasharray="3 3" />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 10, fill: "currentColor", opacity: 0.6 }}
+              tickFormatter={(d: string) =>
+                new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+              }
+              minTickGap={48}
+            />
+            <YAxis
+              tick={{ fontSize: 10, fill: "currentColor", opacity: 0.6 }}
+              width={36}
+              domain={["auto", "auto"]}
+            />
+            <Tooltip
+              contentStyle={{
+                fontSize: 12,
+                borderRadius: 8,
+                border: "1px solid rgba(0,0,0,.1)",
+                background: "rgba(255,255,255,.98)",
+              }}
+              labelFormatter={(label) => {
+                if (typeof label !== "string") return "";
+                return new Date(label).toLocaleDateString("en-US", {
+                  year: "numeric", month: "short", day: "numeric",
+                });
+              }}
+              formatter={(value, name) => {
+                const n = typeof value === "number" ? value : Number(value);
+                const pretty = `${n.toFixed(2)} (${(n - 100).toFixed(2)}%)`;
+                const label = name === "portfolio" ? "Portfolio" : data.benchmark;
+                return [pretty, label];
+              }}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
+              formatter={(v) => (v === "portfolio" ? "Portfolio" : data.benchmark)}
+            />
+            <Line
+              type="monotone"
+              dataKey="portfolio"
+              stroke="rgb(16 185 129)"
+              strokeWidth={2}
+              dot={false}
+              isAnimationActive={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="benchmark"
+              stroke="rgb(107 98 89)"
+              strokeWidth={1.5}
+              strokeDasharray="4 3"
+              dot={false}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+/** Synthetic performance series for /portfolio/4. Portfolio ends +68% at
+ *  current value (matches DEMO_RETURNS); SPY ends +42% (matches DEMO_RETURNS.
+ *  benchmarkReturnPct). Both are smooth random walks to that endpoint. */
+function makeDemoPerformance(range: string): PerformanceSeries {
+  const days = range === "1m" ? 22
+    : range === "3m" ? 66
+    : range === "6m" ? 130
+    : range === "1y" ? 260
+    : range === "ytd" ? 80
+    : 780; // "all" ≈ 3y
+  const targetP = 100 * (1 + 0.695);       // portfolio ends near 169.5
+  const targetB = 100 * (1 + 0.418);       // SPY ends near 141.8
+
+  let hP = 0xdeadbeef, hB = 0xbeeffeed;
+  const rnd = (state: number) => {
+    const s = (state * 1664525 + 1013904223) >>> 0;
+    return { n: s, v: (s & 0xffffffff) / 0xffffffff };
+  };
+
+  const points = [] as PerformancePoint[];
+  for (let i = 0; i < days; i++) {
+    const t = i / (days - 1);
+    const baseP = 100 + (targetP - 100) * t;
+    const baseB = 100 + (targetB - 100) * t;
+
+    const rpP = rnd(hP); hP = rpP.n;
+    const rpB = rnd(hB); hB = rpB.n;
+    const noiseP = (rpP.v - 0.5) * 3.5;
+    const noiseB = (rpB.v - 0.5) * 1.8;
+
+    const p = Math.max(50, baseP + noiseP);
+    const b = Math.max(50, baseB + noiseB);
+
+    const date = new Date(Date.now() - (days - 1 - i) * 86400000);
+    points.push({
+      date:               date.toISOString(),
+      portfolioIndex:     p,
+      benchmarkIndex:     b,
+      portfolioReturnPct: p - 100,
+      benchmarkReturnPct: b - 100,
+    });
+  }
+  if (points.length > 0) {
+    points[0] = { ...points[0], portfolioIndex: 100, benchmarkIndex: 100, portfolioReturnPct: 0, benchmarkReturnPct: 0 };
+    const last = points[points.length - 1];
+    points[points.length - 1] = {
+      ...last,
+      portfolioIndex:     targetP,
+      benchmarkIndex:     targetB,
+      portfolioReturnPct: targetP - 100,
+      benchmarkReturnPct: targetB - 100,
+    };
+  }
+  return {
+    benchmark: "SPY",
+    range,
+    points,
+    finalPortfolioReturnPct: targetP - 100,
+    finalBenchmarkReturnPct: targetB - 100,
+    finalAlphaPct:           (targetP - 100) - (targetB - 100),
+  };
 }
 
 /**

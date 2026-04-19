@@ -292,6 +292,151 @@ public class PortfolioController(
         )).ToList());
     }
 
+    /// <summary>
+    /// Portfolio value over time, indexed to 100, alongside the benchmark (SPY)
+    /// on the same index so the two are directly comparable. Falls back to a
+    /// synthetic series built from current holdings × market_data when no daily
+    /// snapshots exist yet (new portfolio, cron hasn't run).
+    /// </summary>
+    [HttpGet("{id}/performance")]
+    public async Task<ActionResult<PerformanceSeriesResponse>> GetPerformance(
+        long id, [FromQuery] string range = "3m", CancellationToken ct = default)
+    {
+        var userId = await GetUserId();
+        var portfolio = await db.Portfolios
+            .Include(p => p.Holdings)
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId, ct);
+        if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
+
+        var fromDate = range.ToLowerInvariant() switch
+        {
+            "1w"  => DateTime.UtcNow.AddDays(-7),
+            "1m"  => DateTime.UtcNow.AddMonths(-1),
+            "3m"  => DateTime.UtcNow.AddMonths(-3),
+            "6m"  => DateTime.UtcNow.AddMonths(-6),
+            "1y"  => DateTime.UtcNow.AddYears(-1),
+            "ytd" => new DateTime(DateTime.UtcNow.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            "all" => DateTime.UtcNow.AddYears(-5),
+            _     => DateTime.UtcNow.AddMonths(-3),
+        };
+
+        // Prefer persisted snapshots (they reflect actual transaction history).
+        var snapshots = await db.Set<Models.PortfolioSnapshot>()
+            .Where(s => s.PortfolioId == id && s.Date >= fromDate)
+            .OrderBy(s => s.Date)
+            .Select(s => new { s.Date, s.TotalValue })
+            .ToListAsync(ct);
+
+        // Fallback: rebuild from current holdings × daily closes. Assumes today's
+        // quantities held throughout the window — fine for stable portfolios,
+        // wrong for any rebalance older than the window. We flag this by keeping
+        // the Range string; the UI can append "(reconstructed)" if snapshots are
+        // empty. For ≤ 10 snapshots we also fall back, since the cron may have
+        // missed days.
+        List<(DateTime Date, double Value)> valueSeries;
+        if (snapshots.Count >= 10)
+        {
+            valueSeries = snapshots
+                .Select(s => (s.Date, s.TotalValue))
+                .ToList();
+        }
+        else
+        {
+            var stockIds = portfolio.Holdings.Select(h => h.StockId).Distinct().ToList();
+            if (stockIds.Count == 0)
+                return Ok(new PerformanceSeriesResponse("SPY", range, [], null, null, null));
+
+            var bars = await db.MarketData
+                .Where(m => stockIds.Contains(m.StockId) && m.Ts >= fromDate)
+                .Select(m => new { m.StockId, m.Ts, m.Close })
+                .ToListAsync(ct);
+
+            var dateGroups = bars
+                .GroupBy(b => b.Ts.Date)
+                .OrderBy(g => g.Key);
+
+            valueSeries = new();
+            foreach (var g in dateGroups)
+            {
+                var closes = g.ToDictionary(b => b.StockId, b => b.Close);
+                double value = 0;
+                bool complete = true;
+                foreach (var h in portfolio.Holdings)
+                {
+                    if (!closes.TryGetValue(h.StockId, out var c))
+                    {
+                        complete = false;
+                        break;
+                    }
+                    value += h.Quantity * c;
+                }
+                if (complete && value > 0) valueSeries.Add((g.Key, value));
+            }
+        }
+
+        if (valueSeries.Count < 2)
+            return Ok(new PerformanceSeriesResponse("SPY", range, [], null, null, null));
+
+        // SPY benchmark over the same window, date-aligned to portfolio points.
+        var spyStock = await db.Stocks.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Ticker == "SPY", ct);
+        var spyByDate = new Dictionary<DateTime, double>();
+        if (spyStock is not null)
+        {
+            var spyBars = await db.MarketData
+                .Where(m => m.StockId == spyStock.Id && m.Ts >= fromDate)
+                .Select(m => new { m.Ts, m.Close })
+                .ToListAsync(ct);
+            foreach (var b in spyBars) spyByDate[b.Ts.Date] = b.Close;
+        }
+
+        // Index both series to 100 at the first aligned point. Start point is
+        // whichever the portfolio has — we look up SPY's closest preceding close.
+        var t0 = valueSeries[0];
+        double? spyStart = null;
+        if (spyByDate.Count > 0)
+        {
+            var startSpy = spyByDate
+                .Where(kv => kv.Key <= t0.Date)
+                .OrderByDescending(kv => kv.Key)
+                .FirstOrDefault();
+            if (startSpy.Value > 0) spyStart = startSpy.Value;
+        }
+
+        var points = new List<PerformancePoint>(valueSeries.Count);
+        foreach (var (date, value) in valueSeries)
+        {
+            var portfolioIdx = value / t0.Value * 100;
+            double benchIdx = 100;
+            if (spyStart is > 0)
+            {
+                // Use the closest SPY close on or before this date
+                var spy = spyByDate
+                    .Where(kv => kv.Key <= date)
+                    .OrderByDescending(kv => kv.Key)
+                    .FirstOrDefault();
+                if (spy.Value > 0) benchIdx = spy.Value / spyStart.Value * 100;
+            }
+            points.Add(new PerformancePoint(
+                Date:                date,
+                PortfolioIndex:      Math.Round(portfolioIdx, 4),
+                BenchmarkIndex:      Math.Round(benchIdx, 4),
+                PortfolioReturnPct:  Math.Round(portfolioIdx - 100, 2),
+                BenchmarkReturnPct:  Math.Round(benchIdx - 100, 2)
+            ));
+        }
+
+        var last = points[^1];
+        return Ok(new PerformanceSeriesResponse(
+            Benchmark:                "SPY",
+            Range:                    range,
+            Points:                   points,
+            FinalPortfolioReturnPct:  last.PortfolioReturnPct,
+            FinalBenchmarkReturnPct:  last.BenchmarkReturnPct,
+            FinalAlphaPct:            Math.Round(last.PortfolioReturnPct - last.BenchmarkReturnPct, 2)
+        ));
+    }
+
     /// <summary>Get risk metrics and sector allocation analytics.</summary>
     [HttpGet("{id}/analytics")]
     public async Task<ActionResult<PortfolioAnalyticsResponse>> GetAnalytics(long id)

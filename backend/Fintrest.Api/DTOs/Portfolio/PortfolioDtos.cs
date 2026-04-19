@@ -72,6 +72,28 @@ public record SnapshotResponse(
     double CumulativeReturnPct
 );
 
+/// <summary>
+/// One point on the Performance vs Market chart. Both values are indexed to 100
+/// at the start of the requested window so the line chart shows relative growth,
+/// not absolute dollars — same treatment as SimplyWall.st's portfolio chart.
+/// </summary>
+public record PerformancePoint(
+    DateTime Date,
+    double PortfolioIndex,  // 100 at t0
+    double BenchmarkIndex,  // 100 at t0
+    double PortfolioReturnPct,  // cumulative return from t0
+    double BenchmarkReturnPct   // cumulative return from t0
+);
+
+public record PerformanceSeriesResponse(
+    string Benchmark,           // e.g. "SPY"
+    string Range,               // "1m" | "3m" | "6m" | "1y" | "all"
+    List<PerformancePoint> Points,
+    double? FinalPortfolioReturnPct,
+    double? FinalBenchmarkReturnPct,
+    double? FinalAlphaPct
+);
+
 public record RecommendationResponse(
     long Id,
     string Type,
