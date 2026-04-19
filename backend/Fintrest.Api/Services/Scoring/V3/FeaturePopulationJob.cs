@@ -85,9 +85,10 @@ public class FeaturePopulationJob(
         try
         {
             using var scope = scopeFactory.CreateScope();
-            var db       = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var bulk     = scope.ServiceProvider.GetRequiredService<FeatureBulkRepository>();
-            var features = scope.ServiceProvider.GetRequiredService<IEnumerable<IFeature>>().ToList();
+            var db         = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bulk       = scope.ServiceProvider.GetRequiredService<FeatureBulkRepository>();
+            var features   = scope.ServiceProvider.GetRequiredService<IEnumerable<IFeature>>().ToList();
+            var sectorMap  = scope.ServiceProvider.GetRequiredService<SectorMap>();
 
             db.Set<FeatureRunLog>().Add(log);
             await db.SaveChangesAsync(ct);
@@ -111,13 +112,47 @@ public class FeaturePopulationJob(
                     g => stockById[g.Key].Ticker,
                     g => (IReadOnlyList<MarketData>)g.OrderBy(m => m.Ts).ToList());
 
+            // Load bars for the sector benchmark ETFs (XLK, XLF, …, SPY). Separate
+            // query because these ETFs may or may not be flagged Active in `stocks`;
+            // sector-relative features need them regardless.
+            var sectorEtfs = sectorMap.CanonicalSectorLabels
+                .Select(label => sectorMap.GetEtfForSectorLabel(label))
+                .Append(sectorMap.MarketBenchmarkEtf)
+                .Distinct()
+                .ToList();
+            var sectorStocks = await db.Stocks
+                .Where(s => sectorEtfs.Contains(s.Ticker))
+                .ToListAsync(ct);
+            var sectorStockIds = sectorStocks.Select(s => s.Id).ToList();
+            var sectorBarRows = sectorStockIds.Count == 0
+                ? new List<MarketData>()
+                : await db.MarketData
+                    .Where(m => sectorStockIds.Contains(m.StockId) && m.Ts >= barCutoff)
+                    .OrderBy(m => m.Ts)
+                    .ToListAsync(ct);
+            var sectorStockById = sectorStocks.ToDictionary(s => s.Id);
+            var sectorBarsByEtf = sectorBarRows
+                .GroupBy(m => m.StockId)
+                .ToDictionary(
+                    g => sectorStockById[g.Key].Ticker,
+                    g => (IReadOnlyList<MarketData>)g.OrderBy(m => m.Ts).ToList());
+
+            if (sectorBarsByEtf.Count < sectorEtfs.Count)
+            {
+                logger.LogWarning(
+                    "Sector ETF bars missing for {Missing} of {Total} — sector-relative features will skip tickers in those sectors. Missing: {MissingList}",
+                    sectorEtfs.Count - sectorBarsByEtf.Count,
+                    sectorEtfs.Count,
+                    string.Join(",", sectorEtfs.Except(sectorBarsByEtf.Keys)));
+            }
+
             var ctx = new FeatureComputationContext
             {
                 TradeDate       = tradeDate,
                 UniverseTickers = stocks.Select(s => s.Ticker).ToList(),
                 BarsByTicker    = barsByTicker,
+                SectorBars      = sectorBarsByEtf,
                 StocksByTicker  = stocks.ToDictionary(s => s.Ticker),
-                // SectorBars left empty for M2.1; M2.2 populates it.
             };
 
             // 2. For each enabled feature, walk the universe and compute.

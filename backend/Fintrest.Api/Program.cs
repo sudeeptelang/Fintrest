@@ -115,6 +115,9 @@ builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
     Fintrest.Api.Services.Scoring.V3.Features.Volume.AccumulationDistributionFeature>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
     Fintrest.Api.Services.Scoring.V3.Features.Trend.CloseVsMa50PctFeature>();
+// ─── M2.2 Phase A ──────────────────────────────────────────────────────────
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.V3.IFeature,
+    Fintrest.Api.Services.Scoring.V3.Features.Sector.SectorRelativeStrengthFeature>();
 
 // Orchestrator is a singleton so the Timer lives through the app's lifetime;
 // HostedService auto-registers via AddHostedService and pulls the same instance.
