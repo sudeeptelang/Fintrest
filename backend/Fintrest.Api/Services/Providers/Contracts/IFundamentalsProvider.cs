@@ -36,7 +36,27 @@ public interface IFundamentalsProvider
     /// <summary>Global earning calendar for a date range (no symbol filter).
     /// Used by the dashboard earnings widget so it works without per-stock ingestion.</summary>
     Task<List<EarningCalendarEntry>> GetEarningCalendarAsync(DateTime from, DateTime to, CancellationToken ct = default);
+
+    /// <summary>Analyst rating consensus — counts across 5 rating buckets + the
+    /// aggregate recommendation. Used as a fallback when the primary Finnhub feed
+    /// is unavailable. Returns null when FMP has no data for the ticker.
+    /// Shares the <c>AnalystConsensus</c> record defined in INewsProvider so the
+    /// controller can merge Finnhub + FMP results without field-mapping gymnastics.</summary>
+    Task<AnalystConsensus?> GetAnalystConsensusAsync(string ticker, CancellationToken ct = default);
+
+    /// <summary>Per-analyst price-target summary. Drives the high / low / median
+    /// columns on the analyst consensus widget that Finnhub's free tier doesn't
+    /// expose.</summary>
+    Task<PriceTargetSummary?> GetPriceTargetSummaryAsync(string ticker, CancellationToken ct = default);
 }
+
+public record PriceTargetSummary(
+    double? TargetHigh,
+    double? TargetLow,
+    double? TargetConsensus,
+    double? TargetMedian,
+    int     AnalystCount
+);
 
 public record EarningCalendarEntry(
     string Ticker,

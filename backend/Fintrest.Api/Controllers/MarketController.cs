@@ -706,30 +706,50 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     }
 
     [HttpGet("stocks/{ticker}/analyst")]
-    public async Task<ActionResult<AnalystConsensusResponse>> GetAnalystConsensus(string ticker)
+    public async Task<ActionResult<AnalystConsensusResponse>> GetAnalystConsensus(string ticker, CancellationToken ct = default)
     {
-        // Analyst ratings from Finnhub
-        var ratings = await newsProvider.GetAnalystRatingsAsync(ticker);
+        // Try Finnhub first (historic primary). If it returns nothing — as the
+        // free tier does for most tickers — fall back to FMP's grades-consensus
+        // endpoint which covers the Premier universe. Price targets always
+        // enrich via FMP's price-target-summary.
+        var finnhubTask = newsProvider.GetAnalystRatingsAsync(ticker);
+        var fmpConsensusTask = fundamentalsProvider.GetAnalystConsensusAsync(ticker, ct);
+        var fmpPriceTargetTask = fundamentalsProvider.GetPriceTargetSummaryAsync(ticker, ct);
+        await Task.WhenAll(finnhubTask, fmpConsensusTask, fmpPriceTargetTask);
 
-        // Price target from FMP (already on Stock model if ingested, but also fetch fresh)
-        var stock = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker.ToUpper() == ticker.ToUpper());
+        var finnhub = await finnhubTask;
+        var fmpConsensus = await fmpConsensusTask;
+        var priceTargets = await fmpPriceTargetTask;
 
-        if (ratings is null && stock?.AnalystTargetPrice is null)
-            return Ok(new AnalystConsensusResponse(ticker, 0, 0, 0, 0, 0, 0, 0, null, null, null, null));
+        var stock = await db.Stocks
+            .FirstOrDefaultAsync(s => s.Ticker.ToUpper() == ticker.ToUpper(), ct);
+
+        int strongBuy  = finnhub?.StrongBuy  ?? fmpConsensus?.StrongBuy  ?? 0;
+        int buy        = finnhub?.Buy        ?? fmpConsensus?.Buy        ?? 0;
+        int hold       = finnhub?.Hold       ?? fmpConsensus?.Hold       ?? 0;
+        int sell       = finnhub?.Sell       ?? fmpConsensus?.Sell       ?? 0;
+        int strongSell = finnhub?.StrongSell ?? fmpConsensus?.StrongSell ?? 0;
+        int total      = finnhub?.TotalAnalysts ?? fmpConsensus?.TotalAnalysts ?? 0;
+        double rating  = finnhub?.Rating ?? fmpConsensus?.Rating ?? 0;
+
+        double? targetConsensus = priceTargets?.TargetConsensus ?? stock?.AnalystTargetPrice;
+        double? targetHigh   = priceTargets?.TargetHigh;
+        double? targetLow    = priceTargets?.TargetLow;
+        double? targetMedian = priceTargets?.TargetMedian;
 
         return Ok(new AnalystConsensusResponse(
-            Ticker: ticker.ToUpperInvariant(),
-            StrongBuy: ratings?.StrongBuy ?? 0,
-            Buy: ratings?.Buy ?? 0,
-            Hold: ratings?.Hold ?? 0,
-            Sell: ratings?.Sell ?? 0,
-            StrongSell: ratings?.StrongSell ?? 0,
-            TotalAnalysts: ratings?.TotalAnalysts ?? 0,
-            Rating: ratings?.Rating ?? 0,
-            TargetHigh: null, // Would need FMP /price-target endpoint for per-analyst targets
-            TargetLow: null,
-            TargetConsensus: stock?.AnalystTargetPrice,
-            TargetMedian: null
+            Ticker:          ticker.ToUpperInvariant(),
+            StrongBuy:       strongBuy,
+            Buy:             buy,
+            Hold:            hold,
+            Sell:            sell,
+            StrongSell:      strongSell,
+            TotalAnalysts:   total,
+            Rating:          rating,
+            TargetHigh:      targetHigh,
+            TargetLow:       targetLow,
+            TargetConsensus: targetConsensus,
+            TargetMedian:    targetMedian
         ));
     }
 

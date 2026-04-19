@@ -293,6 +293,70 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
             .ToList();
     }
 
+    public async Task<AnalystConsensus?> GetAnalystConsensusAsync(string ticker, CancellationToken ct = default)
+    {
+        // FMP stable: /grades-consensus returns aggregate counts across the 5 rating
+        // buckets plus a numeric consensus. Different path from the older /v3
+        // /upgrades-downgrades-consensus endpoint; same semantics.
+        var url = $"{_baseUrl}/grades-consensus?symbol={ticker}&apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpGradesConsensus>>(url, ct);
+        var row = rows?.FirstOrDefault();
+        if (row is null) return null;
+
+        var strongBuy  = row.StrongBuy  ?? 0;
+        var buy        = row.Buy        ?? 0;
+        var hold       = row.Hold       ?? 0;
+        var sell       = row.Sell       ?? 0;
+        var strongSell = row.StrongSell ?? 0;
+        var total      = strongBuy + buy + hold + sell + strongSell;
+        if (total == 0) return null;
+
+        // Numeric rating: Finnhub-style 1-5 where 5 = strong buy. Weighted avg.
+        var rating = (strongBuy * 5 + buy * 4 + hold * 3 + sell * 2 + strongSell * 1)
+                     / (double)total;
+
+        return new AnalystConsensus(
+            Ticker:        ticker.ToUpperInvariant(),
+            Rating:        Math.Round(rating, 2),
+            TotalAnalysts: total,
+            StrongBuy:     strongBuy,
+            Buy:           buy,
+            Hold:          hold,
+            Sell:          sell,
+            StrongSell:    strongSell,
+            TargetPrice:   null
+        );
+    }
+
+    public async Task<PriceTargetSummary?> GetPriceTargetSummaryAsync(string ticker, CancellationToken ct = default)
+    {
+        // FMP stable: /price-target-summary returns recent avg targets aggregated
+        // across multiple horizons. Only the most relevant bucket surfaces in
+        // the widget (latest consensus + high/low range implied by it).
+        var url = $"{_baseUrl}/price-target-summary?symbol={ticker}&apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpPriceTargetSummary>>(url, ct);
+        var row = rows?.FirstOrDefault();
+        if (row is null) return null;
+
+        // Use lastMonth when present, else fall back through lastQuarter → allTime.
+        var avg = row.LastMonthAvgPriceTarget
+               ?? row.LastQuarterAvgPriceTarget
+               ?? row.AllTimeAvgPriceTarget;
+        var count = row.LastMonth
+                 ?? row.LastQuarter
+                 ?? row.AllTime
+                 ?? 0;
+        if (avg is null or 0) return null;
+
+        return new PriceTargetSummary(
+            TargetHigh:      null,
+            TargetLow:       null,
+            TargetConsensus: avg,
+            TargetMedian:    null,
+            AnalystCount:    count
+        );
+    }
+
     public async Task<List<EarningCalendarEntry>> GetEarningCalendarAsync(DateTime from, DateTime to, CancellationToken ct = default)
     {
         // FMP stable: /earning-calendar with date range returns all companies reporting.
@@ -488,4 +552,26 @@ file record FmpInsiderTrade(
     [property: JsonPropertyName("transactionType")] string? TransactionType,
     [property: JsonPropertyName("securitiesTransacted")] double? SecuritiesTransacted,
     [property: JsonPropertyName("price")] double? Price
+);
+
+file record FmpGradesConsensus(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("strongBuy")]  int? StrongBuy,
+    [property: JsonPropertyName("buy")]        int? Buy,
+    [property: JsonPropertyName("hold")]       int? Hold,
+    [property: JsonPropertyName("sell")]       int? Sell,
+    [property: JsonPropertyName("strongSell")] int? StrongSell,
+    [property: JsonPropertyName("consensus")]  string? Consensus
+);
+
+file record FmpPriceTargetSummary(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("lastMonth")] int? LastMonth,
+    [property: JsonPropertyName("lastMonthAvgPriceTarget")] double? LastMonthAvgPriceTarget,
+    [property: JsonPropertyName("lastQuarter")] int? LastQuarter,
+    [property: JsonPropertyName("lastQuarterAvgPriceTarget")] double? LastQuarterAvgPriceTarget,
+    [property: JsonPropertyName("lastYear")] int? LastYear,
+    [property: JsonPropertyName("lastYearAvgPriceTarget")] double? LastYearAvgPriceTarget,
+    [property: JsonPropertyName("allTime")] int? AllTime,
+    [property: JsonPropertyName("allTimeAvgPriceTarget")] double? AllTimeAvgPriceTarget
 );
