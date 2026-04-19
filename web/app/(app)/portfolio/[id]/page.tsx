@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api, type Holding } from "@/lib/api";
+import { api, type Holding, type PortfolioReturnBreakdown } from "@/lib/api";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-profile";
 
@@ -61,6 +61,16 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
   const { data: advisorData, isError: advisorErrored } = useQuery({
     queryKey: ["portfolio-advisor", portfolioId],
     queryFn: () => api.portfolioAdvisor(portfolioId),
+    retry: false,
+    throwOnError: false,
+    enabled: !usingDemoData,
+  });
+
+  // Return breakdown — pillar #1 of the 10-pillar spec. Powers the header KPIs:
+  // total return (split into unrealized + realized + dividends) and annualized CAGR.
+  const { data: returns } = useQuery({
+    queryKey: ["portfolio-returns", portfolioId],
+    queryFn: () => api.portfolioReturns(portfolioId),
     retry: false,
     throwOnError: false,
     enabled: !usingDemoData,
@@ -166,8 +176,15 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
         </div>
       </div>
 
-      {/* Athena profile — factor radar + verdict mix + regime. Only renders when the advisor
-          call succeeds; if Athena errored (known Npgsql disposed-connector issue during scans,
+      {/* Return breakdown — pillar #1. Three-source split of lifetime return
+          plus annualized CAGR. Only meaningful when transactions exist, so
+          hidden on the demo portfolio (no txns) and while loading. */}
+      {!usingDemoData && returns && returns.costBasis > 0 && (
+        <ReturnBreakdownCard data={returns} />
+      )}
+
+      {/* Lens profile — factor radar + signal mix + regime. Only renders when the advisor
+          call succeeds; if it errored (known Npgsql disposed-connector issue during scans,
           or stale advisor record), we skip it rather than crash the whole page. */}
       {!advisorErrored && advisorData && (
         <PortfolioAthenaProfile advisor={advisorData} />
@@ -267,6 +284,118 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Total-return decomposition card. Shows the three sources of a portfolio's
+ * lifetime return side-by-side (price appreciation / realized gains / dividends)
+ * plus annualized CAGR so large absolute returns are contextualized by time held.
+ * Mirrors SimplyWall.st's demo portfolio header pattern.
+ */
+function ReturnBreakdownCard({ data }: { data: PortfolioReturnBreakdown }) {
+  const fmt$ = (n: number) => {
+    const sign = n >= 0 ? "+" : "−";
+    return `${sign}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  };
+  const fmtPct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+
+  // Horizontal proportional bar — widths derived from absolute contribution so
+  // the reader sees at a glance which source drove the total.
+  const components = [
+    { label: "Unrealized", value: data.unrealizedPnl, color: "bg-emerald-500" },
+    { label: "Realized",   value: data.realizedPnl,   color: "bg-blue-500" },
+    { label: "Dividends",  value: data.dividendsReceived, color: "bg-amber-500" },
+  ];
+  const absTotal = components.reduce((s, c) => s + Math.abs(c.value), 0);
+
+  const inception = data.inceptionDate
+    ? new Date(data.inceptionDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+    : null;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <h3 className="font-[var(--font-heading)] text-base font-semibold">Return breakdown</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Lifetime return split across its three sources
+            {inception && ` · since ${inception}`}
+          </p>
+        </div>
+        <div className="flex items-baseline gap-4">
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total return</p>
+            <p className={`font-[var(--font-mono)] text-xl font-bold ${data.totalReturn >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+              {fmt$(data.totalReturn)}
+            </p>
+            <p className={`text-xs font-medium ${data.totalReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {fmtPct(data.totalReturnPct)}
+            </p>
+          </div>
+          {data.annualizedReturnPct != null && (
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Annualized</p>
+              <p className={`font-[var(--font-mono)] text-xl font-bold ${data.annualizedReturnPct >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                {fmtPct(data.annualizedReturnPct)}
+              </p>
+              <p className="text-xs text-muted-foreground">CAGR · {(data.daysSinceInception / 365.25).toFixed(1)}y</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Proportional contribution bar */}
+      {absTotal > 0 && (
+        <div className="mb-4">
+          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+            {components.map((c) => {
+              const width = (Math.abs(c.value) / absTotal) * 100;
+              if (width < 0.5) return null;
+              return (
+                <div
+                  key={c.label}
+                  className={c.color}
+                  style={{ width: `${width}%` }}
+                  title={`${c.label}: ${fmt$(c.value)}`}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Three component cards */}
+      <div className="grid grid-cols-3 gap-3">
+        {components.map((c) => (
+          <div key={c.label} className="rounded-lg border border-border bg-background/50 p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className={`h-2 w-2 rounded-full ${c.color}`} />
+              <p className="text-[11px] text-muted-foreground">{c.label}</p>
+            </div>
+            <p className={`font-[var(--font-mono)] text-base font-semibold ${c.value >= 0 ? "text-foreground" : "text-red-500"}`}>
+              {fmt$(c.value)}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Cost basis + current value footnote */}
+      <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground flex-wrap gap-2">
+        <span>
+          Invested:{" "}
+          <span className="font-[var(--font-mono)] text-foreground/80 font-medium">
+            ${data.costBasis.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </span>
+        </span>
+        <span>
+          Current value:{" "}
+          <span className="font-[var(--font-mono)] text-foreground/80 font-medium">
+            ${data.currentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </span>
+        </span>
       </div>
     </div>
   );

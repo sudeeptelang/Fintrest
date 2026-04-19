@@ -319,6 +319,123 @@ public class PortfolioController(
         return Ok(new PortfolioAnalyticsResponse(riskResponse, sectorAllocation, topHoldings, healthScore));
     }
 
+    /// <summary>
+    /// Return decomposition — total return broken into unrealized / realized /
+    /// dividend sources plus annualized CAGR. Drives the pillar-#1 header card.
+    /// </summary>
+    [HttpGet("{id}/returns")]
+    public async Task<ActionResult<ReturnBreakdownResponse>> GetReturnBreakdown(long id)
+    {
+        var userId = await GetUserId();
+        var portfolio = await db.Portfolios
+            .Include(p => p.Holdings).ThenInclude(h => h.Stock)
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
+        if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
+
+        // 1. Live holdings value — pull the latest market_data bar for each stock, same
+        //    pattern as GetHoldings above so the number matches what's on screen.
+        var stockIds = portfolio.Holdings.Select(h => h.StockId).Distinct().ToList();
+        var latestPriceByStock = new Dictionary<long, double>();
+        if (stockIds.Count > 0)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-14);
+            var bars = await db.MarketData
+                .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
+                .Select(m => new { m.StockId, m.Ts, m.Close })
+                .ToListAsync();
+            foreach (var grp in bars.GroupBy(b => b.StockId))
+                latestPriceByStock[grp.Key] = grp.OrderByDescending(b => b.Ts).First().Close;
+        }
+
+        double currentValue = 0;
+        double heldCostBasis = 0;
+        foreach (var h in portfolio.Holdings)
+        {
+            var price = latestPriceByStock.TryGetValue(h.StockId, out var live) && live > 0
+                ? live
+                : h.CurrentPrice;
+            currentValue  += h.Quantity * price;
+            heldCostBasis += h.Quantity * h.AvgCost;
+        }
+
+        // 2. Walk transactions to split invested $ vs proceeds vs dividends.
+        var txns = await db.Set<Models.PortfolioTransaction>()
+            .Where(t => t.PortfolioId == id)
+            .OrderBy(t => t.ExecutedAt)
+            .ToListAsync();
+
+        double grossInvested  = 0; // sum of BUY totals (money in)
+        double grossProceeds  = 0; // sum of SELL totals (money out from sales)
+        double dividends      = 0; // sum of DIVIDEND totals (cash from dividends)
+        double realizedPnl    = 0; // proceeds - cost basis of the shares sold
+        // Per-stock running avg cost to compute realized PnL on each SELL.
+        var avgCostByStock = new Dictionary<long, (double qty, double costBasis)>();
+
+        foreach (var t in txns)
+        {
+            var type = (t.Type ?? "").Trim().ToUpperInvariant();
+            switch (type)
+            {
+                case "BUY":
+                    grossInvested += t.Total;
+                    var cur = avgCostByStock.GetValueOrDefault(t.StockId);
+                    avgCostByStock[t.StockId] = (cur.qty + t.Quantity, cur.costBasis + t.Total);
+                    break;
+
+                case "SELL":
+                    grossProceeds += t.Total;
+                    var lot = avgCostByStock.GetValueOrDefault(t.StockId);
+                    if (lot.qty > 0)
+                    {
+                        var avgCost    = lot.costBasis / lot.qty;
+                        var costOfSold = avgCost * t.Quantity;
+                        realizedPnl += t.Total - costOfSold;
+                        var remaining = lot.qty - t.Quantity;
+                        avgCostByStock[t.StockId] = remaining > 0
+                            ? (remaining, lot.costBasis - costOfSold)
+                            : (0, 0);
+                    }
+                    break;
+
+                case "DIVIDEND":
+                    dividends += t.Total;
+                    break;
+            }
+        }
+
+        var unrealizedPnl  = currentValue - heldCostBasis;
+        var costBasisAllTime = grossInvested; // lifetime money put in
+        var totalReturn    = unrealizedPnl + realizedPnl + dividends;
+        var totalReturnPct = costBasisAllTime > 0
+            ? totalReturn / costBasisAllTime * 100
+            : 0;
+
+        // CAGR: (1 + r)^(1/years) - 1. Only meaningful with ≥ 30 days of history.
+        var inceptionDate = txns.Count > 0 ? txns[0].ExecutedAt : (DateTime?)null;
+        var daysSinceInception = inceptionDate is null ? 0
+            : Math.Max(0, (int)(DateTime.UtcNow - inceptionDate.Value).TotalDays);
+        double? cagr = null;
+        if (daysSinceInception >= 30 && costBasisAllTime > 0)
+        {
+            var years = daysSinceInception / 365.25;
+            var ratio = (totalReturn + costBasisAllTime) / costBasisAllTime;
+            if (ratio > 0) cagr = (Math.Pow(ratio, 1.0 / years) - 1) * 100;
+        }
+
+        return Ok(new ReturnBreakdownResponse(
+            CostBasis:           costBasisAllTime,
+            CurrentValue:        currentValue,
+            UnrealizedPnl:       unrealizedPnl,
+            RealizedPnl:         realizedPnl,
+            DividendsReceived:   dividends,
+            TotalReturn:         totalReturn,
+            TotalReturnPct:      totalReturnPct,
+            AnnualizedReturnPct: cagr,
+            InceptionDate:       inceptionDate,
+            DaysSinceInception:  daysSinceInception
+        ));
+    }
+
     /// <summary>Get AI advisor recommendations and alerts.</summary>
     [HttpGet("{id}/advisor")]
     public async Task<ActionResult<AdvisorResponse>> GetAdvisor(long id)

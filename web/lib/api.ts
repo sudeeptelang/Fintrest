@@ -551,6 +551,7 @@ export const api = {
   portfolioHoldings: (id: number) => authFetchApi<Holding[]>(`/portfolios/${id}/holdings`),
   portfolioTransactions: (id: number) => authFetchApi<Transaction[]>(`/portfolios/${id}/transactions`).catch(() => []),
   portfolioAnalytics: (id: number) => authFetchApi<PortfolioAnalytics>(`/portfolios/${id}/analytics`).catch(() => null),
+  portfolioReturns: (id: number) => authFetchApi<PortfolioReturnBreakdown>(`/portfolios/${id}/returns`).catch(() => null),
   portfolioAdvisor: (id: number) => authFetchApi<AdvisorResult>(`/portfolios/${id}/advisor`),
   addTransaction: (portfolioId: number, req: { stockTicker: string; type: string; quantity: number; price: number; fees?: number }) =>
     authFetchApi<Transaction>(`/portfolios/${portfolioId}/transactions`, {
@@ -640,6 +641,19 @@ export interface RiskMetrics {
   var95: number | null;
   volatility: number | null;
   totalReturn: number | null;
+}
+
+export interface PortfolioReturnBreakdown {
+  costBasis: number;
+  currentValue: number;
+  unrealizedPnl: number;
+  realizedPnl: number;
+  dividendsReceived: number;
+  totalReturn: number;
+  totalReturnPct: number;
+  annualizedReturnPct: number | null;
+  inceptionDate: string | null;
+  daysSinceInception: number;
 }
 
 export interface AdvisorResult {

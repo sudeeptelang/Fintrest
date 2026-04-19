@@ -92,6 +92,30 @@ public record PortfolioAnalyticsResponse(
     double HealthScore
 );
 
+/// <summary>
+/// Return decomposition for the portfolio header (pillar #1 of the 10-pillar spec).
+/// Mirrors SimplyWall.st's demo: total return broken into its three sources, plus
+/// annualized IRR so a +115% lifetime return makes sense alongside its 22% CAGR.
+///
+/// <para><b>CAGR formula:</b> assumes money-weighted return approximation —
+/// <c>((currentValue + dividends + cashProceeds) / totalInvested) ^ (1/years) - 1</c>.
+/// This is the retail-tool convention; a true IRR with ongoing deposits needs
+/// solving for the IRR root, which we'll add when it matters for the Elite-tier
+/// PDF report. Until then this is close enough for a header number.</para>
+/// </summary>
+public record ReturnBreakdownResponse(
+    double CostBasis,             // sum of BUY totals (money invested, gross of any sales)
+    double CurrentValue,          // live holdings value at latest market prices
+    double UnrealizedPnl,         // CurrentValue - (cost basis still held)
+    double RealizedPnl,           // proceeds from SELLs - cost basis of those shares (approx.)
+    double DividendsReceived,     // sum of DIVIDEND transaction totals
+    double TotalReturn,           // UnrealizedPnl + RealizedPnl + DividendsReceived
+    double TotalReturnPct,        // TotalReturn / CostBasis * 100
+    double? AnnualizedReturnPct,  // CAGR — null if < 30 days of history (annualizing noise)
+    DateTime? InceptionDate,      // date of the earliest transaction
+    int DaysSinceInception
+);
+
 public record AdvisorResponse(
     double HealthScore,
     List<RecommendationResponse> Recommendations,
