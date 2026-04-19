@@ -47,8 +47,13 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
         if (indexTickers.Count == 0)
             return BadRequest(new { message = $"No tickers returned for preset '{key}'. Supported: sp500, nasdaq, dowjones, midcap, russell1k" });
 
-        // Always include the index ETF proxies so /market/indices has data
-        var etfProxies = new[] { "SPY", "QQQ", "DIA", "IWM" };
+        // Always include the index ETF proxies (for /market/indices) AND the
+        // 11 SPDR sector ETFs (needed by sector-relative v3 features).
+        var etfProxies = new[]
+        {
+            "SPY", "QQQ", "DIA", "IWM",
+            "XLK", "XLF", "XLE", "XLV", "XLI", "XLY", "XLP", "XLRE", "XLU", "XLB", "XLC",
+        };
         var fullList = indexTickers.Concat(etfProxies).Distinct().ToList();
 
         var added = await ingestion.SyncStockUniverseAsync(fullList, ct);
