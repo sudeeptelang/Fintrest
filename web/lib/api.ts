@@ -559,6 +559,8 @@ export const api = {
     authFetchApi<PortfolioTaxProfile>(`/portfolios/${id}/tax`).catch(() => null),
   deletePortfolio: (id: number) =>
     authFetchApi<void>(`/portfolios/${id}`, { method: "DELETE" }),
+  deleteHolding: (portfolioId: number, holdingId: number) =>
+    authFetchApi<void>(`/portfolios/${portfolioId}/holdings/${holdingId}`, { method: "DELETE" }),
   portfolioAdvisor: (id: number) => authFetchApi<AdvisorResult>(`/portfolios/${id}/advisor`),
   addTransaction: (portfolioId: number, req: { stockTicker: string; type: string; quantity: number; price: number; fees?: number }) =>
     authFetchApi<Transaction>(`/portfolios/${portfolioId}/transactions`, {

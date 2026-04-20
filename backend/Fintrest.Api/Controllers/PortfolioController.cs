@@ -289,6 +289,34 @@ public class PortfolioController(
         }
     }
 
+    /// <summary>Remove a single holding from a portfolio. Deletes the holding row
+    /// and all transaction rows (BUYs, SELLs, dividends) for that stock within the
+    /// portfolio. 404 if the holding isn't in the user's portfolio.</summary>
+    [HttpDelete("{id}/holdings/{holdingId}")]
+    public async Task<IActionResult> DeleteHolding(long id, long holdingId, CancellationToken ct)
+    {
+        var userId = await GetUserId();
+        var portfolio = await db.Portfolios
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId, ct);
+        if (portfolio is null) return NotFound(new { message = "Portfolio not found" });
+
+        var holding = await db.Set<Models.PortfolioHolding>()
+            .FirstOrDefaultAsync(h => h.Id == holdingId && h.PortfolioId == id, ct);
+        if (holding is null) return NotFound(new { message = "Holding not found" });
+
+        // Transactions for this stock in this portfolio are history — deleting the
+        // holding without them would leave orphan rows that feed incorrect numbers
+        // into the Returns / Tax tabs. Cascade at the ticker level.
+        await db.Set<Models.PortfolioTransaction>()
+            .Where(t => t.PortfolioId == id && t.StockId == holding.StockId)
+            .ExecuteDeleteAsync(ct);
+
+        db.Set<Models.PortfolioHolding>().Remove(holding);
+        await db.SaveChangesAsync(ct);
+
+        return NoContent();
+    }
+
     /// <summary>Get transaction history.</summary>
     [HttpGet("{id}/transactions")]
     public async Task<ActionResult<List<TransactionResponse>>> GetTransactions(long id)

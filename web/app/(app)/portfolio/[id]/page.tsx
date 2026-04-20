@@ -370,6 +370,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
                   ["Gain/Loss $", "pnl", "text-right"],
                   ["Return %", "pnl", "text-right"],
                   ["Signal", "signal", "text-center"],
+                  ["", "ticker", "text-center"],  // actions column, sort-inert
                 ] as const).map(([label, key, alignClass], i) => {
                   const active = sortKey === key;
                   return (
@@ -392,9 +393,9 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
             </thead>
             <tbody className="divide-y divide-border">
               {holdingsLoading ? (
-                <tr><td colSpan={10} className="px-5 py-8 text-center text-muted-foreground">Loading...</td></tr>
+                <tr><td colSpan={11} className="px-5 py-8 text-center text-muted-foreground">Loading...</td></tr>
               ) : sortedHoldings.length === 0 ? (
-                <tr><td colSpan={10} className="px-5 py-8 text-center text-muted-foreground">No holdings</td></tr>
+                <tr><td colSpan={11} className="px-5 py-8 text-center text-muted-foreground">No holdings</td></tr>
               ) : sortedHoldings.map((h) => {
                 const costBasis = h.quantity * h.avgCost;
                 return (
@@ -461,6 +462,11 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
                         <span className="font-[var(--font-mono)] text-xs font-bold">{Math.round(h.signalScore)}</span>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3.5 text-center">
+                      {!usingDemoData && (
+                        <HoldingActions portfolioId={portfolioId} holding={h} />
                       )}
                     </td>
                   </tr>
@@ -1026,6 +1032,69 @@ function TaxProfileCard({ tax }: { tax: PortfolioTaxProfile }) {
         for wash-sale rules, state tax, or AMT · not tax advice.
       </p>
     </div>
+  );
+}
+
+/**
+ * Per-holding row action — inline Remove button with a confirm overlay. Deletes
+ * the holding plus all its transactions (the backend cascades). The overlay
+ * appears in a small popover anchored to the button so the user doesn't lose
+ * row context the way a full-page modal would.
+ */
+function HoldingActions({ portfolioId, holding }: { portfolioId: number; holding: Holding }) {
+  const qc = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+
+  const removeMut = useMutation({
+    mutationFn: () => api.deleteHolding(portfolioId, holding.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["portfolio-holdings", portfolioId] });
+      qc.invalidateQueries({ queryKey: ["portfolio-returns", portfolioId] });
+      qc.invalidateQueries({ queryKey: ["portfolio-rating", portfolioId] });
+      qc.invalidateQueries({ queryKey: ["portfolio-tax", portfolioId] });
+    },
+    onError: (e) => {
+      alert(`Delete failed: ${e instanceof Error ? e.message : String(e)}`);
+      setConfirming(false);
+    },
+  });
+
+  if (confirming) {
+    return (
+      <div className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/5 px-2 py-1">
+        <span className="text-[10px] font-semibold text-red-500 whitespace-nowrap">
+          Remove {holding.ticker}?
+        </span>
+        <button
+          onClick={() => setConfirming(false)}
+          disabled={removeMut.isPending}
+          className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => removeMut.mutate()}
+          disabled={removeMut.isPending}
+          className="inline-flex items-center gap-1 text-[10px] font-semibold text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded"
+        >
+          {removeMut.isPending
+            ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+            : <Trash2 className="h-2.5 w-2.5" />}
+          Confirm
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setConfirming(true)}
+      className="p-1.5 rounded-md text-muted-foreground/40 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+      aria-label={`Remove ${holding.ticker}`}
+      title={`Remove ${holding.ticker}`}
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </button>
   );
 }
 
