@@ -2,260 +2,237 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import {
-  ArrowRight, Play, Shield, Zap, Sparkles,
-  Radar, Target, Brain, Landmark, Users, Activity, Database, TrendingUp,
-} from "lucide-react";
+import { ArrowRight, Play, Shield, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
+  hidden: { opacity: 0, y: 24 },
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
     transition: {
-      delay: i * 0.1,
-      duration: 0.6,
+      delay: i * 0.08,
+      duration: 0.5,
       ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
     },
   }),
 };
 
+/**
+ * Marketing hero — v2 Forest & Rust. Single column over ink-0 white, with
+ * a score-ring demo panel underneath. Per docs/fintrest_screens_v2_preview.html.
+ *
+ * The old two-column hero with a navy CapabilityInfographic on the right is
+ * gone; the Lens 4-step flow it used to carry now lives in the dedicated
+ * Lens section below (how-it-works / lens-steps).
+ */
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-navy" />
-      <div className="absolute inset-0 bg-grid opacity-40" />
-      <div className="absolute top-1/4 -left-32 w-96 h-96 rounded-full bg-primary/10 blur-[120px]" />
-      <div className="absolute bottom-1/4 -right-32 w-96 h-96 rounded-full bg-primary/5 blur-[120px]" />
+    <section className="relative overflow-hidden bg-ink-0">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28 lg:pt-32 pb-16 lg:pb-24">
+        {/* Badge */}
+        <motion.div
+          custom={0}
+          initial="hidden"
+          animate="visible"
+          variants={fadeUp}
+          className="inline-flex items-center gap-2 rounded-full bg-forest-light border border-forest/20 px-3.5 py-2 mb-8"
+        >
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-forest opacity-40" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-forest" />
+          </span>
+          <span className="text-xs font-medium text-forest-dark tracking-wide">
+            Research layer · Updated every morning before the open
+          </span>
+        </motion.div>
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-24 lg:py-28 w-full">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          {/* Left — copy */}
-          <div>
-            <motion.div
-              custom={0}
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 mb-8"
+        {/* H1 */}
+        <motion.h1
+          custom={1}
+          initial="hidden"
+          animate="visible"
+          variants={fadeUp}
+          className="font-[var(--font-heading)] text-4xl sm:text-5xl lg:text-[64px] xl:text-[72px] font-bold text-ink-950 leading-[1.05] tracking-[-0.025em] max-w-[900px]"
+        >
+          Every stock idea,{" "}
+          <span className="gradient-text">stress-tested before the open.</span>
+        </motion.h1>
+
+        {/* Subcopy */}
+        <motion.p
+          custom={2}
+          initial="hidden"
+          animate="visible"
+          variants={fadeUp}
+          className="mt-6 text-base sm:text-lg text-ink-600 max-w-[680px] leading-relaxed"
+        >
+          Fintrest runs 500+ US stocks through a 7-factor research engine every
+          morning. You see which setups passed the test, exactly why they
+          passed, and the full audit trail — including the losers.{" "}
+          <span className="text-ink-900 font-medium">
+            Research, not recommendations.
+          </span>
+        </motion.p>
+
+        {/* CTAs */}
+        <motion.div
+          custom={3}
+          initial="hidden"
+          animate="visible"
+          variants={fadeUp}
+          className="mt-10 flex flex-col sm:flex-row gap-3"
+        >
+          <Link href="/auth/signup">
+            <Button
+              size="lg"
+              className="bg-forest hover:bg-forest-dark text-ink-0 h-12 px-7 text-sm font-semibold rounded-md"
             >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-              </span>
-              <span className="text-sm font-medium text-primary">
-                Research layer · Updated every morning before the open
-              </span>
-            </motion.div>
-
-            <motion.h1
-              custom={1}
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              className="font-[var(--font-heading)] text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] tracking-tight"
+              Start free
+              <ArrowRight className="ml-1.5 h-4 w-4" />
+            </Button>
+          </Link>
+          <Link href="#how-it-works">
+            <Button
+              variant="outline"
+              size="lg"
+              className="border-ink-300 text-ink-900 hover:border-ink-500 hover:bg-ink-50 h-12 px-7 text-sm font-semibold rounded-md"
             >
-              Every stock idea,{" "}
-              <span className="gradient-text">stress-tested before the open.</span>
-            </motion.h1>
+              <Play className="mr-1.5 h-4 w-4" />
+              See how the engine works
+            </Button>
+          </Link>
+        </motion.div>
 
-            <motion.p
-              custom={2}
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              className="mt-6 text-lg text-white/60 max-w-lg leading-relaxed"
-            >
-              Fintrest runs 500+ US stocks through a 7-factor research engine
-              every morning. You see which setups passed the test, exactly why
-              they passed, and the full audit trail — including the losers.
-              Research, not recommendations.
-            </motion.p>
+        {/* Trust line */}
+        <motion.div
+          custom={4}
+          initial="hidden"
+          animate="visible"
+          variants={fadeUp}
+          className="mt-8 flex items-center gap-4 text-xs text-ink-500"
+        >
+          <span className="flex items-center gap-1.5">
+            <Shield className="h-3.5 w-3.5 text-ink-400" />
+            No credit card required
+          </span>
+          <span className="h-0.5 w-0.5 rounded-full bg-ink-400" aria-hidden />
+          <span className="flex items-center gap-1.5">
+            <Zap className="h-3.5 w-3.5 text-ink-400" />
+            30-second setup
+          </span>
+          <span className="h-0.5 w-0.5 rounded-full bg-ink-400" aria-hidden />
+          <span className="hidden sm:inline">Cancel anytime</span>
+        </motion.div>
 
-            <motion.div
-              custom={3}
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              className="mt-8 flex flex-col sm:flex-row gap-4"
-            >
-              <Link href="/auth/signup">
-                <Button
-                  size="lg"
-                  className="bg-primary hover:bg-primary/90 text-white h-12 px-8 text-base font-semibold shadow-lg shadow-primary/25"
-                >
-                  Start free
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="#how-it-works">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="border-white/20 text-white hover:bg-white/10 h-12 px-8 text-base"
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  See how the engine works
-                </Button>
-              </Link>
-            </motion.div>
-
-            <motion.div
-              custom={4}
-              initial="hidden"
-              animate="visible"
-              variants={fadeUp}
-              className="mt-10 flex items-center gap-6 text-sm text-white/40"
-            >
-              <span className="flex items-center gap-1.5">
-                <Shield className="h-4 w-4 text-primary" />
-                No credit card required
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Zap className="h-4 w-4 text-primary" />
-                30-second setup
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Shield className="h-4 w-4 text-primary" />
-                Cancel anytime
-              </span>
-            </motion.div>
-          </div>
-
-          {/* Right — capability infographic (the product stack, not a fake signal list) */}
-          <CapabilityInfographic />
-        </div>
+        {/* Hero visual — score ring demo panel */}
+        <motion.div
+          custom={5}
+          initial="hidden"
+          animate="visible"
+          variants={fadeUp}
+          className="mt-16 lg:mt-20"
+        >
+          <HeroScoreRingPanel />
+        </motion.div>
       </div>
     </section>
   );
 }
 
 /**
- * Hero-right infographic showing Fintrest's product stack as four concentric capability rings
- * around a central Athena orb. Each ring represents a stage: Scan → Score → Narrate → Trade.
- * No fake tickers or fabricated data — it's an editorial visual of what the platform does.
+ * The signature visual: a 7-segment score ring on a quiet panel, with
+ * a short editorial caption on the left. This is the v2 "what makes us
+ * different" marker — the ring's job is to telegraph "research has an
+ * anatomy" at first glance.
  */
-function CapabilityInfographic() {
-  const rings = [
-    {
-      label: "Scan",
-      color: "#00b87c",
-      chips: [
-        { icon: Radar,    text: "500+ US stocks scanned every morning" },
-        { icon: Database, text: "Prices · fundamentals · news · options flow" },
-        { icon: Activity, text: "Regime-aware · intraday drift correction" },
-      ],
-    },
-    {
-      label: "Score",
-      color: "#3b6fd4",
-      chips: [
-        { icon: TrendingUp, text: "7-factor quant scoring · 0–100 per factor" },
-        { icon: Target,     text: "Cross-sectional percentile rank within sector" },
-        { icon: Shield,     text: "Regime-gated weights · bull · bear · chop" },
-      ],
-    },
-    {
-      label: "Narrate",
-      color: "#00b87c",
-      chips: [
-        { icon: Brain,     text: "Lens thesis · plain English" },
-        { icon: Sparkles,  text: "Setup type · dip · breakout · trend continuation" },
-        { icon: Landmark,  text: "Catalysts · congress · insider · ownership" },
-      ],
-    },
-    {
-      label: "Review",
-      color: "#00b87c",
-      chips: [
-        { icon: Target,  text: "Reference levels: entry · stop · target · R:R" },
-        { icon: Zap,     text: "Real-time research alerts" },
-        { icon: Users,   text: "Portfolio factor profile · you decide what to do" },
-      ],
-    },
+function HeroScoreRingPanel() {
+  // 7 segments, one per factor. Each segment is a 51.43° arc with a 2° gap,
+  // colored up-green (score ≥ 40) against an ink-100 track. Percentages are
+  // purely illustrative — they match a "NVDA 87/100 BUY TODAY" demo state.
+  const factors: Array<{ label: string; score: number }> = [
+    { label: "Momentum",    score: 92 },
+    { label: "Rel Volume",  score: 88 },
+    { label: "Catalyst",    score: 76 },
+    { label: "Earnings",    score: 81 },
+    { label: "Sentiment",   score: 72 },
+    { label: "Trend",       score: 94 },
+    { label: "Risk",        score: 68 },
   ];
 
+  // Compute arc paths: we render 7 arcs around a 108-radius circle in a 240×240 viewBox.
+  const cx = 120, cy = 120, r = 108;
+  const gap = 2;                          // degrees between segments
+  const segArc = 360 / 7 - gap;           // degrees of each segment
+  const startOffset = -90;                // begin at 12 o'clock
+
+  const polar = (angleDeg: number) => {
+    const a = (angleDeg * Math.PI) / 180;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 40 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.4, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-      className="relative"
-    >
-      <div className="absolute -inset-4 rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-primary/5 blur-xl" />
-      <div className="relative rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm p-8 shadow-2xl overflow-hidden">
-        {/* Orbiting decorative rings */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full border border-white/5" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full border border-white/5" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] rounded-full border border-white/[0.03]" />
-        </div>
+    <div className="rounded-xl border border-ink-200 bg-ink-50 p-8 lg:p-12 grid lg:grid-cols-[1fr_320px] gap-8 lg:gap-12 items-center">
+      <div>
+        <p className="text-[11px] font-semibold text-forest tracking-[0.1em] uppercase mb-3">
+          The signature
+        </p>
+        <h2 className="font-[var(--font-heading)] text-2xl lg:text-3xl font-semibold text-ink-950 tracking-[-0.01em] mb-4">
+          The 7-factor score, visible at a glance.
+        </h2>
+        <p className="text-ink-600 text-base leading-relaxed max-w-md">
+          Every signal carries a score ring. Seven segments, one per factor.
+          Segment length = factor strength. One look tells you whether the
+          score is driven by one great factor — or seven good ones.
+        </p>
+      </div>
 
-        {/* Athena badge — compact inline header, not a dominant orb */}
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.5 }}
-          className="relative flex items-center gap-3 mb-5"
-        >
-          <div className="relative flex items-center justify-center h-10 w-10 rounded-lg bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] shadow-lg shadow-blue-500/20">
-            <Sparkles className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-              Lens
-            </p>
-            <p className="text-[11px] text-white/50">
-              The research layer at the center
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Four capability rings, stacked */}
-        <div className="space-y-3 relative">
-          {rings.map((ring, i) => (
-            <motion.div
-              key={ring.label}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 + i * 0.12, duration: 0.5 }}
-              className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <span
-                  className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: `${ring.color}22`, color: ring.color }}
-                >
-                  {i + 1}. {ring.label}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {ring.chips.map((chip) => {
-                  const Icon = chip.icon;
-                  return (
-                    <div
-                      key={chip.text}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] border border-white/[0.05] px-2.5 py-1 text-[10.5px] text-white/80"
-                    >
-                      <Icon className="h-3 w-3" style={{ color: ring.color }} />
-                      {chip.text}
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-5 pt-4 border-t border-white/[0.06] text-center">
-          <p className="text-[10px] text-white/40">
-            See what passed the test — and exactly why.
-          </p>
+      {/* Score ring SVG */}
+      <div className="relative w-[240px] h-[240px] mx-auto">
+        <svg viewBox="0 0 240 240" className="w-full h-full -rotate-90">
+          {factors.map((f, i) => {
+            const start = startOffset + i * (segArc + gap);
+            const end = start + segArc;
+            const s = polar(start);
+            const e = polar(end);
+            const largeArc = segArc > 180 ? 1 : 0;
+            const pathD = `M ${s.x} ${s.y} A ${r} ${r} 0 ${largeArc} 1 ${e.x} ${e.y}`;
+            // Fill length scales by score (40-100 maps to 0-100% of arc).
+            const fillPct = Math.max(0, Math.min(100, (f.score - 40) * (100 / 60)));
+            // Arc length ≈ 2πr × (segArc / 360). Dasharray trick to "fill" proportionally.
+            const arcLen = (2 * Math.PI * r * segArc) / 360;
+            const dashOn = arcLen * (fillPct / 100);
+            const dashOff = arcLen - dashOn;
+            return (
+              <g key={f.label}>
+                {/* track */}
+                <path d={pathD} fill="none" stroke="var(--ink-100)" strokeWidth="8" />
+                {/* fill */}
+                <path
+                  d={pathD}
+                  fill="none"
+                  stroke="var(--up)"
+                  strokeWidth="8"
+                  strokeDasharray={`${dashOn} ${dashOff}`}
+                  strokeLinecap="butt"
+                />
+              </g>
+            );
+          })}
+        </svg>
+        {/* Center */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="font-[var(--font-mono)] text-[56px] leading-none font-medium text-ink-900 tracking-[-0.02em]">
+            87
+          </span>
+          <span className="font-[var(--font-mono)] text-sm text-ink-500 mt-1">
+            out of 100
+          </span>
+          <span className="text-[10px] font-semibold text-forest-dark tracking-[0.1em] uppercase mt-2.5">
+            NVDA · BUY TODAY
+          </span>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
