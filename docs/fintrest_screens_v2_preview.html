@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fintrest.ai — Static Screens · Design Language v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* INK STACK */
+  --ink-0:   #FFFFFF;
+  --ink-50:  #FAFBFC;
+  --ink-100: #F2F4F7;
+  --ink-200: #E4E7EC;
+  --ink-300: #D0D5DD;
+  --ink-400: #98A2B3;
+  --ink-500: #667085;
+  --ink-600: #475467;
+  --ink-700: #344054;
+  --ink-800: #1D2939;
+  --ink-900: #101828;
+  --ink-950: #060C1A;
+
+  /* BRAND — FOREST */
+  --forest:      #0F4F3A;
+  --forest-lt:   #E8F1EC;
+  --forest-dk:   #0A3528;
+
+  /* ACCENT — RUST */
+  --rust:        #B8502F;
+  --rust-lt:     #FBF0EA;
+  --rust-dk:     #8A3B1F;
+
+  /* SEMANTIC */
+  --up:          #0A7F4F;
+  --down:        #6B5443;
+
+  /* FUNCTIONAL */
+  --warn:        #B25E09;
+  --warn-lt:     #FEF6E7;
+  --danger:      #912018;
+  --danger-lt:   #FEE4E2;
+
+  /* SHADOWS */
+  --e1: 0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08);
+  --e2: 0 4px 8px rgba(16,24,40,0.08), 0 12px 24px rgba(16,24,40,0.10);
+
+  /* TRANSITION */
+  --t: 120ms ease-out;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--ink-900);
+  background: var(--ink-0);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── CONTROL BAR (session navigator) ─── */
+.controls {
+  position: fixed;
+  top: 16px; right: 16px;
+  z-index: 100;
+  background: var(--ink-950);
+  color: var(--ink-0);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  gap: 4px;
+  box-shadow: var(--e2);
+}
+.controls button {
+  background: transparent;
+  color: var(--ink-300);
+  border: none;
+  padding: 6px 12px;
+  font: 600 12px/1.5 'DM Sans', system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all var(--t);
+}
+.controls button:hover { color: var(--ink-0); background: var(--ink-800); }
+.controls button.active { background: var(--forest); color: var(--ink-0); }
+
+/* ─── SCREEN CONTAINER ─── */
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ═══════════════════════════════════════════════════════════ */
+/*  MARKETING NAV  (64px)                                      */
+/* ═══════════════════════════════════════════════════════════ */
+.m-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--ink-0);
+  border-bottom: 1px solid var(--ink-200);
+  height: 64px;
+  display: flex;
+  align-items: center;
+}
+.m-nav-inner {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.m-logo {
+  font: 700 17px/1 'Sora', sans-serif;
+  color: var(--ink-900);
+  letter-spacing: -0.01em;
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer;
+}
+.m-logo-mark {
+  width: 24px; height: 24px;
+  background: var(--forest);
+  border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-0);
+  font: 700 14px/1 'Sora', sans-serif;
+}
+.m-logo em { color: var(--ink-500); font-style: normal; font-weight: 400; }
+.m-nav-links {
+  display: flex;
+  gap: 32px;
+}
+.m-nav-link {
+  font: 500 14px/1 'DM Sans', sans-serif;
+  color: var(--ink-600);
+  cursor: pointer;
+  padding: 8px 0;
+  border-bottom: 2px solid transparent;
+  transition: color var(--t);
+}
+.m-nav-link:hover { color: var(--ink-900); }
+.m-nav-link.active { color: var(--ink-900); border-bottom-color: var(--forest); }
+.m-nav-cta {
+  display: flex; gap: 8px; align-items: center;
+}
+
+/* ─── BUTTONS ─── */
+.btn {
+  font: 600 14px/1 'DM Sans', sans-serif;
+  padding: 11px 20px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--t);
+  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--forest);
+  color: var(--ink-0);
+}
+.btn-primary:hover { background: var(--forest-dk); }
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-700);
+  border-color: transparent;
+}
+.btn-ghost:hover { color: var(--ink-900); }
+.btn-secondary {
+  background: var(--ink-0);
+  color: var(--ink-900);
+  border-color: var(--ink-300);
+}
+.btn-secondary:hover { border-color: var(--ink-500); }
+.btn-sm { padding: 7px 14px; font-size: 13px; }
+.btn-lg { padding: 14px 28px; font-size: 15px; }
+
+/* ═══════════════════════════════════════════════════════════ */
+/*  TYPOGRAPHY HELPERS                                         */
+/* ═══════════════════════════════════════════════════════════ */
+.eyebrow {
+  font: 600 11px/16px 'DM Sans', sans-serif;
+  color: var(--forest);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.eyebrow-rust { color: var(--rust); }
+.eyebrow-ink { color: var(--ink-500); }
+
+h1, h2, h3, h4 {
+  font-family: 'Sora', sans-serif;
+  color: var(--ink-950);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.display-xl { font: 700 72px/80px 'Sora', sans-serif; letter-spacing: -0.03em; }
+.display-lg { font: 700 56px/64px 'Sora', sans-serif; letter-spacing: -0.025em; }
+.display-md { font: 700 40px/48px 'Sora', sans-serif; letter-spacing: -0.02em; }
+.h1 { font: 600 32px/40px 'Sora', sans-serif; letter-spacing: -0.015em; }
+.h2 { font: 600 24px/32px 'Sora', sans-serif; letter-spacing: -0.01em; }
+.h3 { font: 600 20px/28px 'Sora', sans-serif; letter-spacing: -0.005em; }
+
+.body-lg { font: 400 16px/26px 'DM Sans', sans-serif; }
+.body { font: 400 14px/22px 'DM Sans', sans-serif; }
+.caption { font: 400 12px/18px 'DM Sans', sans-serif; }
+
+.mono { font-family: 'DM Mono', ui-monospace, monospace; font-weight: 500; }
+.data-lg { font: 500 32px/40px 'DM Mono', monospace; letter-spacing: -0.01em; }
+.data { font: 500 16px/24px 'DM Mono', monospace; }
+
+.ink-500 { color: var(--ink-500); }
+.ink-600 { color: var(--ink-600); }
+.ink-700 { color: var(--ink-700); }
+.up { color: var(--up); }
+.down { color: var(--down); }
+.forest-c { color: var(--forest); }
+.rust-c { color: var(--rust); }
+
+/* ═══════════════════════════════════════════════════════════ */
+/*  HOMEPAGE                                                   */
+/* ═══════════════════════════════════════════════════════════ */
+.page { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+.hero {
+  padding: 128px 24px 96px;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 12px;
+  background: var(--forest-lt);
+  border: 1px solid rgba(15, 79, 58, 0.2);
+  border-radius: 100px;
+  font: 500 12px/1 'DM Sans', sans-serif;
+  color: var(--forest-dk);
+  margin-bottom: 32px;
+  letter-spacing: 0.01em;
+}
+.hero-badge-dot {
+  width: 6px; height: 6px;
+  background: var(--forest);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(15, 79, 58, 0.15);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(15, 79, 58, 0.15); }
+  50% { box-shadow: 0 0 0 6px rgba(15, 79, 58, 0.05); }
+}
+
+.hero h1 {
+  max-width: 900px;
+  margin-bottom: 24px;
+}
+.hero-subcopy {
+  font: 400 18px/28px 'DM Sans', sans-serif;
+  color: var(--ink-600);
+  max-width: 680px;
+  margin-bottom: 40px;
+}
+.hero-cta {
+  display: flex; gap: 12px;
+  margin-bottom: 20px;
+}
+.hero-trust {
+  display: flex; gap: 16px;
+  color: var(--ink-500);
+}
+.hero-trust-item {
+  display: flex; align-items: center; gap: 6px;
+  font: 400 13px/1 'DM Sans', sans-serif;
+}
+.hero-trust-dot {
+  width: 3px; height: 3px;
+  background: var(--ink-400);
+  border-radius: 50%;
+}
+
+/* Hero visual — the score ring as signature */
+.hero-visual {
+  position: relative;
+  margin-top: 80px;
+  padding: 48px;
+  background: var(--ink-50);
+  border: 1px solid var(--ink-200);
+  border-radius: 12px;
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 48px;
+  align-items: center;
+}
+.hero-visual-text .eyebrow { color: var(--forest); }
+.hero-visual-text .h2 { margin-bottom: 16px; }
+.hero-visual-text .body-lg { color: var(--ink-600); max-width: 440px; }
+
+/* Score ring SVG — the signature element */
+.score-ring {
+  width: 240px; height: 240px;
+  position: relative;
+  margin: 0 auto;
+}
+.score-ring svg {
+  width: 100%; height: 100%;
+  transform: rotate(-90deg);
+}
+.score-ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.score-ring-value {
+  font: 500 56px/1 'DM Mono', monospace;
+  color: var(--ink-900);
+  letter-spacing: -0.02em;
+}
+.score-ring-of {
+  font: 500 16px/1 'DM Mono', monospace;
+  color: var(--ink-500);
+  margin-top: 4px;
+}
+.score-ring-label {
+  font: 600 10px/1 'DM Sans', sans-serif;
+  color: var(--forest-dk);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 10px;
+}
+
+/* ─── LENS SECTION ─── */
+.lens-section {
+  background: var(--forest-lt);
+  padding: 96px 0;
+  margin: 96px 0;
+  border-top: 1px solid rgba(15, 79, 58, 0.1);
+  border-bottom: 1px solid rgba(15, 79, 58, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+.lens-section::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(15, 79, 58, 0.08), transparent 70%);
+  pointer-events: none;
+}
+.lens-section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  margin-bottom: 48px;
+}
+.lens-brand {
+  display: flex; align-items: center; gap: 10px;
+}
+.lens-brand-mark {
+  width: 40px; height: 40px;
+  background: var(--forest);
+  color: var(--ink-0);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font: 600 20px/1 'Sora', sans-serif;
+}
+.lens-brand-name {
+  font: 600 28px/1 'Sora', sans-serif;
+  color: var(--ink-950);
+}
+.lens-tagline {
+  font: 400 16px/1 'DM Sans', sans-serif;
+  color: var(--ink-600);
+  font-style: italic;
+}
+
+.lens-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+.lens-step {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-200);
+  border-radius: 10px;
+  padding: 24px;
+  position: relative;
+  transition: all var(--t);
+}
+.lens-step:hover {
+  border-color: var(--ink-300);
+  box-shadow: var(--e1);
+  transform: translateY(-2px);
+}
+.lens-step-num {
+  font: 500 14px/1 'DM Mono', monospace;
+  color: var(--forest);
+  margin-bottom: 16px;
+}
+.lens-step h4 {
+  font: 600 18px/1.3 'Sora', sans-serif;
+  color: var(--ink-950);
+  margin-bottom: 14px;
+}
+.lens-step-list {
+  list-style: none;
+  padding: 0;
+}
+.lens-step-list li {
+  font: 400 13px/20px 'DM Sans', sans-serif;
+  color: var(--ink-600);
+  padding: 4px 0;
+  display: flex; align-items: flex-start; gap: 6px;
+}
+.lens-step-list li::before {
+  content: '';
+  flex-shrink: 0;
+  width: 3px; height: 3px;
+  background: var(--ink-400);
+  border-radius: 50%;
+  margin-top: 8px;
+}
+
+.lens-strapline {
+  text-align: center;
+  margin-top: 48px;
+  font: 600 20px/1.4 'Sora', sans-serif;
+  color: var(--ink-800);
+  letter-spacing: -0.005em;
+}
+
+/* ─── FEATURES GRID ─── */
+.features-section { padding: 96px 0; }
+.features-header { margin-bottom: 56px; max-width: 640px; }
+.features-header h2 { margin-bottom: 16px; }
+.features-header .body-lg { color: var(--ink-600); }
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--ink-200);
+  border: 1px solid var(--ink-200);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.feature-card {
+  padding: 32px;
+  background: var(--ink-0);
+  transition: background var(--t);
+}
+.feature-card:hover { background: var(--ink-50); }
+.feature-icon {
+  width: 36px; height: 36px;
+  background: var(--forest-lt);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+  color: var(--forest-dk);
+}
+.feature-icon svg { width: 18px; height: 18px; stroke-width: 1.5; fill: none; stroke: currentColor; }
+.feature-card h3 {
+  font: 600 17px/24px 'Sora', sans-serif;
+  color: var(--ink-950);
+  margin-bottom: 10px;
+}
+.feature-card p {
+  font: 400 14px/22px 'DM Sans', sans-serif;
+  color: var(--ink-600);
+}
+
+/* ─── AUDIT LOG METRICS ─── */
+.audit-section {
+  padding: 96px 24px;
+  background: var(--ink-950);
+  color: var(--ink-0);
+  margin: 96px -100vw 96px -100vw;
+  padding-left: calc(50vw - 600px + 24px);
+  padding-right: calc(50vw - 600px + 24px);
+}
+.audit-inner { max-width: 1200px; margin: 0 auto; }
+.audit-section .eyebrow { color: var(--rust); }
+.audit-section h2 { color: var(--ink-0); margin-bottom: 24px; }
+.audit-hypothetical-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(178, 94, 9, 0.12);
+  border: 1px solid rgba(178, 94, 9, 0.35);
+  border-radius: 4px;
+  font: 600 11px/1 'DM Sans', sans-serif;
+  color: #F5B563;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 48px;
+}
+.audit-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--ink-800);
+  border: 1px solid var(--ink-800);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 32px;
+}
+.audit-metric {
+  padding: 32px 28px;
+  background: var(--ink-950);
+}
+.audit-metric-value {
+  font: 500 48px/1 'DM Mono', monospace;
+  color: var(--ink-0);
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+.audit-metric-label {
+  font: 500 12px/16px 'DM Sans', sans-serif;
+  color: var(--ink-400);
+  letter-spacing: 0.02em;
+}
+.audit-disclaimer {
+  font: 400 13px/22px 'DM Sans', sans-serif;
+  color: var(--ink-400);
+  max-width: 760px;
+}
+.audit-disclaimer strong { color: var(--ink-200); font-weight: 600; }
+
+/* ─── TESTIMONIALS ─── */
+.testimonials-section { padding: 96px 0; }
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 48px;
+}
+.testimonial-card {
+  background: var(--rust-lt);
+  border: 1px solid rgba(184, 80, 47, 0.2);
+  border-radius: 10px;
+  padding: 28px;
+  position: relative;
+}
+.testimonial-card::before {
+  content: '"';
+  position: absolute;
+  top: 8px; left: 20px;
+  font: 700 60px/1 'Sora', sans-serif;
+  color: var(--rust);
+  opacity: 0.25;
+}
+.testimonial-quote {
+  font: 500 15px/24px 'DM Sans', sans-serif;
+  color: var(--ink-800);
+  margin-bottom: 20px;
+  position: relative;
+  padding-top: 16px;
+}
+.testimonial-author {
+  font: 600 13px/1 'DM Sans', sans-serif;
+  color: var(--ink-900);
+  margin-bottom: 2px;
+}
+.testimonial-role {
+  font: 400 12px/1 'DM Sans', sans-serif;
+  color: var(--ink-500);
+  margin-bottom: 16px;
+}
+.testimonial-disclosure {
+  font: 400 11px/16px 'DM Sans', sans-serif;
+  color: var(--ink-500);
+  border-top: 1px solid rgba(184, 80, 47, 0.15);
+  padding-top: 12px;
+}
+
+/* ─── PRICING ─── */
+.pricing-section { padding: 96px 0; }
+.pricing-header { text-align: center; margin-bottom: 56px; max-width: 640px; margin-left: auto; margin-right: auto; }
+.pricing-toggle {
+  display: inline-flex;
+  background: var(--ink-50);
+  border: 1px solid var(--ink-200);
+  border-radius: 100px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+.pricing-toggle-btn {
+  padding: 8px 20px;
+  font: 600 13px/1 'DM Sans', sans-serif;
+  border: none;
+  background: transparent;
+  color: var(--ink-600);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all var(--t);
+}
+.pricing-toggle-btn.active {
+  background: var(--ink-0);
+  color: var(--ink-900);
+  box-shadow: var(--e1);
+}
+.pricing-save-hint {
+  font: 400 13px/1 'DM Sans', sans-serif;
+  color: var(--rust-dk);
+  font-style: italic;
+}
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.pricing-card {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-200);
+  border-radius: 12px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.pricing-card.popular {
+  border-color: var(--forest);
+  border-width: 2px;
+  box-shadow: 0 0 0 4px rgba(15, 79, 58, 0.06);
+}
+.pricing-popular-ribbon {
+  position: absolute;
+  top: -1px; right: 24px;
+  background: var(--forest);
+  color: var(--ink-0);
+  font: 600 11px/1 'DM Sans', sans-serif;
+  padding: 6px 12px;
+  border-radius: 0 0 6px 6px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.pricing-tier-name {
+  font: 600 18px/1 'Sora', sans-serif;
+  color: var(--ink-900);
+  margin-bottom: 8px;
+}
+.pricing-tier-tagline {
+  font: 400 14px/22px 'DM Sans', sans-serif;
+  color: var(--ink-500);
+  margin-bottom: 28px;
+  min-height: 44px;
+}
+.pricing-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.pricing-amount {
+  font: 500 40px/1 'DM Mono', monospace;
+  color: var(--ink-950);
+  letter-spacing: -0.02em;
+}
+.pricing-period {
+  font: 500 14px/1 'DM Mono', monospace;
+  color: var(--ink-500);
+}
+.pricing-save-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: var(--rust-lt);
+  color: var(--rust-dk);
+  font: 600 11px/1 'DM Sans', sans-serif;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  margin-bottom: 24px;
+  align-self: flex-start;
+}
+.pricing-features {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 28px;
+  flex: 1;
+  border-top: 1px solid var(--ink-200);
+  padding-top: 24px;
+}
+.pricing-features li {
+  font: 400 13px/20px 'DM Sans', sans-serif;
+  color: var(--ink-700);
+  padding: 8px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.pricing-check {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--up);
+}
+.pricing-check svg { width: 16px; height: 16px; stroke-width: 2; fill: none; stroke: currentColor; }
+
+/* ─── BOTTOM CTA ─── */
+.bottom-cta {
+  padding: 96px 0;
+  text-align: center;
+  background: var(--ink-50);
+  border-top: 1px solid var(--ink-200);
+  border-bottom: 1px solid var(--ink-200);
+}
+.bottom-cta h2 { margin-bottom: 16px; }
+.bottom-cta p {
+  font: 400 16px/26px 'DM Sans', sans-serif;
+  color: var(--ink-600);
+  max-width: 560px;
+  margin: 0 auto 32px;
+}
+.bottom-cta-buttons {
+  display: inline-flex;
+  gap: 12px;
+}
+
+/* ─── FOOTER ─── */
+.footer {
+  background: var(--ink-950);
+  color: var(--ink-400);
+  padding: 64px 0 40px;
+}
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.footer-top {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 48px;
+  padding-bottom: 48px;
+  border-bottom: 1px solid var(--ink-800);
+}
+.footer-brand .m-logo {
+  color: var(--ink-0);
+  margin-bottom: 16px;
+}
+.footer-brand .m-logo em { color: var(--ink-500); }
+.footer-tagline {
+  font: 400 14px/22px 'DM Sans', sans-serif;
+  color: var(--ink-400);
+  max-width: 300px;
+}
+.footer-col h4 {
+  font: 600 12px/1 'DM Sans', sans-serif;
+  color: var(--ink-300);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.footer-col ul {
+  list-style: none;
+  padding: 0;
+}
+.footer-col li {
+  padding: 6px 0;
+}
+.footer-col a {
+  font: 400 13px/20px 'DM Sans', sans-serif;
+  color: var(--ink-400);
+  text-decoration: none;
+  transition: color var(--t);
+}
+.footer-col a:hover { color: var(--ink-200); }
+
+.footer-disclaimer {
+  padding-top: 32px;
+  font: 400 12px/20px 'DM Sans', sans-serif;
+  color: var(--ink-500);
+  max-width: 800px;
+}
+.footer-disclaimer p { margin-bottom: 12px; }
+.footer-copy {
+  margin-top: 24px;
+  font: 400 12px/1 'DM Sans', sans-serif;
+  color: var(--ink-500);
+}
+
+/* Persistent compliance strip */
+.compliance-strip {
+  background: var(--ink-950);
+  color: var(--ink-400);
+  text-align: center;
+  padding: 10px 24px;
+  font: 400 11px/16px 'DM Sans', sans-serif;
+  border-top: 1px solid var(--ink-800);
+  letter-spacing: 0.01em;
+}
+.compliance-strip strong { color: var(--ink-200); font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════════ */
+/*  LEGAL / FOCUS-READING ARCHETYPE                            */
+/* ═══════════════════════════════════════════════════════════ */
+.legal-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 64px 48px 96px;
+}
+.legal-breadcrumb {
+  font: 500 12px/1 'DM Sans', sans-serif;
+  color: var(--ink-500);
+  letter-spacing: 0.02em;
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.legal-breadcrumb a {
+  color: var(--ink-500);
+  text-decoration: none;
+  transition: color var(--t);
+}
+.legal-breadcrumb a:hover { color: var(--ink-900); }
+.legal-breadcrumb svg { width: 12px; height: 12px; stroke-width: 2; fill: none; stroke: currentColor; }
+
+.legal-page h1 {
+  font: 600 40px/48px 'Sora', sans-serif;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+.legal-updated {
+  font: 400 13px/20px 'DM Sans', sans-serif;
+  color: var(--ink-500);
+  font-style: italic;
+  margin-bottom: 48px;
+}
+
+.legal-page h2 {
+  font: 600 22px/32px 'Sora', sans-serif;
+  letter-spacing: -0.005em;
+  color: var(--ink-900);
+  margin-top: 48px;
+  margin-bottom: 16px;
+  padding-top: 24px;
+  border-top: 1px solid var(--ink-200);
+}
+.legal-page h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+
+.legal-page p {
+  font: 400 16px/28px 'DM Sans', sans-serif;
+  color: var(--ink-800);
+  margin-bottom: 20px;
+}
+.legal-page p strong { color: var(--ink-950); font-weight: 600; }
+
+.legal-callout {
+  border-left: 3px solid var(--rust);
+  padding: 0 0 0 20px;
+  margin: 24px 0;
+  background: var(--rust-lt);
+  padding: 20px 24px;
+  border-radius: 0 8px 8px 0;
+}
+.legal-callout .eyebrow { color: var(--rust-dk); margin-bottom: 8px; }
+.legal-callout p { margin-bottom: 0; font-size: 14px; line-height: 24px; }
+
+/* ═══════════════════════════════════════════════════════════ */
+/*  ABOUT PAGE                                                 */
+/* ═══════════════════════════════════════════════════════════ */
+.about-hero {
+  padding: 128px 24px 64px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.about-hero .eyebrow { margin-bottom: 24px; }
+.about-hero h1 {
+  max-width: 800px;
+  margin-bottom: 24px;
+}
+.about-hero-lead {
+  font: 400 20px/32px 'DM Sans', sans-serif;
+  color: var(--ink-600);
+  max-width: 680px;
+}
+
+.about-section { padding: 64px 0; max-width: 800px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+.about-section h2 { margin-bottom: 24px; }
+.about-section p {
+  font: 400 17px/30px 'DM Sans', sans-serif;
+  color: var(--ink-700);
+  margin-bottom: 20px;
+}
+.about-section p strong { color: var(--ink-950); font-weight: 600; }
+
+.about-principles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--ink-200);
+  border: 1px solid var(--ink-200);
+  border-radius: 10px;
+  overflow: hidden;
+  max-width: 1200px;
+  margin: 32px auto;
+}
+.about-principle {
+  background: var(--ink-0);
+  padding: 28px;
+}
+.about-principle-num {
+  font: 500 20px/1 'DM Mono', monospace;
+  color: var(--rust);
+  margin-bottom: 12px;
+}
+.about-principle h3 {
+  font: 600 16px/1.3 'Sora', sans-serif;
+  color: var(--ink-950);
+  margin-bottom: 10px;
+}
+.about-principle p {
+  font: 400 14px/22px 'DM Sans', sans-serif;
+  color: var(--ink-600);
+  margin-bottom: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/*  DIVIDERS                                                   */
+/* ═══════════════════════════════════════════════════════════ */
+.section-divider {
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 1px;
+  background: var(--ink-200);
+}
+
+</style>
+</head>
+<body>
+
+<!-- ─────────────────── SESSION CONTROLS ─────────────────── -->
+<div class="controls">
+  <button class="active" onclick="showScreen('home', this)">Home</button>
+  <button onclick="showScreen('pricing', this)">Pricing</button>
+  <button onclick="showScreen('about', this)">About</button>
+  <button onclick="showScreen('disclaimer', this)">Disclaimer</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SCREEN: HOMEPAGE                                                 -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="screen-home" class="screen active">
+
+  <!-- NAV -->
+  <nav class="m-nav">
+    <div class="m-nav-inner">
+      <div class="m-logo">
+        <span class="m-logo-mark">F</span>
+        Fintrest<em>.ai</em>
+      </div>
+      <div class="m-nav-links">
+        <a class="m-nav-link active">Research engine</a>
+        <a class="m-nav-link">How it works</a>
+        <a class="m-nav-link" onclick="showScreen('pricing')">Pricing</a>
+        <a class="m-nav-link" onclick="showScreen('about')">About</a>
+      </div>
+      <div class="m-nav-cta">
+        <button class="btn btn-ghost btn-sm">Log in</button>
+        <button class="btn btn-primary btn-sm">Start free</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      Research layer · Updated every morning before the open
+    </div>
+    <h1 class="display-xl">Every stock idea, stress-tested before the open.</h1>
+    <p class="hero-subcopy">Fintrest runs 500+ US stocks through a 7-factor research engine every morning. You see which setups passed the test, exactly why they passed, and the full audit trail — including the losers. <strong style="color: var(--ink-900); font-weight: 500;">Research, not recommendations.</strong></p>
+    <div class="hero-cta">
+      <button class="btn btn-primary btn-lg">Start free →</button>
+      <button class="btn btn-secondary btn-lg">See how the engine works</button>
+    </div>
+    <div class="hero-trust">
+      <span class="hero-trust-item">No credit card required</span>
+      <span class="hero-trust-dot"></span>
+      <span class="hero-trust-item">30-second setup</span>
+      <span class="hero-trust-dot"></span>
+      <span class="hero-trust-item">Cancel anytime</span>
+    </div>
+
+    <!-- HERO VISUAL: score ring demo -->
+    <div class="hero-visual">
+      <div class="hero-visual-text">
+        <div class="eyebrow">The signature</div>
+        <h2 class="h2">The 7-factor score, visible at a glance.</h2>
+        <p class="body-lg">Every signal carries a score ring. Seven segments, one per factor. Segment length = factor strength. One look tells you whether the score is driven by one great factor — or seven good ones.</p>
+      </div>
+      <div class="score-ring">
+        <svg viewBox="0 0 240 240">
+          <!-- Background track rings -->
+          <g>
+            <!-- 7 segments at 51.43° each, 2° gap -->
+            <!-- Factor 1: Momentum 92 -->
+            <path d="M 120 12 A 108 108 0 0 1 167.57 23.22" fill="none" stroke="#F2F4F7" stroke-width="8" stroke-linecap="butt"/>
+            <path d="M 120 12 A 108 108 0 0 1 167.57 23.22" fill="none" stroke="#0A7F4F" stroke-width="8" stroke-linecap="butt" stroke-dasharray="100" stroke-dashoffset="8"/>
+            <!-- Factor 2: Volume 88 -->
+            <path d="M 170.15 24.54 A 108 108 0 0 1 210.47 64.87" fill="none" stroke="#F2F4F7" stroke-width="8"/>
+            <path d="M 170.15 24.54 A 108 108 0 0 1 210.47 64.87" fill="none" stroke="#0A7F4F" stroke-width="8" stroke-dasharray="100" stroke-dashoffset="12"/>
+            <!-- Factor 3: Catalyst 76 -->
+            <path d="M 211.79 67.45 A 108 108 0 0 1 223 114.43" fill="none" stroke="#F2F4F7" stroke-width="8"/>
+            <path d="M 211.79 67.45 A 108 108 0 0 1 223 114.43" fill="none" stroke="#0A7F4F" stroke-width="8" stroke-dasharray="100" stroke-dashoffset="24"/>
+            <!-- Factor 4: Earnings 81 -->
+            <path d="M 223 117.57 A 108 108 0 0 1 210.47 175.13" fill="none" stroke="#F2F4F7" stroke-width="8"/>
+            <path d="M 223 117.57 A 108 108 0 0 1 210.47 175.13" fill="none" stroke="#0A7F4F" stroke-width="8" stroke-dasharray="100" stroke-dashoffset="19"/>
+            <!-- Factor 5: Sentiment 72 -->
+            <path d="M 209.15 177.71 A 108 108 0 0 1 167.57 216.78" fill="none" stroke="#F2F4F7" stroke-width="8"/>
+            <path d="M 209.15 177.71 A 108 108 0 0 1 167.57 216.78" fill="none" stroke="#0A7F4F" stroke-width="8" stroke-dasharray="100" stroke-dashoffset="28"/>
+            <!-- Factor 6: Trend 94 -->
+            <path d="M 164.82 218.10 A 108 108 0 0 1 117.71 227.99" fill="none" stroke="#F2F4F7" stroke-width="8"/>
+            <path d="M 164.82 218.10 A 108 108 0 0 1 117.71 227.99" fill="none" stroke="#0A7F4F" stroke-width="8" stroke-dasharray="100" stroke-dashoffset="6"/>
+            <!-- Factor 7: Risk 68 -->
+            <path d="M 115.00 227.99 A 108 108 0 0 1 72.43 216.78 A 108 108 0 0 1 29.53 175.13 A 108 108 0 0 1 17 117.57 A 108 108 0 0 1 17 114.43 A 108 108 0 0 1 29.53 64.87 A 108 108 0 0 1 72.43 23.22 A 108 108 0 0 1 117.29 12" fill="none" stroke="#F2F4F7" stroke-width="8"/>
+            <path d="M 115.00 227.99 A 108 108 0 0 1 72.43 216.78 A 108 108 0 0 1 29.53 175.13 A 108 108 0 0 1 17 117.57" fill="none" stroke="#0A7F4F" stroke-width="8" stroke-dasharray="100" stroke-dashoffset="32"/>
+          </g>
+        </svg>
+        <div class="score-ring-center">
+          <div class="score-ring-value">87</div>
+          <div class="score-ring-of">out of 100</div>
+          <div class="score-ring-label">NVDA · BUY TODAY</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LENS SECTION -->
+  <section class="lens-section">
+    <div class="page">
+      <div class="lens-section-header">
+        <div class="lens-brand">
+          <div class="lens-brand-mark">L</div>
+          <span class="lens-brand-name">Lens</span>
+        </div>
+        <span class="lens-tagline">The research layer at the center</span>
+      </div>
+      <div class="lens-steps">
+        <div class="lens-step">
+          <div class="lens-step-num">01 · Scan</div>
+          <h4>We look at 500+ stocks</h4>
+          <ul class="lens-step-list">
+            <li>Every morning before open</li>
+            <li>Prices · fundamentals · news · options flow</li>
+            <li>Regime-aware · intraday drift correction</li>
+          </ul>
+        </div>
+        <div class="lens-step">
+          <div class="lens-step-num">02 · Score</div>
+          <h4>7-factor quant bar</h4>
+          <ul class="lens-step-list">
+            <li>0–100 per factor</li>
+            <li>Cross-sectional percentile within sector</li>
+            <li>Regime-gated weights: bull · bear · chop</li>
+          </ul>
+        </div>
+        <div class="lens-step">
+          <div class="lens-step-num">03 · Narrate</div>
+          <h4>Lens explains why</h4>
+          <ul class="lens-step-list">
+            <li>Plain English thesis</li>
+            <li>Setup type: dip · breakout · trend</li>
+            <li>Catalysts · congress · insider · ownership</li>
+          </ul>
+        </div>
+        <div class="lens-step">
+          <div class="lens-step-num">04 · Review</div>
+          <h4>You decide what to do</h4>
+          <ul class="lens-step-list">
+            <li>Entry · stop · target · R:R reference levels</li>
+            <li>Real-time research alerts</li>
+            <li>Portfolio factor profile</li>
+          </ul>
+        </div>
+      </div>
+      <p class="lens-strapline">See what passed the test — and exactly why.</p>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features-section">
+    <div class="page">
+      <div class="features-header">
+        <div class="eyebrow">Research engine</div>
+        <h2 class="h1">A research layer for self-directed traders</h2>
+        <p class="body-lg">Data-driven research with a full audit trail. Every score is explainable, every signal is traceable, every outcome is logged — losers included.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+          </div>
+          <h3>Explainable signals</h3>
+          <p>Every signal carries a plain-English Lens explanation of why it ranked and which factors drove the score. No black boxes.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 3 5-6"/></svg>
+          </div>
+          <h3>7-factor scoring</h3>
+          <p>Momentum, relative volume, news catalysts, earnings, sentiment, trend strength, and risk — each scored 0–100 and regime-weighted.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><path d="M9 15l2 2 4-4"/></svg>
+          </div>
+          <h3>Before-the-open drop</h3>
+          <p>Morning research in your inbox or on your phone before the bell. Email, SMS, or push — you choose the channel and quiet hours.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M8 7l4-4 4 4"/><path d="M8 17l4 4 4-4"/></svg>
+          </div>
+          <h3>Reference levels</h3>
+          <p>Every signal includes reference entry, stop, and target levels from technical structure and volatility. Research outputs, not instructions.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M9 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2h-4"/><path d="M9 11V5a3 3 0 016 0v6"/></svg>
+          </div>
+          <h3>Public audit log</h3>
+          <p>Every signal's outcome is logged and published — hit rate, average move, max drawdown, losers included. No highlight reel.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          </div>
+          <h3>Sector heatmap</h3>
+          <p>Sector-level relative strength at a glance — which sectors are leading, which are bleeding, how the regime is rotating.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AUDIT LOG -->
+  <section class="audit-section">
+    <div class="audit-inner">
+      <div class="eyebrow" style="color: var(--rust)">Audit log</div>
+      <h2 class="display-md">Every signal, audited publicly.</h2>
+      <p class="body-lg" style="color: var(--ink-300); max-width: 680px; margin-top: 16px; margin-bottom: 32px;">Every signal the engine publishes is logged and its outcome is tracked — winners and losers. No cherry-picking.</p>
+      <div class="audit-hypothetical-badge">
+        Hypothetical · Backtested · Jan 2024 – Mar 2026 · Not live trading results
+      </div>
+      <div class="audit-metrics">
+        <div class="audit-metric">
+          <div class="audit-metric-value">73%</div>
+          <div class="audit-metric-label">Backtested hit rate</div>
+        </div>
+        <div class="audit-metric">
+          <div class="audit-metric-value">12.4%</div>
+          <div class="audit-metric-label">Backtested avg move / signal</div>
+        </div>
+        <div class="audit-metric">
+          <div class="audit-metric-value">2,400+</div>
+          <div class="audit-metric-label">Signals in backtest window</div>
+        </div>
+        <div class="audit-metric">
+          <div class="audit-metric-value">&lt;3%</div>
+          <div class="audit-metric-label">Backtested avg drawdown</div>
+        </div>
+      </div>
+      <p class="audit-disclaimer">
+        <strong>The numbers above are hypothetical backtested results</strong> generated by running the current scoring engine over historical data for Jan 2024 – Mar 2026. They do not represent actual trading, actual user accounts, or actual outcomes any user experienced. No user was trading these signals during the backtest window. Backtests do not account for real-world frictions: slippage, spread, commissions, taxes, missed fills, or capacity constraints. <strong>Past performance — including backtested performance — does not guarantee future results.</strong>
+      </p>
+    </div>
+  </section>
+
+  <!-- TESTIMONIALS -->
+  <section class="testimonials-section">
+    <div class="page">
+      <div class="eyebrow eyebrow-rust">What users say</div>
+      <h2 class="h1">Research that changes how you start the day.</h2>
+      <div class="testimonials-grid">
+        <div class="testimonial-card">
+          <p class="testimonial-quote">Fintrest replaced 3 hours of morning research with one glance at my dashboard. The Lens explanations walk me through what the model saw and why — the research is the value, not just the list.</p>
+          <div class="testimonial-author">Marcus T.</div>
+          <div class="testimonial-role">Swing Trader</div>
+          <p class="testimonial-disclosure">Not compensated. Individual results vary. Past results do not guarantee future results.</p>
+        </div>
+        <div class="testimonial-card">
+          <p class="testimonial-quote">I love that every signal tells me why it scored high. No other platform does this with such clarity. The research drop before the open is the part I never miss.</p>
+          <div class="testimonial-author">Sarah K.</div>
+          <div class="testimonial-role">Part-time Investor</div>
+          <p class="testimonial-disclosure">Not compensated. Individual results vary. Past results do not guarantee future results.</p>
+        </div>
+        <div class="testimonial-card">
+          <p class="testimonial-quote">The 7-factor breakdown is brilliant. I can see exactly what's driving each signal — momentum, catalysts, sentiment — all in one view. It's the quality-assurance layer I used to build myself in a spreadsheet.</p>
+          <div class="testimonial-author">James L.</div>
+          <div class="testimonial-role">Day Trader</div>
+          <p class="testimonial-disclosure">Not compensated. Individual results vary. Past results do not guarantee future results.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOTTOM CTA -->
+  <section class="bottom-cta">
+    <div class="page">
+      <h2 class="display-md">Ready to see what passed the test?</h2>
+      <p>Join self-directed traders who start their day with Fintrest research. Free to begin. No credit card required.</p>
+      <div class="bottom-cta-buttons">
+        <button class="btn btn-primary btn-lg">Start free →</button>
+        <button class="btn btn-secondary btn-lg">See today's research</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="m-logo" style="color: var(--ink-0)">
+            <span class="m-logo-mark">F</span>
+            Fintrest<em>.ai</em>
+          </div>
+          <p class="footer-tagline">The research layer for self-directed traders. Explainable signals, transparent scoring, a public audit log. Research, not recommendations.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Product</h4>
+          <ul>
+            <li><a>Today's Research</a></li>
+            <li><a>Sector Heatmap</a></li>
+            <li><a>Audit Log</a></li>
+            <li><a onclick="showScreen('pricing')">Pricing</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul>
+            <li><a onclick="showScreen('about')">About</a></li>
+            <li><a>Blog</a></li>
+            <li><a>Careers</a></li>
+            <li><a>Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Legal</h4>
+          <ul>
+            <li><a onclick="showScreen('disclaimer')">Not Financial Advice</a></li>
+            <li><a>Risk Disclosure</a></li>
+            <li><a>Terms of Use</a></li>
+            <li><a>Privacy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-disclaimer">
+        <p>Fintrest.ai is a stock research and data-analytics platform operated by DSYS Inc. We are not a Registered Investment Adviser, a broker-dealer, a financial planner, or a licensed portfolio manager. We do not manage money, hold customer funds, or execute trades.</p>
+        <p>Nothing on this website, in any email, in any alert, or in any chat with Lens constitutes investment advice, a personal recommendation, or a solicitation to buy or sell any security. All signals, scores, theses, reference levels, and commentary are educational research outputs derived from public market data.</p>
+        <p class="footer-copy">© 2026 DSYS Inc. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- COMPLIANCE STRIP -->
+  <div class="compliance-strip">
+    <strong>Fintrest publishes research, not recommendations.</strong> Not a Registered Investment Adviser. Trading involves risk of loss.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SCREEN: PRICING                                                  -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="screen-pricing" class="screen">
+
+  <nav class="m-nav">
+    <div class="m-nav-inner">
+      <div class="m-logo" onclick="showScreen('home')" style="cursor:pointer">
+        <span class="m-logo-mark">F</span>
+        Fintrest<em>.ai</em>
+      </div>
+      <div class="m-nav-links">
+        <a class="m-nav-link" onclick="showScreen('home')">Research engine</a>
+        <a class="m-nav-link" onclick="showScreen('home')">How it works</a>
+        <a class="m-nav-link active">Pricing</a>
+        <a class="m-nav-link" onclick="showScreen('about')">About</a>
+      </div>
+      <div class="m-nav-cta">
+        <button class="btn btn-ghost btn-sm">Log in</button>
+        <button class="btn btn-primary btn-sm">Start free</button>
+      </div>
+    </div>
+  </nav>
+
+  <section style="padding: 96px 24px 48px; max-width: 1200px; margin: 0 auto;">
+    <div class="pricing-header">
+      <div class="eyebrow">Pricing</div>
+      <h1 class="display-md">Simple, transparent pricing.</h1>
+      <p class="body-lg" style="color: var(--ink-600); margin: 16px auto 32px;">Start free. Upgrade when you want the full research board, unlimited Lens, and the full audit log.</p>
+      <div class="pricing-toggle">
+        <button class="pricing-toggle-btn">Monthly</button>
+        <button class="pricing-toggle-btn active">Annual</button>
+      </div>
+      <div class="pricing-save-hint">Save up to 17% with annual billing</div>
+    </div>
+  </section>
+
+  <section style="padding: 0 24px 96px; max-width: 1200px; margin: 0 auto;">
+    <div class="pricing-grid">
+
+      <!-- FREE -->
+      <div class="pricing-card">
+        <div class="pricing-tier-name">Free</div>
+        <div class="pricing-tier-tagline">See what the engine sees. A daily taste of the research.</div>
+        <div class="pricing-price">
+          <span class="pricing-amount">$0</span>
+          <span class="pricing-period">/ forever</span>
+        </div>
+        <div style="height: 24px;"></div>
+        <ul class="pricing-features">
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Top 3 signals daily</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Lens thesis on the top 3</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>5 research pages / day</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>1 watchlist · 5 items</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Morning research digest</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Public audit log access</li>
+        </ul>
+        <button class="btn btn-secondary" style="width: 100%; justify-content: center;">Start free</button>
+      </div>
+
+      <!-- PRO -->
+      <div class="pricing-card popular">
+        <div class="pricing-popular-ribbon">Most popular</div>
+        <div class="pricing-tier-name">Pro</div>
+        <div class="pricing-tier-tagline">The full research layer. Everything a self-directed trader needs to stress-test ideas every morning.</div>
+        <div class="pricing-price">
+          <span class="pricing-amount">$199</span>
+          <span class="pricing-period">/ yr</span>
+        </div>
+        <div class="pricing-save-chip">Save $29 · 13% off</div>
+        <ul class="pricing-features">
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Full signal board (50+) with Lens filter chips</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Unlimited Lens thesis</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Ask Lens — unlimited research chat</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Unlimited research pages</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>3 watchlists · 30 items</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Portfolio import + Lens research layer (3 portfolios)</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Real-time research alerts (push + email)</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Congress + Insider feeds</li>
+        </ul>
+        <button class="btn btn-primary" style="width: 100%; justify-content: center;">Go Pro →</button>
+      </div>
+
+      <!-- ELITE -->
+      <div class="pricing-card">
+        <div class="pricing-tier-name">Elite</div>
+        <div class="pricing-tier-tagline">Institutional-grade research. Lens tuned to your portfolio.</div>
+        <div class="pricing-price">
+          <span class="pricing-amount">$449</span>
+          <span class="pricing-period">/ yr</span>
+        </div>
+        <div class="pricing-save-chip">Save $91 · 17% off</div>
+        <ul class="pricing-features">
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Everything in Pro</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Unlimited portfolios</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Lens Personalized — thesis tuned to your holdings</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Weekly portfolio research PDF (JPM-style)</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Backtest runner — historical what-if</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Priority Lens — no rate limits</li>
+          <li><span class="pricing-check"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span>Early access to new research modules</li>
+        </ul>
+        <button class="btn btn-secondary" style="width: 100%; justify-content: center;">Go Elite</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="m-logo" style="color: var(--ink-0)">
+            <span class="m-logo-mark">F</span>
+            Fintrest<em>.ai</em>
+          </div>
+          <p class="footer-tagline">The research layer for self-directed traders.</p>
+        </div>
+        <div class="footer-col"><h4>Product</h4><ul><li><a>Today's Research</a></li><li><a>Sector Heatmap</a></li><li><a>Audit Log</a></li><li><a onclick="showScreen('pricing')">Pricing</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a onclick="showScreen('about')">About</a></li><li><a>Blog</a></li><li><a>Careers</a></li><li><a>Contact</a></li></ul></div>
+        <div class="footer-col"><h4>Legal</h4><ul><li><a onclick="showScreen('disclaimer')">Not Financial Advice</a></li><li><a>Risk Disclosure</a></li><li><a>Terms of Use</a></li><li><a>Privacy</a></li></ul></div>
+      </div>
+      <div class="footer-disclaimer">
+        <p class="footer-copy">© 2026 DSYS Inc. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+  <div class="compliance-strip">
+    <strong>Fintrest publishes research, not recommendations.</strong> Not a Registered Investment Adviser. Trading involves risk of loss.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SCREEN: ABOUT                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="screen-about" class="screen">
+
+  <nav class="m-nav">
+    <div class="m-nav-inner">
+      <div class="m-logo" onclick="showScreen('home')" style="cursor:pointer">
+        <span class="m-logo-mark">F</span>
+        Fintrest<em>.ai</em>
+      </div>
+      <div class="m-nav-links">
+        <a class="m-nav-link" onclick="showScreen('home')">Research engine</a>
+        <a class="m-nav-link" onclick="showScreen('home')">How it works</a>
+        <a class="m-nav-link" onclick="showScreen('pricing')">Pricing</a>
+        <a class="m-nav-link active">About</a>
+      </div>
+      <div class="m-nav-cta">
+        <button class="btn btn-ghost btn-sm">Log in</button>
+        <button class="btn btn-primary btn-sm">Start free</button>
+      </div>
+    </div>
+  </nav>
+
+  <section class="about-hero">
+    <div class="eyebrow">About Fintrest</div>
+    <h1 class="display-lg">We publish research. You decide what to do with it.</h1>
+    <p class="about-hero-lead">Fintrest is a stock research platform built on one unusual idea: most retail investing products try to tell you what to buy. We don't. We stress-test 500+ US stocks every morning, publish which ones passed and exactly why, and leave the decision where it belongs — with you.</p>
+  </section>
+
+  <section class="about-section">
+    <h2 class="h1">Why we built this</h2>
+    <p>The retail stock software market converged on one format: an app tells you what to buy, promises returns, and takes a subscription. The format works for a few weeks until the user loses three trades and churns. Then they try the next one. Retention in this category is brutal — often under 30% at six months.</p>
+    <p>We think the format is wrong. The problem isn't that people need better picks. It's that <strong>people need to understand the research, not just consume it.</strong> A signal you can't explain isn't research — it's a trade recommendation dressed up as one. We built Fintrest the other way: every score is explainable, every factor is audited, every outcome is logged publicly — losers included.</p>
+  </section>
+
+  <section style="padding: 64px 24px; max-width: 1200px; margin: 0 auto;">
+    <div style="text-align: center; margin-bottom: 48px;">
+      <div class="eyebrow eyebrow-rust">Our principles</div>
+      <h2 class="h1" style="max-width: 560px; margin: 16px auto 0;">Three things we will not do.</h2>
+    </div>
+    <div class="about-principles">
+      <div class="about-principle">
+        <div class="about-principle-num">01</div>
+        <h3>We don't recommend trades.</h3>
+        <p>Fintrest publishes research. Every signal is a scored research artifact, not a recommendation. Lens explains what the model saw — never what you should do.</p>
+      </div>
+      <div class="about-principle">
+        <div class="about-principle-num">02</div>
+        <h3>We don't hide losers.</h3>
+        <p>Every signal's outcome is logged and published — hit rate, average move, drawdown, losers included. The audit log is public and it's complete.</p>
+      </div>
+      <div class="about-principle">
+        <div class="about-principle-num">03</div>
+        <h3>We don't sell your data.</h3>
+        <p>We don't share, rent, or sell user data. We make money from subscriptions, not from surveillance. If you cancel, your data is deleted.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="about-section">
+    <h2 class="h1">Who we are</h2>
+    <p>Fintrest is built by <strong>DSYS Inc.</strong>, a technology company focused on AI, data engineering, and consumer fintech. We are not a Registered Investment Adviser. We do not manage money or execute trades. We build software, publish research, and leave the investing to you.</p>
+    <p>We're based in Alpharetta, Georgia, and we're a small team. You can reach us anytime at <a href="#" style="color: var(--forest); text-decoration: none; font-weight: 500;">deep@dsysinc.com</a>.</p>
+  </section>
+
+  <section class="bottom-cta">
+    <div class="page">
+      <h2 class="display-md">Ready to see the research?</h2>
+      <p>Free to begin. No credit card required.</p>
+      <div class="bottom-cta-buttons">
+        <button class="btn btn-primary btn-lg">Start free →</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="m-logo" style="color: var(--ink-0)">
+            <span class="m-logo-mark">F</span>
+            Fintrest<em>.ai</em>
+          </div>
+          <p class="footer-tagline">The research layer for self-directed traders.</p>
+        </div>
+        <div class="footer-col"><h4>Product</h4><ul><li><a>Today's Research</a></li><li><a>Sector Heatmap</a></li><li><a>Audit Log</a></li><li><a onclick="showScreen('pricing')">Pricing</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a onclick="showScreen('about')">About</a></li><li><a>Blog</a></li><li><a>Careers</a></li><li><a>Contact</a></li></ul></div>
+        <div class="footer-col"><h4>Legal</h4><ul><li><a onclick="showScreen('disclaimer')">Not Financial Advice</a></li><li><a>Risk Disclosure</a></li><li><a>Terms of Use</a></li><li><a>Privacy</a></li></ul></div>
+      </div>
+      <div class="footer-disclaimer">
+        <p class="footer-copy">© 2026 DSYS Inc. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+  <div class="compliance-strip">
+    <strong>Fintrest publishes research, not recommendations.</strong> Not a Registered Investment Adviser. Trading involves risk of loss.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SCREEN: DISCLAIMER (FOCUS-READING ARCHETYPE)                     -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="screen-disclaimer" class="screen">
+
+  <nav class="m-nav">
+    <div class="m-nav-inner">
+      <div class="m-logo" onclick="showScreen('home')" style="cursor:pointer">
+        <span class="m-logo-mark">F</span>
+        Fintrest<em>.ai</em>
+      </div>
+      <div class="m-nav-links">
+        <a class="m-nav-link" onclick="showScreen('home')">Research engine</a>
+        <a class="m-nav-link" onclick="showScreen('home')">How it works</a>
+        <a class="m-nav-link" onclick="showScreen('pricing')">Pricing</a>
+        <a class="m-nav-link" onclick="showScreen('about')">About</a>
+      </div>
+      <div class="m-nav-cta">
+        <button class="btn btn-ghost btn-sm">Log in</button>
+        <button class="btn btn-primary btn-sm">Start free</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="legal-page">
+    <div class="legal-breadcrumb">
+      <a onclick="showScreen('home')">Home</a>
+      <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      <a>Legal</a>
+      <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      <span style="color: var(--ink-900)">Disclaimer</span>
+    </div>
+
+    <h1>Disclaimer</h1>
+    <p class="legal-updated">Last updated: April 2026</p>
+
+    <div class="legal-callout">
+      <div class="eyebrow">In one sentence</div>
+      <p>Fintrest publishes stock research. We are not a Registered Investment Adviser, and nothing on this site is investment advice.</p>
+    </div>
+
+    <h2>1. Who we are</h2>
+    <p>Fintrest.ai is a stock research and data-analytics platform operated by <strong>DSYS Inc.</strong> ("Fintrest," "we," "us," or "our"). We are a technology company, not a financial institution. <strong>We are not a Registered Investment Adviser</strong> under the Investment Advisers Act of 1940, not a broker-dealer registered with the SEC or FINRA, and not a licensed financial planner. We do not custody customer funds, do not execute trades, and do not manage portfolios.</p>
+
+    <h2>2. What Fintrest publishes</h2>
+    <p>Fintrest publishes educational research outputs: quantitative signals scored 0–100 across a 7-factor model; plain-English theses written by the Lens research layer; reference entry, stop, and target levels derived from technical structure; sector-level heatmaps; historical performance statistics and audit logs; market commentary; and catalysts-based feeds (earnings, insider trades, congressional filings, ownership changes).</p>
+    <p>All of this content is produced from public market data. It is informational and educational. It does not take into account the personal financial situation, investment objectives, risk tolerance, tax position, or constraints of any individual user.</p>
+
+    <h2>3. Nothing on this platform is investment advice</h2>
+    <p>Nothing on Fintrest.ai — including signals, scores, Lens theses, reference levels, morning digests, alerts, the audit log, blog posts, chat responses, emails, SMS messages, and push notifications — constitutes:</p>
+    <p>(a) investment advice of any kind; (b) a personal recommendation to buy, sell, hold, or refrain from buying any security; (c) a solicitation, offer, or inducement to enter into an investment advisory, brokerage, or other financial-services relationship; (d) an offer to sell or a solicitation to buy any security in any jurisdiction; (e) tax, legal, accounting, or financial-planning advice.</p>
+    <p>Specifically, the designations <strong>"BUY TODAY," "WATCH," "AVOID,"</strong> or any similar signal label are research classifications generated by an automated scoring model. They are not recommendations to any user to take any action. Users must not interpret any signal, score, thesis, or reference level as a personal instruction.</p>
+
+    <h2>4. You are solely responsible for your decisions</h2>
+    <p>You are solely responsible for any investment, trading, or financial decisions you make. Before acting on any information obtained from Fintrest.ai, you should: (a) consider your own financial situation, objectives, and risk tolerance; (b) conduct your own research; and (c) consult a licensed investment professional, tax advisor, and/or attorney.</p>
+
+    <h2>5. Performance disclosures</h2>
+    <p>Any historical performance figures shown on Fintrest.ai — hit rates, average returns per signal, win rates, drawdowns, Sharpe ratios — are one of two kinds, and are labeled accordingly:</p>
+    <p><strong>(a) Backtested / hypothetical performance:</strong> results generated by running the current scoring engine over historical data. These do not represent actual trading, actual user outcomes, or any real money at risk. They do not include slippage, bid-ask spread, commissions, taxes, borrow costs, missed fills, or capacity constraints.</p>
+    <p><strong>(b) Live post-launch performance:</strong> actual outcomes of signals published since a stated launch date. These do not represent any user's actual account performance.</p>
+    <p>Past performance — backtested or live — does not guarantee future results.</p>
+
+    <h2>6. Risk of loss</h2>
+    <p>Trading stocks involves substantial risk of loss, including the total loss of your investment. Using leverage, margin, options, or derivatives increases the risk materially. Fintrest cannot and does not represent that any signal, strategy, or set of signals is suitable for any particular user.</p>
+
+    <h2>7. Contact</h2>
+    <p>Questions about this disclaimer: <a href="#" style="color: var(--forest); text-decoration: none; font-weight: 500;">legal@dsysinc.com</a> · DSYS Inc., United States.</p>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="m-logo" style="color: var(--ink-0)">
+            <span class="m-logo-mark">F</span>
+            Fintrest<em>.ai</em>
+          </div>
+          <p class="footer-tagline">The research layer for self-directed traders.</p>
+        </div>
+        <div class="footer-col"><h4>Product</h4><ul><li><a>Today's Research</a></li><li><a>Sector Heatmap</a></li><li><a>Audit Log</a></li><li><a onclick="showScreen('pricing')">Pricing</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a onclick="showScreen('about')">About</a></li><li><a>Blog</a></li><li><a>Careers</a></li><li><a>Contact</a></li></ul></div>
+        <div class="footer-col"><h4>Legal</h4><ul><li><a onclick="showScreen('disclaimer')">Not Financial Advice</a></li><li><a>Risk Disclosure</a></li><li><a>Terms of Use</a></li><li><a>Privacy</a></li></ul></div>
+      </div>
+      <div class="footer-disclaimer">
+        <p class="footer-copy">© 2026 DSYS Inc. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+  <div class="compliance-strip">
+    <strong>Fintrest publishes research, not recommendations.</strong> Not a Registered Investment Adviser. Trading involves risk of loss.
+  </div>
+</div>
+
+<script>
+function showScreen(id, btn) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+
+  // Update control buttons
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  if (btn) {
+    btn.classList.add('active');
+  } else {
+    // find and activate the right control button
+    const labels = { home: 'Home', pricing: 'Pricing', about: 'About', disclaimer: 'Disclaimer' };
+    document.querySelectorAll('.controls button').forEach(b => {
+      if (b.textContent === labels[id]) b.classList.add('active');
+    });
+  }
+
+  window.scrollTo(0, 0);
+}
+</script>
+
+</body>
+</html>
