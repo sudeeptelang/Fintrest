@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { TrendingUp, TrendingDown, Activity, ArrowUpDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, ArrowUpDown, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useMarketScreener } from "@/lib/hooks";
 import type { ScreenerRow } from "@/lib/api";
 import { StockLogo } from "@/components/stock/stock-logo";
@@ -10,6 +10,8 @@ import type { ScreenerKey } from "./trending-lists";
 import { SCREENERS } from "./trending-lists";
 
 type MoverTab = "gainers" | "losers" | "active" | "all";
+type SortKey = "ticker" | "price" | "changePct" | "volume" | "sector" | "signal" | null;
+type SortDir = "asc" | "desc";
 
 /**
  * Movers table — shows Top Gainers / Losers / Most Active / All Signals as tabs, OR
@@ -29,13 +31,44 @@ export function MoversTable({
   const { data: screener } = useMarketScreener(500);
   const [moverTab, setMoverTab] = useState<MoverTab>("gainers");
 
+  // Column sort — overrides the tab/screener default sort when set. Null = use
+  // the tab/screener's natural order (e.g. gainers sort by changePct desc).
+  const [sortKey, setSortKey] = useState<SortKey>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
   // When a screener pill maps cleanly to a tab, sync the tab so the UI stays coherent.
   useEffect(() => {
     if (screenerKey === "gainers") setMoverTab("gainers");
     else if (screenerKey === "losers") setMoverTab("losers");
   }, [screenerKey]);
 
+  // Reset column sort whenever the view changes — otherwise a ticker-sorted
+  // gainers tab carries that sort into a freshly-picked "new-highs" screener
+  // and hides the natural ordering.
+  useEffect(() => { setSortKey(null); }, [screenerKey, moverTab]);
+
   const stocks = useMemo(() => screener ?? [], [screener]);
+
+  function handleSort(key: Exclude<SortKey, null>) {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir(key === "ticker" || key === "sector" ? "asc" : "desc"); }
+  }
+
+  function sortRows(list: ScreenerRow[]): ScreenerRow[] {
+    if (!sortKey) return list;
+    const cmp = (a: ScreenerRow, b: ScreenerRow): number => {
+      switch (sortKey) {
+        case "ticker":    return a.ticker.localeCompare(b.ticker);
+        case "price":     return (a.price ?? 0) - (b.price ?? 0);
+        case "changePct": return (a.changePct ?? 0) - (b.changePct ?? 0);
+        case "volume":    return (a.volume ?? 0) - (b.volume ?? 0);
+        case "sector":    return (a.sector ?? "").localeCompare(b.sector ?? "");
+        case "signal":    return (a.signalScore ?? 0) - (b.signalScore ?? 0);
+        default:          return 0;
+      }
+    };
+    return [...list].sort((a, b) => sortDir === "asc" ? cmp(a, b) : -cmp(a, b));
+  }
 
   const rows = useMemo(() => {
     const list = [...stocks];
@@ -107,6 +140,10 @@ export function MoversTable({
     }
   }, [stocks, moverTab, screenerKey, limit]);
 
+  // Apply column sort on top of the tab/screener filter. Kept out of the
+  // useMemo above so sort-key changes don't re-run the filter pipeline.
+  const displayRows = useMemo(() => sortRows(rows), [rows, sortKey, sortDir]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const activeLabel = screenerKey
     ? SCREENERS.find((s) => s.key === screenerKey)?.label
     : null;
@@ -158,23 +195,46 @@ export function MoversTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/20">
-              <th className="text-left px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Symbol</th>
-              <th className="text-right px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Price</th>
-              <th className="text-right px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Change</th>
-              <th className="text-right px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Volume</th>
-              <th className="text-left px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Sector</th>
-              <th className="text-center px-4 py-2.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Signal</th>
+              {([
+                ["Symbol", "ticker",    "text-left"],
+                ["Price",  "price",     "text-right"],
+                ["Change", "changePct", "text-right"],
+                ["Volume", "volume",    "text-right"],
+                ["Sector", "sector",    "text-left"],
+                ["Signal", "signal",    "text-center"],
+              ] as const).map(([label, key, align]) => {
+                const active = sortKey === key;
+                return (
+                  <th
+                    key={key}
+                    onClick={() => handleSort(key)}
+                    className={`${align} px-4 py-2.5 text-[10px] font-medium uppercase tracking-wider cursor-pointer select-none transition-colors ${
+                      active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    title="Click to sort"
+                  >
+                    <span className={`inline-flex items-center gap-0.5 ${align === "text-right" ? "justify-end w-full" : ""}`}>
+                      {label}
+                      {active
+                        ? (sortDir === "asc"
+                            ? <ChevronUp className="h-3 w-3" />
+                            : <ChevronDown className="h-3 w-3" />)
+                        : <ChevronsUpDown className="h-3 w-3 text-muted-foreground/40" />}
+                    </span>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
-            {rows.length === 0 ? (
+            {displayRows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-xs text-muted-foreground">
                   No data for this filter.
                 </td>
               </tr>
             ) : (
-              rows.map((r) => <MoverRow key={r.ticker} row={r} />)
+              displayRows.map((r) => <MoverRow key={r.ticker} row={r} />)
             )}
           </tbody>
         </table>
