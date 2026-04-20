@@ -20,34 +20,43 @@
 | **Data** | Polygon.io, FMP, Finnhub, Yahoo Finance (fallback) |
 | **Infra** | Vercel (web), Supabase (DB/auth), AWS SES (email), Stripe (billing) |
 
-## Design Tokens
+## Design Tokens — v2.0 Forest & Rust
+
+> Full spec: `@docs/DESIGN_LANGUAGE_V2.md` · Clickable preview: `docs/fintrest_screens_v2_preview.html`
+> v2 supersedes v1. All new UI work uses v2 tokens.
 
 ```
-Primary green:   #00b87c        Green dark:      #008f5f
-Green soft:      rgba(0,184,124,.11)
-Navy:            #0d1a2e        Background:      #f4f1eb (warm parchment — NOT white)
-Surface:         #fbfaf7        Surface-2:       #ffffff
-Surface-3:       #ece7dd        Border:          rgba(35,29,22,.09)
-Text:            #1a1510        Muted:           #6b6259
-Danger:          #d94f3d        Amber:           #d97706
-Blue:            #3b6fd4
+Brand:        forest      #0F4F3A   forest-dark  #0A3528   forest-light #E8F1EC
+Accent:       rust        #B8502F   rust-dark    #8A3B1F   rust-light   #FBF0EA
+Semantic up:  #0A7F4F     (positive performance — separate from brand)
+Semantic dn:  #6B5443     (negative performance — warm gray-brown, NOT red)
+Warn:         #B25E09     Danger: #912018
 
-Font:            Satoshi (fontshare) — headings 900, body 500/700
-Mono:            DM Mono (prices, tickers, codes)
-Border radius:   Cards 20-24px · Buttons 15-16px
-Shadow:          0 12px 32px rgba(16,12,8,.09)
+Ink stack:    ink-0 #FFFFFF · ink-50 #FAFBFC · ink-100 #F2F4F7 · ink-200 #E4E7EC
+              ink-300 #D0D5DD · ink-400 #98A2B3 · ink-500 #667085 · ink-600 #475467
+              ink-700 #344054 · ink-800 #1D2939 · ink-900 #101828 · ink-950 #060C1A
+
+Font:         Sora (display, 400/500/600/700) · DM Sans (body, 400/500/600)
+              DM Mono (data — prices, tickers, scores)
+Border radius: 4 / 6 (default) / 8 / 12 px
+Shadow:       e1 = 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08)
+              e2 = 0 4px 8px rgba(16,24,40,.08), 0 12px 24px rgba(16,24,40,.10)
+Motion:       120ms ease-out default, no parallax, no skeleton shimmer
 ```
 
 ## Non-Negotiable Rules
 
-1. **Warm palette** — never use pure white (#fff) as page background; use `#f4f1eb`
-2. **Athena always in navy cards** — never show AI output on plain white backgrounds
-3. **Signal levels always together** — entry + target + stop shown as a unit, never separated
-4. **Compliance footer** on every signal — non-negotiable, not optional
-5. **R:R ratio** — if ratio < 1.5 the signal shouldn't be published
-6. **Mobile-first** — all layouts designed for 390px width (iPhone 15 Pro)
-7. **Never hardcode prices** — always pull from data providers
-8. **Cache aggressively** — signals in Redis, expire at next scan (6 AM ET)
+1. **Three greens, three jobs** — forest = brand (nav, CTA, logo, Lens gutter), forest-dark = hover/pressed, up `#0A7F4F` = performance data. Never swap.
+2. **Down is warm gray-brown, never red.** Red (`danger`) is reserved for destructive actions.
+3. **No emoji in the UI.** Lucide icons only, 1.5px stroke.
+4. **Lens thesis always has the forest gutter** (2px forest left border + 16px padding + body-lg DM Sans). The typographic signature. Rust gutter when Lens is quoting a source.
+5. **Signal levels always together** — entry + target + stop shown as a unit, never separated.
+6. **Compliance footer** on every signal — non-negotiable, not optional.
+7. **R:R ratio** — if ratio < 1.5 the signal shouldn't be published.
+8. **Mobile-first** — all layouts designed for 390px width (iPhone 15 Pro).
+9. **Never hardcode prices** — always pull from data providers.
+10. **Cache aggressively** — signals in Redis, expire at next scan (6 AM ET).
+11. **Every color use has exactly one valid interpretation.** If a swap still reads correctly, the color is decorative and must be removed.
 
 ## Legal & Compliance Model
 
@@ -74,25 +83,29 @@ No FINRA/SEC registration required. Same model as Motley Fool, TipRanks, Zacks.
 
 ## UI/UX Design Reference
 
-All 22 screens are designed in `docs/fintrest_screens_v2_final.html` — this is the single source of truth for visual design.
-Open this file in a browser to see every screen in Finxoom's warm editorial style with dark phone shells.
+**v2 Forest & Rust is the current design language.** See `@docs/DESIGN_LANGUAGE_V2.md` for the full spec and `docs/fintrest_screens_v2_preview.html` for the clickable preview (Home / Pricing / About / Disclaimer).
 
-**Screen groups:**
-- **Onboarding:** Splash (01), Sign Up (02), Pricing (18)
-- **Signals:** Dashboard (03), Signals List (04), Signal Detail (05), Ask Athena (06), Markets (16), Score Breakdown (21), Candlestick Chart (22)
-- **Portfolio:** Overview (07), Holding Detail (08), Add Holding (09), Performance (10), Rebalancing AI (11), Import (12)
-- **Account:** Watchlist (13), Alerts (14), Create Alert (15), Notifications (17), Profile (19), Weekly Summary (20)
+Legacy reference `docs/fintrest_screens_v2_final.html` (warm parchment phone shells, v1) is kept for mobile screen inventory only — any visual token in it is superseded by v2.
+
+**App IA (5 primary, in order):** Today · Boards · Markets · Ask Lens · Audit log. Secondary items (Watchlist, Alerts, Insiders, Congress, Notifications, Upload) live in a "More" popover or as sub-routes.
+
+**Three layout archetypes:**
+- **Marketing** — single column, 1200px max, 96px section padding (`/`, `/pricing`, `/about`, legal pages).
+- **App-data** — top nav 56px + left rail 240px + 1120px content, scanning-oriented (`/today`, `/boards`, `/markets`, `/audit`).
+- **Focus-reading** — same shell but 800px content, 64px top padding, body-lg as base (`/signal/[id]`, `/ticker/[sym]`, `/ask`, `/settings/*`).
 
 ## Reference Docs
 
 Detailed specs are split into focused files — use `@` imports when needed:
 
+- `@docs/DESIGN_LANGUAGE_V2.md` — tokens, atoms, layout archetypes, IA, Tailwind config
+- `@docs/COMPLIANCE_COPY_REWRITE.md` — site-wide copy rewrite for SEC/FTC compliance
 - `@docs/PRODUCT.md` — screen inventory, subscription plans, roadmap, competitive positioning
 - `@docs/COMPETITORS.md` — full competitor landscape (78 citations), feature matrix, market gaps, differentiators
 - `@docs/SCHEMA.md` — database tables and relationships
 - `@docs/API.md` — all REST endpoints
 - `@docs/SIGNALS.md` — 7-factor scoring engine and thresholds
-- `@docs/ATHENA.md` — AI agent prompts and compliance rules
+- `@docs/ATHENA.md` — AI agent prompts and compliance rules (Athena → Lens rename in progress)
 
 ## Common Commands
 
