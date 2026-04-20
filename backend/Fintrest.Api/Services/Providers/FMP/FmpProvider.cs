@@ -266,11 +266,12 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
 
     public async Task<List<InsiderTradeEvent>> GetLatestInsiderTradesAsync(int limit = 50, CancellationToken ct = default)
     {
-        // FMP stable: /insider-trading/latest returns the firehose (no symbol filter).
-        var url = $"{_baseUrl}/insider-trading/latest?page=0&limit=100&apikey={_apiKey}";
+        // FMP stable: /insider-trading-latest returns the firehose (no symbol filter).
+        // The previous URL had a slash instead of a hyphen — returned empty silently.
+        var url = $"{_baseUrl}/insider-trading-latest?page=0&limit=100&apikey={_apiKey}";
         var rows = await TryFetch<List<FmpInsiderTradeFull>>(url, ct);
         logger.LogInformation(
-            "FMP insider-trading/latest: rows={Rows} (null={Null})",
+            "FMP insider-trading-latest: rows={Rows} (null={Null})",
             rows?.Count ?? 0, rows is null);
         if (rows is null) return [];
 
@@ -407,13 +408,18 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
 
     public async Task<List<CongressTrade>> GetCongressTradesAsync(int limit = 50, CancellationToken ct = default)
     {
-        // FMP stable: senate + house latest trades (firehose feeds).
+        // FMP stable: /senate-trading-latest + /house-trading-latest (firehose,
+        // no symbol filter). Old paths /senate-latest + /house-latest returned
+        // empty silently on Premier.
         var senateTask = TryFetch<List<FmpCongressTrade>>(
-            $"{_baseUrl}/senate-latest?page=0&limit=100&apikey={_apiKey}", ct);
+            $"{_baseUrl}/senate-trading-latest?page=0&limit=100&apikey={_apiKey}", ct);
         var houseTask = TryFetch<List<FmpCongressTrade>>(
-            $"{_baseUrl}/house-latest?page=0&limit=100&apikey={_apiKey}", ct);
+            $"{_baseUrl}/house-trading-latest?page=0&limit=100&apikey={_apiKey}", ct);
 
         await Task.WhenAll(senateTask, houseTask);
+        logger.LogInformation(
+            "FMP congress firehose: senate={S} house={H}",
+            senateTask.Result?.Count ?? 0, houseTask.Result?.Count ?? 0);
 
         var merged = new List<CongressTrade>();
         foreach (var row in senateTask.Result ?? [])
