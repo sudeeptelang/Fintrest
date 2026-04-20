@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Plus, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { usePortfolios, useAddTransaction } from "@/lib/hooks";
 
 export default function AddHoldingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: portfolios, isLoading: portfoliosLoading } = usePortfolios();
   const addTransaction = useAddTransaction();
 
@@ -18,10 +19,14 @@ export default function AddHoldingPage() {
   const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-select first portfolio once loaded
-  if (portfolioId === 0 && portfolios && portfolios.length > 0) {
-    setPortfolioId(portfolios[0].id);
-  }
+  // Honor ?portfolioId= from the deep-link (Add Holding button on /portfolio/:id).
+  // Falls back to the first portfolio when the query param is absent or invalid.
+  useEffect(() => {
+    if (portfolioId !== 0 || !portfolios || portfolios.length === 0) return;
+    const fromQuery = Number(searchParams?.get("portfolioId") ?? "0");
+    const pick = portfolios.find(p => p.id === fromQuery) ?? portfolios[0];
+    setPortfolioId(pick.id);
+  }, [portfolioId, portfolios, searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

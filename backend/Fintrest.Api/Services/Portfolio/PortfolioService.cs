@@ -61,9 +61,9 @@ public class PortfolioService(AppDbContext db, ILogger<PortfolioService> logger)
         switch (type)
         {
             case "BUY":
-                if (portfolio.CashBalance < total)
-                    throw new InvalidOperationException("Insufficient cash balance");
-
+                // No cash balance gate: users recording pre-existing holdings
+                // (most common flow) rarely have a matching cash balance set.
+                // Cash can go negative; the UI surfaces this as needed.
                 portfolio.CashBalance -= total;
 
                 var existingHolding = portfolio.Holdings.FirstOrDefault(h => h.StockId == request.StockId);
@@ -147,11 +147,44 @@ public class PortfolioService(AppDbContext db, ILogger<PortfolioService> logger)
         db.Set<PortfolioTransaction>().Add(transaction);
 
         portfolio.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
+        // Retry wrapper mirrors what PortfolioImporter / DataIngestionService do —
+        // the Npgsql+pgbouncer race can hit any SaveChanges batch, even a tiny
+        // add-holding one, so 3 attempts with pool clear covers us.
+        await SaveChangesWithRetryAsync();
 
         // Reload stock for ticker in response
         await db.Entry(transaction).Reference(t => t.Stock).LoadAsync();
         return transaction;
+    }
+
+    private async Task SaveChangesWithRetryAsync(CancellationToken ct = default)
+    {
+        const int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                return;
+            }
+            catch (Exception ex) when (attempt < maxAttempts && IsTransient(ex))
+            {
+                Npgsql.NpgsqlConnection.ClearAllPools();
+                await Task.Delay(TimeSpan.FromMilliseconds(500 * attempt), ct);
+            }
+        }
+    }
+
+    private static bool IsTransient(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException!)
+        {
+            if (e is ObjectDisposedException) return true;
+            if (e is Npgsql.NpgsqlException) return true;
+            if (e is System.Net.Sockets.SocketException) return true;
+            if (e is TimeoutException) return true;
+        }
+        return false;
     }
 
     public async Task<List<PortfolioHolding>> GetHoldings(long userId, long portfolioId)

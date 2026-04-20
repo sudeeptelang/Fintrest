@@ -44,10 +44,13 @@ public record HoldingResponse(
 );
 
 public record TransactionRequest(
-    [Required] long StockId,
     [Required] string Type, // BUY, SELL, DIVIDEND
     [Required] double Quantity,
     [Required] double Price,
+    // Either supply StockId (if you already have it) OR StockTicker (and the
+    // server will resolve it). StockTicker is what the Add Holding UI sends.
+    long StockId = 0,
+    string? StockTicker = null,
     double? Fees = 0,
     string? Notes = null
 );

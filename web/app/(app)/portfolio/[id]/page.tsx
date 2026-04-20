@@ -4,7 +4,7 @@ import { use, useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { ArrowUpRight, TrendingUp, TrendingDown, AlertTriangle, Upload, ChevronUp, ChevronDown, ChevronsUpDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics, type PortfolioRating, type AdvisorResult, type PerformanceSeries, type PerformancePoint, type PortfolioTaxProfile } from "@/lib/api";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
@@ -345,8 +345,15 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
       {/* --- Holdings tab --- */}
       {activeTab === "holdings" && (
       <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="p-5 border-b border-border flex items-center justify-between">
+        <div className="p-5 border-b border-border flex items-center justify-between gap-3 flex-wrap">
           <h2 className="font-[var(--font-heading)] text-lg font-semibold">Holdings</h2>
+          {!usingDemoData && (
+            <Link href={`/portfolio/add?portfolioId=${portfolioId}`}>
+              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white">
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Holding
+              </Button>
+            </Link>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

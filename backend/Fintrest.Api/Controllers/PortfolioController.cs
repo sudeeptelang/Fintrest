@@ -254,14 +254,29 @@ public class PortfolioController(
         return Ok(responses);
     }
 
-    /// <summary>Add a buy/sell/dividend transaction.</summary>
+    /// <summary>Add a buy/sell/dividend transaction. Accepts either StockId or
+    /// StockTicker on the body — ticker gets resolved here so the service layer
+    /// can stay StockId-only.</summary>
     [HttpPost("{id}/transactions")]
-    public async Task<ActionResult<TransactionResponse>> AddTransaction(long id, TransactionRequest request)
+    public async Task<ActionResult<TransactionResponse>> AddTransaction(long id, TransactionRequest request, CancellationToken ct = default)
     {
         try
         {
             var userId = await GetUserId();
-            var transaction = await portfolioService.AddTransaction(userId, id, request);
+
+            var resolved = request;
+            if (resolved.StockId == 0 && !string.IsNullOrWhiteSpace(resolved.StockTicker))
+            {
+                var ticker = resolved.StockTicker.Trim().ToUpperInvariant();
+                var stock = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker.ToUpper() == ticker, ct);
+                if (stock is null)
+                    return BadRequest(new { message = $"Ticker '{ticker}' not in our universe yet. Import it via /seed/universe first." });
+                resolved = resolved with { StockId = stock.Id };
+            }
+            if (resolved.StockId == 0)
+                return BadRequest(new { message = "StockId or StockTicker required" });
+
+            var transaction = await portfolioService.AddTransaction(userId, id, resolved);
             return Created($"/api/v1/portfolios/{id}/transactions", new TransactionResponse(
                 transaction.Id, transaction.Stock.Ticker, transaction.Type,
                 transaction.Quantity, transaction.Price, transaction.Fees,
