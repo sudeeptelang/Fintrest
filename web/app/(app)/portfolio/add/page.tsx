@@ -1,13 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Plus, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { usePortfolios, useAddTransaction } from "@/lib/hooks";
 
+// Next 16 requires useSearchParams() to sit inside a Suspense boundary so the
+// outer page can be statically prerendered. The actual form lives in the inner
+// component; the exported page is just the Suspense wrapper.
 export default function AddHoldingPage() {
+  return (
+    <Suspense fallback={<div className="max-w-lg mx-auto px-6 py-12 text-sm text-muted-foreground">Loading...</div>}>
+      <AddHoldingForm />
+    </Suspense>
+  );
+}
+
+function AddHoldingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: portfolios, isLoading: portfoliosLoading } = usePortfolios();
