@@ -4,16 +4,19 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/components/query-provider";
 import "./globals.css";
 
+// v2 spec uses Sora 400/500/600/700 for display. 800 dropped — headings
+// read cleaner at 700 against the new forest palette and don't need it.
 const sora = Sora({
   subsets: ["latin"],
   variable: "--font-heading",
-  weight: ["400", "600", "700", "800"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
+  weight: ["400", "500", "600"],
   display: "swap",
 });
 

@@ -4,12 +4,24 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Design Language v2.0 — Forest & Rust
+ * Full spec: docs/DESIGN_LANGUAGE_V2.md
+ *
+ * The @theme inline block maps both legacy shadcn semantic tokens
+ * (background / foreground / primary / muted / etc.) AND v2 named
+ * tokens (forest / rust / up / down / ink-*) to Tailwind utilities.
+ * Components can gradually migrate from bg-primary → bg-forest
+ * without a big-bang refactor.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-heading);
+
+  /* ─── Shadcn semantic tokens (still used by most components) ─── */
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,94 +51,179 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* ─── Legacy aliases (emerald/navy keep working during migration) ─── */
   --color-emerald: var(--emerald);
   --color-emerald-light: var(--emerald-light);
   --color-emerald-dark: var(--emerald-dark);
   --color-navy: var(--navy);
   --color-navy-light: var(--navy-light);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* ─── v2 brand + accent + semantic + ink stack ─── */
+  --color-forest: var(--forest);
+  --color-forest-light: var(--forest-light);
+  --color-forest-dark: var(--forest-dark);
+  --color-rust: var(--rust);
+  --color-rust-light: var(--rust-light);
+  --color-rust-dark: var(--rust-dark);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-warn: var(--warn);
+  --color-warn-light: var(--warn-light);
+  --color-danger: var(--danger);
+  --color-danger-light: var(--danger-light);
+
+  --color-ink-0: var(--ink-0);
+  --color-ink-50: var(--ink-50);
+  --color-ink-100: var(--ink-100);
+  --color-ink-200: var(--ink-200);
+  --color-ink-300: var(--ink-300);
+  --color-ink-400: var(--ink-400);
+  --color-ink-500: var(--ink-500);
+  --color-ink-600: var(--ink-600);
+  --color-ink-700: var(--ink-700);
+  --color-ink-800: var(--ink-800);
+  --color-ink-900: var(--ink-900);
+  --color-ink-950: var(--ink-950);
+
+  /* ─── Radius scale — v2 (4 / 6 / 8 / 12) ─── */
+  --radius-sm: calc(var(--radius) * 0.5);   /* 4px */
+  --radius-md: var(--radius);               /* 8px (new default) */
+  --radius-lg: calc(var(--radius) * 1.5);   /* 12px */
+  --radius-xl: calc(var(--radius) * 2);     /* 16px — keep for oversize cards */
+  --radius-2xl: calc(var(--radius) * 3);    /* 24px */
+  --radius-3xl: calc(var(--radius) * 4);    /* 32px */
+  --radius-4xl: calc(var(--radius) * 5);    /* 40px */
 }
 
 :root {
-  /* Brand (was emerald green, now blue+purple per new theme) */
-  --emerald: #2563eb;          /* primary blue — kept "emerald" name for zero-refactor */
-  --emerald-light: #8b5cf6;    /* secondary purple */
-  --emerald-dark: #1d4ed8;     /* primary dark */
-  --navy: #0b1020;             /* dark surface */
-  --navy-light: #111827;       /* card dark */
+  /* ─────────────────────────────────────────────────────────── */
+  /*  v2 tokens — Forest & Rust                                   */
+  /* ─────────────────────────────────────────────────────────── */
 
-  --background: #f8fafc;       /* cool slate-50 surface */
-  --foreground: #0f172a;       /* slate-900 text */
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #2563eb;
-  --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #eff6ff;
-  --accent-foreground: #0f172a;
-  --destructive: #dc2626;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #2563eb;
-  --chart-1: #2563eb;          /* blue */
-  --chart-2: #8b5cf6;          /* purple */
-  --chart-3: #f59e0b;          /* amber */
-  --chart-4: #10b981;          /* green (gains) */
-  --chart-5: #ef4444;          /* red (losses) */
-  --radius: 1rem;
-  --sidebar: #f8fafc;
-  --sidebar-foreground: #0f172a;
-  --sidebar-primary: #2563eb;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f1f5f9;
-  --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #2563eb;
+  /* Ink stack */
+  --ink-0:   #FFFFFF;
+  --ink-50:  #FAFBFC;
+  --ink-100: #F2F4F7;
+  --ink-200: #E4E7EC;
+  --ink-300: #D0D5DD;
+  --ink-400: #98A2B3;
+  --ink-500: #667085;
+  --ink-600: #475467;
+  --ink-700: #344054;
+  --ink-800: #1D2939;
+  --ink-900: #101828;
+  --ink-950: #060C1A;
+
+  /* Brand — forest */
+  --forest:       #0F4F3A;
+  --forest-light: #E8F1EC;
+  --forest-dark:  #0A3528;
+
+  /* Accent — rust */
+  --rust:         #B8502F;
+  --rust-light:   #FBF0EA;
+  --rust-dark:    #8A3B1F;
+
+  /* Semantic — performance only */
+  --up:           #0A7F4F;
+  --down:         #6B5443;
+
+  /* Functional */
+  --warn:         #B25E09;
+  --warn-light:   #FEF6E7;
+  --danger:       #912018;
+  --danger-light: #FEE4E2;
+
+  /* ─── Shadcn semantic tokens repointed to v2 values ─── */
+  --background:         var(--ink-50);
+  --foreground:         var(--ink-900);
+  --card:               var(--ink-0);
+  --card-foreground:    var(--ink-900);
+  --popover:            var(--ink-0);
+  --popover-foreground: var(--ink-900);
+  --primary:            var(--forest);
+  --primary-foreground: var(--ink-0);
+  --secondary:          var(--ink-100);
+  --secondary-foreground: var(--ink-700);
+  --muted:              var(--ink-100);
+  --muted-foreground:   var(--ink-500);
+  --accent:             var(--forest-light);
+  --accent-foreground:  var(--forest-dark);
+  --destructive:        var(--danger);
+  --border:             var(--ink-200);
+  --input:              var(--ink-200);
+  --ring:               var(--forest);
+
+  /* Chart series — forest, rust, warn, up, down (replaces blue/purple/amber/green/red) */
+  --chart-1: var(--forest);
+  --chart-2: var(--rust);
+  --chart-3: var(--warn);
+  --chart-4: var(--up);
+  --chart-5: var(--down);
+
+  /* ─── Legacy aliases — keep old class names working ─── */
+  --emerald:       var(--forest);       /* bg-emerald now renders forest */
+  --emerald-light: var(--forest-light);
+  --emerald-dark:  var(--forest-dark);
+  --navy:          var(--ink-950);      /* bg-navy now renders true-black */
+  --navy-light:    var(--ink-900);
+
+  /* Radius base — 8px (v2 default) */
+  --radius: 0.5rem;
+
+  /* Sidebar */
+  --sidebar:                    var(--ink-50);
+  --sidebar-foreground:         var(--ink-900);
+  --sidebar-primary:            var(--forest);
+  --sidebar-primary-foreground: var(--ink-0);
+  --sidebar-accent:             var(--ink-100);
+  --sidebar-accent-foreground:  var(--ink-900);
+  --sidebar-border:             var(--ink-200);
+  --sidebar-ring:               var(--forest);
 }
 
 .dark {
-  --background: #0b1020;
-  --foreground: #e2e8f0;
-  --card: #111827;
-  --card-foreground: #e2e8f0;
-  --popover: #111827;
-  --popover-foreground: #e2e8f0;
-  --primary: #93c5fd;
-  --primary-foreground: #0b1020;
-  --secondary: #1e293b;
-  --secondary-foreground: #e2e8f0;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --accent: #1e1b4b;
-  --accent-foreground: #e2e8f0;
-  --destructive: #f87171;
-  --border: rgba(255, 255, 255, 0.1);
-  --input: rgba(255, 255, 255, 0.15);
-  --ring: #93c5fd;
-  --chart-1: #93c5fd;
-  --chart-2: #c4b5fd;
-  --chart-3: #fbbf24;
-  --chart-4: #34d399;
-  --chart-5: #f87171;
-  --sidebar: #111827;
-  --sidebar-foreground: #e2e8f0;
-  --sidebar-primary: #93c5fd;
-  --sidebar-primary-foreground: #0b1020;
-  --sidebar-accent: #1e293b;
-  --sidebar-accent-foreground: #e2e8f0;
-  --sidebar-border: rgba(255, 255, 255, 0.1);
-  --sidebar-ring: #93c5fd;
+  /* Dark mode — not spec'd in v2 design doc. Minimal tone shift from
+   * the previous palette: swap the blue primary for a lighter forest
+   * that reads on a dark surface, keep the rest neutral. */
+  --background:         var(--ink-950);
+  --foreground:         var(--ink-100);
+  --card:               var(--ink-900);
+  --card-foreground:    var(--ink-100);
+  --popover:            var(--ink-900);
+  --popover-foreground: var(--ink-100);
+  --primary:            #5BA889;        /* lighter forest — readable on dark */
+  --primary-foreground: var(--ink-950);
+  --secondary:          var(--ink-800);
+  --secondary-foreground: var(--ink-100);
+  --muted:              var(--ink-800);
+  --muted-foreground:   var(--ink-400);
+  --accent:             #1A3D30;        /* deep forest-dark tint */
+  --accent-foreground:  var(--ink-100);
+  --destructive:        #E07A6D;        /* lighter danger for dark surfaces */
+  --border:             rgba(255, 255, 255, 0.08);
+  --input:              rgba(255, 255, 255, 0.12);
+  --ring:               #5BA889;
+
+  --chart-1: #5BA889;
+  --chart-2: #D48365;
+  --chart-3: #E39A4A;
+  --chart-4: #4EA87A;
+  --chart-5: #8B7763;
+
+  --emerald:       #5BA889;
+  --emerald-light: #7FC4A6;
+  --emerald-dark:  #2E6B52;
+
+  --sidebar:                    var(--ink-900);
+  --sidebar-foreground:         var(--ink-100);
+  --sidebar-primary:            #5BA889;
+  --sidebar-primary-foreground: var(--ink-950);
+  --sidebar-accent:             var(--ink-800);
+  --sidebar-accent-foreground:  var(--ink-100);
+  --sidebar-border:             rgba(255, 255, 255, 0.08);
+  --sidebar-ring:               #5BA889;
 }
 
 @layer base {
@@ -142,24 +239,25 @@
 }
 
 /* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
+html { scroll-behavior: smooth; }
 
-/* Gradient text utility */
+/* ─── Utility classes — repointed to v2 ─── */
+
+/* Gradient text: now forest → forest-dark (was blue→purple). The class
+ * name stays the same for zero refactor; the gradient is quieter now. */
 .gradient-text {
-  background: linear-gradient(135deg, #2563eb 0%, #6366f1 50%, #8b5cf6 100%);
+  background: linear-gradient(135deg, var(--forest) 0%, var(--forest-dark) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* Glow effect */
+/* Glow: forest ring instead of blue+purple. Kept named for zero refactor. */
 .glow-emerald {
-  box-shadow: 0 0 20px rgba(37, 99, 235, 0.3), 0 0 60px rgba(139, 92, 246, 0.15);
+  box-shadow: 0 0 20px rgba(15, 79, 58, 0.25), 0 0 60px rgba(15, 79, 58, 0.08);
 }
 
-/* Animated gradient border */
+/* Animated gradient border: forest variants instead of blue/purple */
 .gradient-border {
   position: relative;
   background: var(--card);
@@ -170,33 +268,29 @@ html {
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: linear-gradient(135deg, #2563eb, #8b5cf6, #2563eb);
+  background: linear-gradient(135deg, var(--forest), var(--forest-dark), var(--forest));
   z-index: -1;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 120ms ease-out;
 }
-.gradient-border:hover::before {
-  opacity: 1;
-}
+.gradient-border:hover::before { opacity: 1; }
 
-/* Hide scrollbar utility (for ticker tapes) */
+/* Hide scrollbar (ticker tapes) */
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
-/* Grid pattern background */
+/* Grid pattern — neutral ink tint (was blue-tinted) */
 .bg-grid {
   background-image:
-    linear-gradient(rgba(37, 99, 235, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(37, 99, 235, 0.04) 1px, transparent 1px);
+    linear-gradient(rgba(16, 24, 40, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 24, 40, 0.03) 1px, transparent 1px);
   background-size: 60px 60px;
 }
 
-/* Noise texture overlay */
+/* Noise texture overlay (unchanged) */
 .bg-noise::after {
   content: "";
   position: absolute;
@@ -204,4 +298,12 @@ html {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
   pointer-events: none;
   z-index: 0;
+}
+
+/* ─── v2 elevations (box-shadow) ─── */
+.shadow-e1 {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
+}
+.shadow-e2 {
+  box-shadow: 0 4px 8px rgba(16, 24, 40, 0.08), 0 12px 24px rgba(16, 24, 40, 0.10);
 }
