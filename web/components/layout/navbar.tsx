@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NAV_LINKS } from "@/lib/constants";
+import { LogoMark } from "@/components/layout/logo";
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -17,19 +17,11 @@ export function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/60">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <Image
-              src="/logo-icon.png"
-              alt="Fintrest"
-              width={36}
-              height={36}
-              priority
-              className="rounded-[9px] shadow-md ring-1 ring-foreground/15 transition-transform group-hover:scale-105"
-            />
-            <span className="font-[var(--font-heading)] text-xl font-bold tracking-tight">
-              Fintrest
-              <span className="text-primary">.ai</span>
+          {/* Logo — v2 inline mark (forest square + white F) */}
+          <Link href="/" className="flex items-center gap-2.5 group" aria-label="Fintrest home">
+            <LogoMark size={32} className="transition-transform group-hover:scale-105" />
+            <span className="font-[var(--font-heading)] text-xl font-bold tracking-tight text-ink-900">
+              Fintrest<span className="text-ink-500 font-normal">.ai</span>
             </span>
           </Link>
 

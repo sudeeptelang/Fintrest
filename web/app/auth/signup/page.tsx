@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { LogoMark } from "@/components/layout/logo";
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
@@ -93,7 +93,7 @@ export default function SignupPage() {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <Link href="/" className="inline-flex items-center gap-2">
-            <Image src="/logo-icon.png" alt="Fintrest" width={48} height={48} />
+            <LogoMark size={48} />
             <span className="font-[var(--font-heading)] text-2xl font-bold tracking-tight">
               Fintrest<span className="text-primary">.ai</span>
             </span>
