@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/layout/logo";
 
@@ -66,8 +67,8 @@ export default function SignupPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <div className="w-full max-w-sm text-center space-y-4">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-            <span className="text-2xl">✓</span>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-forest-light">
+            <Check className="h-6 w-6 text-forest" strokeWidth={2.25} />
           </div>
           <h1 className="font-[var(--font-heading)] text-2xl font-bold">
             Check your email

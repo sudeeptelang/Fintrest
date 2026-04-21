@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoMark } from "@/components/layout/logo";
 
 const footerLinks = {
   Product: [
@@ -25,12 +26,11 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="bg-navy text-white/70">
-      {/* Persistent compliance strip — visible on every page above the main
-          footer content. Short, declarative, unavoidable. */}
-      <div className="border-b border-white/10 bg-black/30">
+    <footer className="bg-ink-950 text-ink-0/70">
+      {/* Persistent compliance strip */}
+      <div className="border-b border-ink-0/10 bg-black/25">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
-          <p className="text-center text-[11px] sm:text-xs text-white/60 tracking-wide">
+          <p className="text-center text-[11px] sm:text-xs text-ink-0/60 tracking-wide">
             Fintrest publishes research, not recommendations. Not a Registered
             Investment Adviser. Trading involves risk of loss.
           </p>
@@ -41,17 +41,13 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="col-span-2">
-            <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-                <span className="font-[var(--font-heading)] text-lg font-extrabold text-white">
-                  F
-                </span>
-              </div>
-              <span className="font-[var(--font-heading)] text-xl font-bold text-white tracking-tight">
-                Fintrest<span className="text-primary">.ai</span>
+            <Link href="/" className="inline-flex items-center gap-2.5 mb-5">
+              <LogoMark size={36} />
+              <span className="font-[var(--font-heading)] text-xl font-bold text-ink-0 tracking-tight">
+                Fintrest<span className="text-[color:var(--up)]">.ai</span>
               </span>
             </Link>
-            <p className="text-sm leading-relaxed max-w-xs">
+            <p className="text-sm leading-relaxed max-w-xs text-ink-0/60">
               The research layer for self-directed traders. Explainable
               signals, transparent scoring, a public audit log. Research, not
               recommendations.
@@ -61,13 +57,15 @@ export function Footer() {
           {/* Links */}
           {Object.entries(footerLinks).map(([category, links]) => (
             <div key={category}>
-              <h4 className="text-sm font-semibold text-white mb-4">{category}</h4>
+              <h4 className="text-xs font-semibold text-ink-0 mb-4 tracking-[0.08em] uppercase">
+                {category}
+              </h4>
               <ul className="space-y-2.5">
                 {links.map((link) => (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm hover:text-white transition-colors"
+                      className="text-sm text-ink-0/60 hover:text-ink-0 transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -78,12 +76,11 @@ export function Footer() {
           ))}
         </div>
 
-        {/* Full disclaimer block — replaces the old one-liner. Kept on the
-            homepage footer so any first-time visitor sees it without drilling. */}
-        <div className="mt-12 pt-8 border-t border-white/10 space-y-4 text-xs text-white/45 leading-relaxed">
+        {/* Full disclaimer block */}
+        <div className="mt-14 pt-8 border-t border-ink-0/10 space-y-4 text-xs text-ink-0/45 leading-relaxed">
           <p>
             Fintrest.ai is a stock research and data-analytics platform
-            operated by DSYS Inc. We are <span className="text-white/70 font-medium">not a Registered Investment Adviser</span>,
+            operated by DSYS Inc. We are <span className="text-ink-0/75 font-medium">not a Registered Investment Adviser</span>,
             a broker-dealer, a financial planner, or a licensed portfolio
             manager. We do not manage money, hold customer funds, or execute
             trades.
@@ -106,7 +103,7 @@ export function Footer() {
             investment decisions. Consult a licensed financial professional
             before acting on any information you see on this site.
           </p>
-          <p className="pt-2 text-white/40">
+          <p className="pt-2 text-ink-0/40">
             &copy; {new Date().getFullYear()} DSYS Inc. All rights reserved.
           </p>
         </div>

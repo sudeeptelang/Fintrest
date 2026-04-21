@@ -5,11 +5,8 @@ import { STATS } from "@/lib/constants";
 
 export function Performance() {
   return (
-    <section id="performance" className="relative py-24 sm:py-32 overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-navy" />
-      <div className="absolute inset-0 bg-grid opacity-30" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full bg-primary/10 blur-[120px]" />
+    <section id="performance" className="relative py-24 sm:py-32 bg-ink-950 overflow-hidden">
+      <div className="absolute inset-0 bg-grid opacity-20" />
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
@@ -19,14 +16,14 @@ export function Performance() {
           transition={{ duration: 0.6 }}
           className="text-center max-w-2xl mx-auto mb-10"
         >
-          <span className="inline-block text-sm font-semibold text-primary mb-4 tracking-wide uppercase">
+          <span className="inline-block text-xs font-semibold text-[color:var(--up)] mb-4 tracking-[0.1em] uppercase">
             Audit log
           </span>
-          <h2 className="font-[var(--font-heading)] text-3xl sm:text-4xl font-bold text-white tracking-tight">
+          <h2 className="font-[var(--font-heading)] text-3xl sm:text-4xl font-bold text-ink-0 tracking-[-0.015em]">
             Every signal,{" "}
-            <span className="gradient-text">audited publicly</span>
+            <span className="text-[color:var(--up)]">audited publicly</span>
           </h2>
-          <p className="mt-4 text-white/50 text-lg">
+          <p className="mt-4 text-ink-0/60 text-base leading-relaxed">
             Every signal the engine publishes is logged and its outcome is
             tracked — winners and losers. The numbers below are backtested;
             live performance since launch is shown separately and never
@@ -34,56 +31,53 @@ export function Performance() {
           </p>
         </motion.div>
 
-        {/* Hypothetical / Backtested inline badge (SEC Rule 206(4)-1) — must be
-            presented with equal prominence to the performance claim. */}
+        {/* Hypothetical / Backtested inline badge (SEC Rule 206(4)-1) */}
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="mb-6 flex justify-center"
+          className="mb-8 flex justify-center"
         >
-          <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-[0.18em] text-amber-300">
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-[color:var(--warn)]/50 bg-[color:var(--warn)]/10 px-4 py-2 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.15em] text-[color:var(--warn)]">
             <span>Hypothetical</span>
-            <span className="text-amber-300/40">·</span>
+            <span className="opacity-40">·</span>
             <span>Backtested</span>
-            <span className="text-amber-300/40">·</span>
+            <span className="opacity-40">·</span>
             <span>Jan 2024 – Mar 2026</span>
-            <span className="text-amber-300/40">·</span>
+            <span className="opacity-40">·</span>
             <span>Not live trading results</span>
           </div>
         </motion.div>
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {STATS.map((stat, i) => (
             <motion.div
               key={stat.label}
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1, duration: 0.5 }}
-              className="text-center rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm p-8"
+              transition={{ delay: i * 0.08, duration: 0.4 }}
+              className="text-center rounded-lg border border-ink-0/10 bg-ink-0/[0.03] p-8"
             >
-              <p className="font-[var(--font-heading)] text-4xl sm:text-5xl font-extrabold text-white">
+              <p className="font-[var(--font-mono)] text-4xl sm:text-5xl font-medium text-ink-0 tracking-[-0.02em]">
                 {stat.value}
               </p>
-              <p className="mt-2 text-sm text-white/40">{stat.label}</p>
+              <p className="mt-3 text-xs text-ink-0/50 tracking-wide uppercase">{stat.label}</p>
             </motion.div>
           ))}
         </div>
 
-        {/* Disclosure block — equal prominence to the numbers, NOT a footer footnote. */}
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm p-6 text-left space-y-3 text-sm text-white/55 leading-relaxed max-w-4xl mx-auto"
+          transition={{ delay: 0.3, duration: 0.5 }}
+          className="mt-8 rounded-lg border border-ink-0/10 bg-ink-0/[0.03] p-6 text-left space-y-3 text-sm text-ink-0/60 leading-relaxed max-w-4xl mx-auto"
         >
           <p>
             The numbers above are{" "}
-            <span className="text-amber-300 font-semibold">
+            <span className="text-[color:var(--warn)] font-semibold">
               hypothetical backtested results
             </span>{" "}
             generated by running the current scoring engine over historical
@@ -98,7 +92,7 @@ export function Performance() {
             or capacity constraints. Real-world results from following the
             same signals would be materially different.
           </p>
-          <p className="text-white/70">
+          <p className="text-ink-0/75">
             Past performance — including backtested performance — does not
             guarantee future results. Trading stocks involves substantial risk
             of loss, including the loss of your entire investment.

@@ -4,8 +4,7 @@ import { motion } from "framer-motion";
 import { Star } from "lucide-react";
 
 // FTC 16 CFR § 255 requires each testimonial to carry a compensation disclosure
-// adjacent to the testimonial — not in a footnote. `compensated` is shown in
-// the card so the user sees it at the same time they read the quote.
+// adjacent to the testimonial — not in a footnote.
 const testimonials = [
   {
     name: "Marcus T.",
@@ -35,7 +34,7 @@ const testimonials = [
 
 export function SocialProof() {
   return (
-    <section className="relative py-24 sm:py-32 bg-muted/30">
+    <section className="relative py-24 sm:py-32 bg-ink-50">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -44,42 +43,42 @@ export function SocialProof() {
           transition={{ duration: 0.6 }}
           className="text-center max-w-2xl mx-auto mb-16"
         >
-          <span className="inline-block text-sm font-semibold text-primary mb-4 tracking-wide uppercase">
+          <span className="inline-block text-xs font-semibold text-forest mb-4 tracking-[0.1em] uppercase">
             What Fintrest users say
           </span>
-          <h2 className="font-[var(--font-heading)] text-3xl sm:text-4xl font-bold tracking-tight">
+          <h2 className="font-[var(--font-heading)] text-3xl sm:text-4xl font-bold tracking-[-0.015em] text-ink-950">
             What users say about{" "}
             <span className="gradient-text">the research</span>
           </h2>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-4">
           {testimonials.map((t, i) => (
             <motion.div
               key={t.name}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1, duration: 0.5 }}
-              className="rounded-2xl border border-border/60 bg-card p-6 flex flex-col"
+              transition={{ delay: i * 0.08, duration: 0.4 }}
+              className="rounded-lg border border-ink-200 bg-ink-0 p-6 flex flex-col hover:border-ink-300 hover:shadow-e1 transition-all"
             >
               <div className="flex gap-0.5 mb-4">
                 {Array.from({ length: t.rating }).map((_, j) => (
                   <Star
                     key={j}
-                    className="h-4 w-4 fill-primary text-primary"
+                    className="h-4 w-4 fill-[color:var(--up)] text-[color:var(--up)]"
                   />
                 ))}
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+              <p className="text-sm text-ink-700 leading-relaxed mb-5 flex-1">
                 &ldquo;{t.content}&rdquo;
               </p>
               <div>
-                <p className="text-sm font-semibold">{t.name}</p>
-                <p className="text-xs text-muted-foreground">{t.role}</p>
+                <p className="text-sm font-semibold text-ink-950">{t.name}</p>
+                <p className="text-xs text-ink-500 mt-0.5">{t.role}</p>
               </div>
-              <div className="mt-4 pt-4 border-t border-border/60 text-[11px] leading-snug text-muted-foreground/80">
-                <p className="font-medium text-foreground/70">
+              <div className="mt-4 pt-4 border-t border-ink-200 text-[11px] leading-snug text-ink-500">
+                <p className="font-medium text-ink-700">
                   Testimonial from a Fintrest.ai user.{" "}
                   {t.compensated ? (
                     <span>

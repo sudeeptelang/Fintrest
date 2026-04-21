@@ -25,8 +25,8 @@ export const PLANS = [
   {
     name: "Pro",
     description: "The full research layer. Everything a self-directed trader needs to stress-test ideas every morning.",
-    monthly: { price: "$19", period: "/mo", slug: "pro" },
-    annual:  { price: "$199", period: "/yr", slug: "pro-annual", savings: "Save 13% ($29)" },
+    monthly: { price: "$29", period: "/mo", slug: "pro" },
+    annual:  { price: "$299", period: "/yr", slug: "pro-annual", savings: "Save 14% ($49)" },
     features: [
       "Full signal board (50+) with Lens filter chips",
       "Unlimited Lens thesis",
