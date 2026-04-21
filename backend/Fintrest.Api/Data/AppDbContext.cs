@@ -47,6 +47,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AlgorithmIcHistory> AlgorithmIcHistory => Set<AlgorithmIcHistory>();
     public DbSet<FeatureRunLog> FeatureRunLogs => Set<FeatureRunLog>();
 
+    // Job state — cron robustness; migration 018.
+    public DbSet<JobState> JobStates => Set<JobState>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -65,6 +68,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<AlgorithmIcHistory>()
             .HasKey(a => new { a.Date, a.Algorithm, a.Sector, a.Regime, a.HorizonDays });
+
+        modelBuilder.Entity<JobState>()
+            .HasKey(j => j.JobName);
 
         // User — Plan is stored as lowercase text to match the DB's
         // `users_plan_check` constraint (free / starter / pro / premium).

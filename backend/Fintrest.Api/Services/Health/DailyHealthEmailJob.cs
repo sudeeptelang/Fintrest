@@ -17,13 +17,11 @@ public class DailyHealthEmailJob(
     IConfiguration config,
     ILogger<DailyHealthEmailJob> logger) : IHostedService, IDisposable
 {
-    private Timer? _timer;
-    private int _runningFlag;
-    private DateOnly _lastRunDate;
-    private static readonly TimeZoneInfo EasternZone = SafeEasternZone();
-
+    private const string JobName = "DailyHealthEmailJob";
     private const int TargetHourEt = 7;
     private const int TargetMinuteEt = 0;
+    private Timer? _timer;
+    private int _runningFlag;
 
     public Task StartAsync(CancellationToken ct)
     {
@@ -45,16 +43,25 @@ public class DailyHealthEmailJob(
     private void Tick(object? state)
     {
         if (Volatile.Read(ref _runningFlag) == 1) return;
+        _ = TickAsync();
+    }
 
-        var etNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, EasternZone);
-        if (etNow.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) return;
-        if (etNow.Hour != TargetHourEt || etNow.Minute != TargetMinuteEt) return;
+    private async Task TickAsync()
+    {
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var jobState = scope.ServiceProvider.GetRequiredService<Fintrest.Api.Services.JobState.JobStateService>();
+            if (!await jobState.ShouldRunAsync(JobName, TargetHourEt, TargetMinuteEt, weekdayOnly: true))
+                return;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "DailyHealthEmailJob: gating check failed; skipping tick");
+            return;
+        }
 
-        var today = DateOnly.FromDateTime(etNow);
-        if (today == _lastRunDate) return;
-        _lastRunDate = today;
-
-        _ = SendOnceAsync(CancellationToken.None);
+        await SendOnceAsync(CancellationToken.None);
     }
 
     /// <summary>Manual trigger — admin controller can call this for a dry run.</summary>
@@ -76,6 +83,7 @@ public class DailyHealthEmailJob(
             using var scope = scopeFactory.CreateScope();
             var health = scope.ServiceProvider.GetRequiredService<SystemHealthService>();
             var email = scope.ServiceProvider.GetRequiredService<EmailService>();
+            var jobState = scope.ServiceProvider.GetRequiredService<Fintrest.Api.Services.JobState.JobStateService>();
 
             var report = await health.GatherAsync(ct);
             var subject = report.OverallStatus == "ok"
@@ -86,9 +94,15 @@ public class DailyHealthEmailJob(
             var result = await email.SendAsync(recipient, subject, html, ct: ct);
 
             if (result.Success)
+            {
                 logger.LogInformation("DailyHealthEmailJob: sent to {To}, status={Status}", recipient, report.OverallStatus);
+                await jobState.MarkSuccessAsync(JobName, ct);
+            }
             else
+            {
                 logger.LogWarning("DailyHealthEmailJob: send failed to {To}: {Error}", recipient, result.Error);
+                await jobState.MarkErrorAsync(JobName, result.Error ?? "unknown send failure", ct);
+            }
 
             return result.Success ? $"sent: {report.OverallStatus}" : $"failed: {result.Error}";
         }
@@ -169,11 +183,5 @@ public class DailyHealthEmailJob(
         sb.Append("<p style=\"font-size:11px; color:#98A2B3; margin-top:32px; padding-top:16px; border-top:1px solid #E4E7EC;\">Fintrest admin · automated daily health check · see /admin/health for the live dashboard.</p>");
         sb.Append("</body></html>");
         return sb.ToString();
-    }
-
-    private static TimeZoneInfo SafeEasternZone()
-    {
-        try { return TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
-        catch { return TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); }
     }
 }

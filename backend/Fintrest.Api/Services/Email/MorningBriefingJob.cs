@@ -8,7 +8,8 @@ public class MorningBriefingJob(
     IServiceScopeFactory scopeFactory,
     ILogger<MorningBriefingJob> logger) : BackgroundService
 {
-    private DateTime _lastRunDate = DateTime.MinValue;
+    private const string BriefingJobName = "MorningBriefingJob";
+    private const string WeeklyJobName = "WeeklyNewsletterJob";
     private static readonly TimeZoneInfo EtTimeZone = GetEtTimeZone();
 
     private static TimeZoneInfo GetEtTimeZone()
@@ -19,30 +20,31 @@ public class MorningBriefingJob(
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        logger.LogInformation("MorningBriefingJob started. Checking every minute for 6:30 AM ET trigger.");
+        logger.LogInformation("MorningBriefingJob started. Checking every minute for 6:30 AM ET + Fri 4:30 PM ET triggers.");
 
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                var etNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, EtTimeZone);
+                using var scope = scopeFactory.CreateScope();
+                var jobState = scope.ServiceProvider.GetRequiredService<Fintrest.Api.Services.JobState.JobStateService>();
 
-                // Fire once at 6:30 AM ET each day
-                if (etNow.Hour == 6 && etNow.Minute == 30 && etNow.Date != _lastRunDate)
+                // Daily briefing — runs every calendar day at 6:30 AM ET or any time past that
+                // if the backend restarted and missed the minute window.
+                if (await jobState.ShouldRunAsync(BriefingJobName, 6, 30, weekdayOnly: false, ct))
                 {
-                    _lastRunDate = etNow.Date;
-                    logger.LogInformation("MorningBriefingJob: triggering at {EtNow}", etNow);
-                    await RunBriefingAsync(ct);
+                    logger.LogInformation("MorningBriefingJob: briefing catch-up / trigger");
+                    await RunBriefingAsync(scope, jobState, ct);
                 }
 
-                // Friday 4:30 PM ET → weekly newsletter
+                // Weekly newsletter — Friday 4:30 PM ET. Handled as a separate job_state
+                // row so it doesn't compete with the daily briefing's last_success_date.
+                var etNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, EtTimeZone);
                 if (etNow.DayOfWeek == DayOfWeek.Friday
-                    && etNow.Hour == 16 && etNow.Minute == 30
-                    && etNow.Date != _lastRunDate)
+                    && await jobState.ShouldRunAsync(WeeklyJobName, 16, 30, weekdayOnly: true, ct))
                 {
-                    _lastRunDate = etNow.Date;
-                    logger.LogInformation("MorningBriefingJob: weekly newsletter at {EtNow}", etNow);
-                    await RunWeeklyAsync(ct);
+                    logger.LogInformation("MorningBriefingJob: weekly newsletter trigger");
+                    await RunWeeklyAsync(scope, jobState, ct);
                 }
             }
             catch (Exception ex)
@@ -54,22 +56,44 @@ public class MorningBriefingJob(
         }
     }
 
-    private async Task RunBriefingAsync(CancellationToken ct)
+    private async Task RunBriefingAsync(
+        IServiceScope scope,
+        Fintrest.Api.Services.JobState.JobStateService jobState,
+        CancellationToken ct)
     {
-        using var scope = scopeFactory.CreateScope();
         var dispatcher = scope.ServiceProvider.GetRequiredService<AlertDispatcher>();
-        var result = await dispatcher.DispatchMorningBriefingsAsync(ct);
-        logger.LogInformation("Morning briefing dispatched: {Sent}/{Matched} sent", result.Sent, result.Matched);
+        try
+        {
+            var result = await dispatcher.DispatchMorningBriefingsAsync(ct);
+            logger.LogInformation("Morning briefing dispatched: {Sent}/{Matched} sent", result.Sent, result.Matched);
+            await jobState.MarkSuccessAsync(BriefingJobName, ct);
+        }
+        catch (Exception ex)
+        {
+            await jobState.MarkErrorAsync(BriefingJobName, ex.Message, ct);
+            throw;
+        }
     }
 
-    private async Task RunWeeklyAsync(CancellationToken ct)
+    private async Task RunWeeklyAsync(
+        IServiceScope scope,
+        Fintrest.Api.Services.JobState.JobStateService jobState,
+        CancellationToken ct)
     {
-        using var scope = scopeFactory.CreateScope();
         var dispatcher = scope.ServiceProvider.GetRequiredService<AlertDispatcher>();
         var summary = "Markets wrapped the week with broad activity across sectors. "
                     + "Fintrest's V2 scoring engine surfaced strong signals in growth and AI names. "
                     + "Review the top picks below for actionable setups heading into next week.";
-        var result = await dispatcher.DispatchWeeklyNewsletterAsync(summary, ct);
-        logger.LogInformation("Weekly newsletter dispatched: {Sent}/{Matched} sent", result.Sent, result.Matched);
+        try
+        {
+            var result = await dispatcher.DispatchWeeklyNewsletterAsync(summary, ct);
+            logger.LogInformation("Weekly newsletter dispatched: {Sent}/{Matched} sent", result.Sent, result.Matched);
+            await jobState.MarkSuccessAsync(WeeklyJobName, ct);
+        }
+        catch (Exception ex)
+        {
+            await jobState.MarkErrorAsync(WeeklyJobName, ex.Message, ct);
+            throw;
+        }
     }
 }

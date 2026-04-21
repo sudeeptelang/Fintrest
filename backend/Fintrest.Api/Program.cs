@@ -141,6 +141,12 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Health.DailyHealthEmailJob>(
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Health.DailyHealthEmailJob>());
 
+// Cron robustness — scoped service that persists last-run state to job_state.
+// All jobs that should survive a backend restart without skipping a day must
+// gate via this service (DailyCronJob, MorningBriefingJob, DailyHealthEmailJob
+// are refactored; FeaturePopulationJob + AlgorithmIcTrackingJob to follow).
+builder.Services.AddScoped<Fintrest.Api.Services.JobState.JobStateService>();
+
 builder.Services.AddSingleton<Fintrest.Api.Services.Email.EmailService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Billing.StripeService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Email.AlertDispatcher>();

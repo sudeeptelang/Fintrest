@@ -38,16 +38,37 @@ public class DailyCronJob(
         _timer?.Dispose();
     }
 
+    private const string JobName = "DailyCronJob";
+    private const int ScheduledHourEt = 6;
+    private const int ScheduledMinuteEt = 30;
+
     private void CheckAndRun(object? state)
     {
-        var easternNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, EasternZone);
-
-        // Only run Mon-Fri at 6:30 AM ET (within the minute window)
-        if (easternNow.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) return;
-        if (easternNow.Hour != 6 || easternNow.Minute != 30) return;
         if (_isRunning) return;
 
-        _ = RunPipelineAsync(CancellationToken.None);
+        // Fire-and-forget — the Timer callback is void and the gating query
+        // needs DB access. If the backend was restarted after the original
+        // 6:30 ET window, JobStateService will still return true so we catch
+        // up on today's run instead of silently skipping a day.
+        _ = CheckAndRunAsyncInternal();
+    }
+
+    private async Task CheckAndRunAsyncInternal()
+    {
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var jobState = scope.ServiceProvider.GetRequiredService<Fintrest.Api.Services.JobState.JobStateService>();
+            if (!await jobState.ShouldRunAsync(JobName, ScheduledHourEt, ScheduledMinuteEt, weekdayOnly: true))
+                return;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "DailyCronJob: gating check failed; skipping tick");
+            return;
+        }
+
+        await RunPipelineAsync(CancellationToken.None);
     }
 
     /// <summary>
@@ -109,10 +130,20 @@ public class DailyCronJob(
             logger.LogInformation(
                 "Daily pipeline complete in {Ms}ms: {Portfolios} portfolios updated, {Errors} errors",
                 sw.ElapsedMilliseconds, portfolios.Count, portfolioErrors);
+
+            var jobState = scope.ServiceProvider.GetRequiredService<Fintrest.Api.Services.JobState.JobStateService>();
+            await jobState.MarkSuccessAsync(JobName, ct);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Daily pipeline failed after {Ms}ms", sw.ElapsedMilliseconds);
+            try
+            {
+                using var errScope = scopeFactory.CreateScope();
+                var jobState = errScope.ServiceProvider.GetRequiredService<Fintrest.Api.Services.JobState.JobStateService>();
+                await jobState.MarkErrorAsync(JobName, ex.Message, ct);
+            }
+            catch { /* best-effort error logging */ }
         }
         finally
         {
