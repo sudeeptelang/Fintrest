@@ -71,7 +71,7 @@ export default function WeeklySummaryPage() {
         </h1>
         <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
           Your personalized recap of the week&apos;s signals, market action, and
-          what Athena is watching next.
+          what Lens is watching next.
         </p>
       </div>
 

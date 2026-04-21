@@ -222,7 +222,7 @@ export default function ScoreBreakdownPage({ params }: PageProps) {
               className="rounded-2xl border border-primary/20 bg-gradient-to-br from-[#1E1B4B] to-[#2D2A6B] p-6 text-white/90"
             >
               <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-3 flex items-center gap-2">
-                <Brain className="h-4.5 w-4.5 text-primary" /> Athena's Rationale
+                <Brain className="h-4.5 w-4.5 text-primary" /> Lens&apos;s Rationale
               </h2>
               <p className="text-sm leading-relaxed text-white/80">
                 {explanation.Summary}

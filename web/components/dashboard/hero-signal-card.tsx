@@ -61,7 +61,7 @@ export function HeroSignalCard({ signal: s, rank }: { signal: Signal; rank: numb
             <div className="flex items-center gap-1.5 mb-1">
               <Sparkles className="h-3 w-3 text-[#00b87c]" />
               <span className="text-[9px] font-bold uppercase tracking-widest text-white/60">
-                Athena Says
+                Lens Says
               </span>
               {thesis?.verdict && (
                 <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-[#00b87c]">
@@ -77,7 +77,7 @@ export function HeroSignalCard({ signal: s, rank }: { signal: Signal; rank: numb
       ) : (
         <div className="mb-3 text-[10px] text-muted-foreground italic">
           <Sparkles className="h-3 w-3 inline mr-1 text-primary/50" />
-          Athena is preparing the thesis...
+          Lens is preparing the thesis...
         </div>
       )}
 

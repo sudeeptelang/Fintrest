@@ -120,7 +120,7 @@ export function NewsReaderDrawer({
               {isLoading ? (
                 <div className="flex items-center gap-2 text-white/70 text-sm">
                   <Loader2 className="h-4 w-4 animate-spin text-[#00b87c]" />
-                  Athena is reading the headline…
+                  Lens is reading the headline…
                 </div>
               ) : summary?.athenaSummary ? (
                 <p className="text-sm leading-relaxed text-white/90">
@@ -128,7 +128,7 @@ export function NewsReaderDrawer({
                 </p>
               ) : (
                 <p className="text-sm text-white/60">
-                  Athena summary not available for this headline yet.
+                  Lens summary not available for this headline yet.
                 </p>
               )}
               <p className="text-[10px] text-white/40 leading-relaxed pt-3 mt-3 border-t border-white/10">

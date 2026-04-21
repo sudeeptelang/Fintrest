@@ -44,7 +44,7 @@ export default function RebalancePage() {
           Rebalancing AI
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Athena analyzes your portfolio and suggests adjustments based on
+          Lens analyzes your portfolio and suggests adjustments based on
           current signals, risk exposure, and diversification.
         </p>
       </div>
@@ -95,7 +95,7 @@ export default function RebalancePage() {
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-6 w-6 animate-spin text-primary mr-3" />
               <span className="text-sm text-muted-foreground">
-                Athena is analyzing your portfolio...
+                Lens is analyzing your portfolio...
               </span>
             </div>
           ) : !advisor ? (

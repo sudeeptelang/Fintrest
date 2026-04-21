@@ -23,7 +23,7 @@ export default function PrivacyPage() {
 
       <h2 className="mt-6 text-xl font-semibold">3. AI Processing</h2>
       <p>
-        Our AI assistant Athena is powered by Anthropic&apos;s Claude API. Portfolio and
+        Our AI assistant Lens is powered by Anthropic&apos;s Claude API. Portfolio and
         stock context sent to Claude is processed for the single purpose of generating
         an analysis response and is not used to train third-party models.
       </p>
