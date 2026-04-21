@@ -1,25 +1,24 @@
 "use client";
 
-import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  ResponsiveContainer,
-} from "recharts";
-import type { StockSnapshot, EarningsHistoryItem, SignalBreakdown } from "@/lib/api";
+import type { StockSnapshot, SignalBreakdown } from "@/lib/api";
 
-type SnowflakeInput = {
+// v2 atom 8h — Fundamental scorecard
+// Ported from the v1 radar "snowflake" to the v2 bar-row layout. The 5 scoring
+// functions are preserved; only presentation changes. Axis rename:
+//   Value → Valuation · Growth → Growth · Past → Performance
+//   Health → Fin. health · Income → Dividend
+// Scores are normalized from the old 0–6 scale to 0–100 for display.
+//
+// Peer markers are placeholder (at sector median ≈ 55% of bar) until sector-peer
+// medians are wired from the backend. Marker can be hidden via peerMedian=null.
+
+type ScorecardInput = {
   snapshot: StockSnapshot;
-  earnings?: EarningsHistoryItem[];
   breakdown?: SignalBreakdown | null;
   dividendYield?: number | null;
 };
 
-// Each axis scored 0–6 (Simply Wall St uses 0–6 tier scale).
-// Higher = better on that dimension.
-function scoreValue(s: StockSnapshot): number {
+function scoreValuation(s: StockSnapshot): number {
   const pe = s.peRatio ?? s.forwardPe;
   const pb = s.priceToBook;
   const peg = s.pegRatio;
@@ -57,7 +56,7 @@ function scoreGrowth(s: StockSnapshot): number {
   return Math.min(6, score);
 }
 
-function scorePast(s: StockSnapshot): number {
+function scorePerformance(s: StockSnapshot): number {
   let score = 0;
   if (s.perfYear !== null) {
     if (s.perfYear > 30) score += 3;
@@ -72,7 +71,7 @@ function scorePast(s: StockSnapshot): number {
   return Math.min(6, score);
 }
 
-function scoreHealth(s: StockSnapshot): number {
+function scoreFinHealth(s: StockSnapshot): number {
   let score = 0;
   if (s.debtToEquity !== null) {
     if (s.debtToEquity < 0.5) score += 2;
@@ -92,7 +91,7 @@ function scoreHealth(s: StockSnapshot): number {
   return Math.min(6, score);
 }
 
-function scoreIncome(s: StockSnapshot, dividendYield: number | null | undefined): number {
+function scoreDividend(dividendYield: number | null | undefined): number {
   const y = dividendYield ?? 0;
   if (y >= 5) return 6;
   if (y >= 4) return 5;
@@ -103,106 +102,95 @@ function scoreIncome(s: StockSnapshot, dividendYield: number | null | undefined)
   return 0;
 }
 
-export function AthenaSnowflake({ snapshot, breakdown, dividendYield }: SnowflakeInput) {
-  const value = scoreValue(snapshot);
-  const growth = scoreGrowth(snapshot);
-  const past = scorePast(snapshot);
-  const health = scoreHealth(snapshot);
-  const income = scoreIncome(snapshot, dividendYield);
+type VerdictTone = "strong" | "med" | "weak";
 
-  const data = [
-    { axis: "Value", score: value },
-    { axis: "Growth", score: growth },
-    { axis: "Past", score: past },
-    { axis: "Health", score: health },
-    { axis: "Income", score: income },
+function verdictFor(axis: string, score: number): { label: string; tone: VerdictTone } {
+  // score is 0–6; threshold mapping mirrors v2 preview (Elite/Strong/Average/Stretched/Low).
+  if (score >= 4.5) return { label: axis === "Dividend" ? "Strong yield" : "Elite", tone: "strong" };
+  if (score >= 3.5) return { label: "Strong", tone: "strong" };
+  if (score >= 2.5) return { label: "Average", tone: "med" };
+  if (score >= 1.5) return { label: axis === "Valuation" ? "Stretched" : "Mixed", tone: "weak" };
+  return { label: axis === "Dividend" ? "Low yield" : "Weak", tone: "weak" };
+}
+
+export function AthenaSnowflake({ snapshot, dividendYield }: ScorecardInput) {
+  const rows = [
+    { axis: "Valuation",   score: scoreValuation(snapshot) },
+    { axis: "Growth",      score: scoreGrowth(snapshot) },
+    { axis: "Performance", score: scorePerformance(snapshot) },
+    { axis: "Fin. health", score: scoreFinHealth(snapshot) },
+    { axis: "Dividend",    score: scoreDividend(dividendYield) },
   ];
 
-  const total = value + growth + past + health + income;
-  const avg = total / 5;
-
-  // Color tiers (0-6 scale)
-  const overallTier =
-    avg >= 4 ? { label: "Strong", color: "#10b981" }
-    : avg >= 2.5 ? { label: "Balanced", color: "#2563eb" }
-    : avg >= 1.5 ? { label: "Mixed", color: "#d97706" }
-    : { label: "Weak", color: "#d94f3d" };
-
-  const radarColor = overallTier.color;
-
   return (
-    <div className="rounded-2xl border border-border bg-card p-6">
-      <div className="flex items-start justify-between mb-2">
-        <div>
-          <h3 className="font-[var(--font-heading)] text-lg font-semibold">
-            Athena Snowflake
-          </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Five-dimensional profile · each axis scored 0–6
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Profile
-          </p>
-          <p className="text-sm font-semibold" style={{ color: radarColor }}>
-            {overallTier.label}
-          </p>
-        </div>
-      </div>
-
-      <div className="h-[260px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={data} outerRadius="72%">
-            <PolarGrid stroke="rgba(35,29,22,0.12)" />
-            <PolarAngleAxis
-              dataKey="axis"
-              tick={{ fill: "#1a1510", fontSize: 11, fontWeight: 600 }}
-            />
-            <PolarRadiusAxis
-              domain={[0, 6]}
-              tick={{ fill: "#6b6259", fontSize: 9 }}
-              tickCount={4}
-              angle={90}
-            />
-            <Radar
-              dataKey="score"
-              stroke={radarColor}
-              fill={radarColor}
-              fillOpacity={0.35}
-              strokeWidth={2}
-              dot={{ fill: radarColor, strokeWidth: 0, r: 3 }}
-            />
-          </RadarChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="grid grid-cols-5 gap-2 mt-3 pt-3 border-t border-border">
-        {data.map((d) => (
-          <div key={d.axis} className="text-center">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              {d.axis}
-            </p>
-            <p
-              className="font-[var(--font-mono)] text-base font-bold mt-1"
-              style={{
-                color:
-                  d.score >= 4 ? "#10b981"
-                  : d.score >= 2.5 ? "#2563eb"
-                  : d.score >= 1.5 ? "#d97706"
-                  : "#d94f3d",
-              }}
-            >
-              {d.score.toFixed(1)}
-            </p>
-          </div>
-        ))}
-      </div>
-      {breakdown && (
-        <p className="text-[10px] text-muted-foreground mt-3">
-          Derived from fundamentals, growth, performance, health & income signals.
+    <div className="rounded-xl border border-ink-200 bg-ink-0 p-6 sm:p-7">
+      {/* Header — Sora 600 14px / body-sm 12/18 */}
+      <div className="mb-5">
+        <h3 className="font-[var(--font-heading)] text-[14px] font-semibold text-ink-900 leading-none mb-1">
+          Fundamental scorecard
+        </h3>
+        <p className="text-[12px] leading-[18px] text-ink-500">
+          Five-dimensional profile · bar = score · peer marker = sector median
         </p>
-      )}
+      </div>
+
+      <div className="space-y-0">
+        {rows.map((r, i) => {
+          const pct = Math.round((r.score / 6) * 100);
+          const tone: VerdictTone =
+            r.score >= 4 ? "strong" : r.score >= 2.5 ? "med" : "weak";
+          const verdict = verdictFor(r.axis, r.score);
+          const barFill =
+            tone === "strong"
+              ? "bg-[color:var(--up)]"
+              : tone === "med"
+              ? "bg-ink-500"
+              : "bg-ink-300";
+          const verdictColor =
+            verdict.tone === "strong"
+              ? "text-[color:var(--up)]"
+              : verdict.tone === "weak"
+              ? "text-[color:var(--down)]"
+              : "text-ink-500";
+          return (
+            <div
+              key={r.axis}
+              className="grid grid-cols-[120px_1fr_48px_72px] sm:grid-cols-[140px_1fr_60px_80px] gap-5 items-center py-2.5"
+              style={i > 0 ? { borderTop: "1px solid var(--ink-100)" } : undefined}
+            >
+              {/* Label — DM Sans 600 11px/0.08em UPPERCASE ink-700 */}
+              <div className="text-[11px] font-semibold leading-none text-ink-700 tracking-[0.08em] uppercase">
+                {r.axis}
+              </div>
+              {/* Bar + peer marker */}
+              <div className="relative h-2 bg-ink-100 rounded">
+                <div
+                  className={`absolute inset-y-0 left-0 rounded ${barFill}`}
+                  style={{ width: `${pct}%` }}
+                />
+                {/* Peer marker at ~55% (placeholder until sector median wired) */}
+                <div
+                  className="absolute -top-1 -bottom-1 w-[2px] bg-ink-800 rounded-[1px]"
+                  style={{ left: "55%" }}
+                  aria-hidden
+                />
+              </div>
+              {/* Score — DM Mono 500 14px ink-900 right-align */}
+              <div className="font-[var(--font-mono)] text-[14px] font-medium text-ink-900 text-right tabular-nums">
+                {pct}/100
+              </div>
+              {/* Verdict — DM Sans 600 10px/0.12em UPPERCASE */}
+              <div className={`text-[10px] font-semibold tracking-[0.12em] uppercase text-right ${verdictColor}`}>
+                {verdict.label}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-[11px] text-ink-500 leading-relaxed mt-5 pt-4 border-t border-ink-100">
+        Derived from fundamentals, growth, performance, health &amp; income signals. Peer marker is a placeholder until sector median is wired.
+      </p>
     </div>
   );
 }
