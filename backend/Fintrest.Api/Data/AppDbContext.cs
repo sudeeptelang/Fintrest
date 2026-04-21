@@ -79,7 +79,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(u => u.Email).IsUnique();
             e.Property(u => u.Plan).HasConversion(
                 v => v.ToString().ToLowerInvariant(),
-                v => Enum.Parse<PlanType>(v, ignoreCase: true));
+                v => Enum.Parse<PlanType>(v, true));
         });
 
         // Subscription — both Plan and Status use lowercase text to align with
@@ -90,10 +90,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(s => s.UserId).IsUnique();
             e.Property(s => s.Status).HasConversion(
                 v => v.ToString().ToLowerInvariant(),
-                v => Enum.Parse<SubscriptionStatus>(v, ignoreCase: true));
+                v => Enum.Parse<SubscriptionStatus>(v, true));
             e.Property(s => s.Plan).HasConversion(
                 v => v.ToString().ToLowerInvariant(),
-                v => Enum.Parse<PlanType>(v, ignoreCase: true));
+                v => Enum.Parse<PlanType>(v, true));
         });
 
         // Stock
