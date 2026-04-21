@@ -135,6 +135,13 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.V3.AlgorithmIcTracki
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Scoring.V3.AlgorithmIcTrackingJob>());
 
+// Firehose cache — write-through at 6:15 AM ET Mon–Fri (migration 020).
+// Decouples /insiders + /congress from live FMP so transient provider errors
+// don't cause blank pages.
+builder.Services.AddSingleton<Fintrest.Api.Services.Ingestion.FirehoseIngestJob>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<Fintrest.Api.Services.Ingestion.FirehoseIngestJob>());
+
 // Admin health — shared service + daily email at 7:00 AM ET.
 builder.Services.AddScoped<Fintrest.Api.Services.Health.SystemHealthService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Health.DailyHealthEmailJob>();

@@ -46,6 +46,12 @@ public class SystemHealthService(AppDbContext db, ILogger<SystemHealthService> l
 
         var lastFeatureRun = await db.FeatureRunLogs.OrderByDescending(f => f.StartedAt).FirstOrDefaultAsync(ct);
 
+        // Firehose cache freshness — migration 020.
+        var lastFirehoseCapture = await db.MarketFirehoseSnapshots
+            .OrderByDescending(s => s.CapturedAt)
+            .Select(s => (DateTime?)s.CapturedAt)
+            .FirstOrDefaultAsync(ct);
+
         var lastIngestion = await db.AdminAuditLogs
             .Where(a => a.Action == "trigger_ingestion" || a.Action == "trigger_scan")
             .OrderByDescending(a => a.CreatedAt)
@@ -98,6 +104,12 @@ public class SystemHealthService(AppDbContext db, ILogger<SystemHealthService> l
         if (lastMorningBriefing is { Status: "completed", FailedCount: > 0 } lmb)
             alerts.Add($"Last morning briefing had {lmb.FailedCount} failed send{(lmb.FailedCount == 1 ? "" : "s")} of {lmb.AudienceSize}");
 
+        // Firehose cache staleness — fire if nightly refresh hasn't written in > 26h.
+        // Don't alert when we've never captured anything (new install); that state
+        // resolves itself the first time FirehoseIngestJob succeeds.
+        if (lastFirehoseCapture is not null && utcNow - lastFirehoseCapture.Value > TimeSpan.FromHours(26))
+            alerts.Add($"Firehose cache (insiders + congress) is stale — last capture {FormatAgo(lastFirehoseCapture, utcNow)}");
+
         var overallStatus = alerts.Count == 0 ? "ok" : "alert";
 
         var jobs = new[]
@@ -107,6 +119,7 @@ public class SystemHealthService(AppDbContext db, ILogger<SystemHealthService> l
             new JobSchedule("FeaturePopulationJob",   "Mon–Fri 5:45 AM ET", NextWeekdayAt(etNow, 5, 45)),
             new JobSchedule("AlgorithmIcTrackingJob", "Mon–Fri 5:30 AM ET (stub)", NextWeekdayAt(etNow, 5, 30)),
             new JobSchedule("DailyHealthEmailJob",    "Mon–Fri 7:00 AM ET", NextWeekdayAt(etNow, 7, 0)),
+            new JobSchedule("FirehoseIngestJob",      "Mon–Fri 6:15 AM ET", NextWeekdayAt(etNow, 6, 15)),
             new JobSchedule("IntradayDriftJob",       "Every 15m when SPY>1% / VIX>15%", etNow.AddMinutes(15)),
         };
 

@@ -53,6 +53,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     // Briefing run history — migration 019.
     public DbSet<BriefingRun> BriefingRuns => Set<BriefingRun>();
 
+    // Write-through cache for FMP firehoses — migration 020.
+    public DbSet<MarketFirehoseSnapshot> MarketFirehoseSnapshots => Set<MarketFirehoseSnapshot>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

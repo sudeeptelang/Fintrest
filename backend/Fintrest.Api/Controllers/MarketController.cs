@@ -859,10 +859,37 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         [FromServices] ILogger<MarketController> logger,
         [FromQuery] int limit = 50)
     {
-        var trades = await fundamentalsProvider.GetLatestInsiderTradesAsync(Math.Clamp(limit, 1, 200));
-        if (trades.Count == 0)
-            logger.LogWarning("Insider feed empty — provider returned 0 rows. Check FMP plan access to /stable/insider-trading/latest.");
-        return Ok(trades.Select(t => new InsiderActivityItem(
+        // Read from the write-through cache (migration 020). FirehoseIngestJob
+        // refreshes rows nightly at 6:15 AM ET. If the cache is empty — e.g.
+        // first boot before the job has run — fall back to a live FMP call so
+        // the user doesn't see a blank page.
+        var clamped = Math.Clamp(limit, 1, 200);
+        var rows = await db.MarketFirehoseSnapshots
+            .AsNoTracking()
+            .Where(s => s.Kind == "insider")
+            .OrderByDescending(s => s.FilingDate ?? s.TransactionDate)
+            .ThenByDescending(s => s.Id)
+            .Take(clamped)
+            .ToListAsync();
+
+        if (rows.Count > 0)
+        {
+            return Ok(rows.Select(r => new InsiderActivityItem(
+                r.Ticker ?? "",
+                r.TransactionDate?.ToDateTime(TimeOnly.MinValue),
+                r.FilingDate?.ToDateTime(TimeOnly.MinValue),
+                r.ActorName,
+                r.ActorRole,
+                r.TransactionType,
+                r.Shares,
+                r.Price,
+                r.TotalValue
+            )).ToList());
+        }
+
+        logger.LogWarning("Insider cache empty — falling back to live FMP call. Check FirehoseIngestJob.");
+        var live = await fundamentalsProvider.GetLatestInsiderTradesAsync(clamped);
+        return Ok(live.Select(t => new InsiderActivityItem(
             t.Ticker, t.TransactionDate, t.FilingDate, t.ReportingName, t.Relationship,
             t.TransactionType, t.SharesTraded, t.Price, t.TotalValue
         )).ToList());
@@ -875,13 +902,47 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         [FromServices] ILogger<MarketController> logger,
         [FromQuery] int limit = 50)
     {
-        var trades = await fundamentalsProvider.GetCongressTradesAsync(Math.Clamp(limit, 1, 200));
-        if (trades.Count == 0)
-            logger.LogWarning("Congress feed empty — provider returned 0 rows. Check FMP plan access to /senate-latest + /house-latest.");
-        return Ok(trades.Select(t => new CongressTradeItem(
+        var clamped = Math.Clamp(limit, 1, 200);
+        var rows = await db.MarketFirehoseSnapshots
+            .AsNoTracking()
+            .Where(s => s.Kind == "senate" || s.Kind == "house")
+            .OrderByDescending(s => s.DisclosureDate ?? s.TransactionDate)
+            .ThenByDescending(s => s.Id)
+            .Take(clamped)
+            .ToListAsync();
+
+        if (rows.Count > 0)
+        {
+            return Ok(rows.Select(r => new CongressTradeItem(
+                r.Chamber ?? r.Kind,
+                r.Ticker ?? "",
+                r.AssetDescription,
+                r.ActorName,
+                r.TransactionType,
+                r.TransactionDate?.ToDateTime(TimeOnly.MinValue),
+                r.DisclosureDate?.ToDateTime(TimeOnly.MinValue),
+                r.AmountRange,
+                r.SourceUrl
+            )).ToList());
+        }
+
+        logger.LogWarning("Congress cache empty — falling back to live FMP call. Check FirehoseIngestJob.");
+        var live = await fundamentalsProvider.GetCongressTradesAsync(clamped);
+        return Ok(live.Select(t => new CongressTradeItem(
             t.Chamber, t.Ticker, t.AssetDescription, t.Representative, t.TransactionType,
             t.TransactionDate, t.DisclosureDate, t.Amount, t.SourceUrl
         )).ToList());
+    }
+
+    /// <summary>Manual trigger for the firehose cache — admin-only.</summary>
+    [Authorize(Roles = "Admin")]
+    [HttpPost("admin/firehose/refresh")]
+    public async Task<IActionResult> TriggerFirehoseRefresh(
+        [FromServices] Fintrest.Api.Services.Ingestion.FirehoseIngestJob job,
+        CancellationToken ct)
+    {
+        var summary = await job.RunOnceAsync(ct);
+        return Ok(summary);
     }
 
     [HttpGet("stocks/{ticker}/ownership")]
