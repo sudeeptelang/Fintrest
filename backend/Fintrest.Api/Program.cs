@@ -129,6 +129,12 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.V3.FeaturePopulation
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Scoring.V3.FeaturePopulationJob>());
 
+// IC tracking — §14.0 in docs/SIGNALS_V3.md. Skeleton only; computation lands
+// after the schema is extended (sector + p-value + turnover + 60d horizon).
+builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.V3.AlgorithmIcTrackingJob>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<Fintrest.Api.Services.Scoring.V3.AlgorithmIcTrackingJob>());
+
 builder.Services.AddSingleton<Fintrest.Api.Services.Email.EmailService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Billing.StripeService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Email.AlertDispatcher>();
