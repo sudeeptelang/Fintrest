@@ -321,3 +321,138 @@ backend/
 - Target ladders give a real trade plan, not a single exit price
 - "Strong vs sector" badge on signals with Cross-Sectional Rank ≥ 80
 - Weekly regime update posted to the feed by Athena
+
+---
+
+## 14. Post-v3 Roadmap — Toward a Professional Factor Model
+
+Once v3 Phases A–C are shipped, the model still treats Fundamentals and Revisions
+as monolithic factors. The path from v3 to a genuine professional-grade multi-factor
+model runs through **deepening** the existing factor families rather than inventing
+new ones.
+
+> **Scope rule:** Every step below except §14.6 is buildable on **data we already
+> pay for** (FMP Ultimate, Polygon Starter, Finnhub, FRED free). §14.6 (options
+> flow) requires the Polygon Options add-on (~$99/mo) and is **deferred by default**
+> — skip it unless short-horizon options signals become a product priority.
+> Chart-pattern recognition is explicitly out of scope; this roadmap is statistical
+> models driven by API data, not technical chart patterns.
+
+### 14.0. Prerequisite: Per-Algorithm IC Tracking (start now)
+
+Before building any new factor family, instrument **daily information-coefficient
+tracking by algorithm, by sector, by regime**. Without this, each new feature
+family ships without a baseline to judge it against — decisions revert to theory
+instead of Sharpe.
+
+- Table: `algorithm_ic_history(algo_id, as_of_ts, sector, regime, horizon_days, rank_ic, ic_pvalue, turnover)`
+- Nightly job populates from realized returns at horizons 5 / 20 / 60 trading days
+- Dashboard: rolling 60-day rank-IC per algorithm × sector, color-coded by significance
+- **Kill-switch rule:** any algorithm with 60-day rolling rank-IC < 0.02 and p > 0.2 loses weight until it recovers
+
+The v3 feature-store work (`FeatureStore.cs`, `FeaturePopulationJob`) already
+produces the inputs; the remaining piece is the realized-return join + rolling IC.
+
+### 14.1. Quality, Profitability, Growth as Explicit Sub-Models
+
+Today the Fundamentals factor is a single composite. Split it into three
+sector-normalized sub-models using FMP income / balance / cash-flow statements:
+
+| Sub-model | Representative metrics | Notes |
+|---|---|---|
+| **Quality** | Gross profitability (GP/Assets), accruals ratio, CFO / Net Income, debt stability | Novy-Marx gross profitability is the classic anchor. |
+| **Profitability** | ROIC, ROE, operating margin trend, FCF yield | Use trailing 5y mean + latest; both matter. |
+| **Growth** | 3y CAGR of revenue + EPS, R&D intensity, SG&A leverage, sustainable growth (ROE × retention) | Avoid naive 1y growth — cyclicals game it. |
+
+Each metric is ranked **within sector** (GICS Level 1), then z-scored, then
+aggregated to a sub-model score. The Fundamentals factor in §2 then becomes a
+weighted sum of these three sub-models rather than a flat composite. This mirrors
+how MSCI, Axioma, and Barra-style models decompose "Quality."
+
+### 14.2. Deepen the Revisions Factor
+
+v3 ships revisions as **breadth-only** (share of analysts revising up vs down over
+90 days). Expand to four distinct sub-signals:
+
+- **Breadth** — % of analysts with estimate increases (existing)
+- **Magnitude** — mean % change in consensus EPS / revenue over 30d / 90d
+- **Target-price change** — median analyst target-price drift, sector-normalized
+- **Rating drift** — flow of upgrades minus downgrades, weighted by analyst hit-rate
+
+Practitioner research (Brinson, Clarke, Pope) consistently finds revisions one of
+the **highest-IC families** at 1–3 month horizons — it deserves more than one
+dimension.
+
+### 14.3. Earnings Event Dynamics
+
+The current earnings module mostly flags calendar proximity. Add the mechanics
+that actually move stocks around earnings:
+
+- **Standardized unexpected earnings (SUE)** — (actual − consensus) / σ(surprise)
+- **Guidance change** — mgmt guide ΔEPS / ΔRevenue, tokenized "raised / maintained / cut"
+- **Post-earnings-announcement drift (PEAD)** by sector — the persistence of the
+  surprise, which is empirically sector-specific
+
+Gated by factor 14.2 and factor 14.3 together, the engine can separate a "real
+beat" (SUE > 1 AND guide raised AND drift positive) from a "headline beat" that
+fades in five sessions.
+
+### 14.4. Risk Controls — Low-Vol & Liquidity Screens
+
+Before a BUY_TODAY ships, screen on tradability so high-score names are also
+sizable:
+
+- **Liquidity filter** — 20-day $ volume > user-position-size × 10× turnover budget
+- **Spread filter** — median quoted spread / price < X bps at 1-min resolution
+  (Polygon aggs)
+- **Low-vol overlay** — BAB-style tilt away from realized-vol top quintile within
+  each sector when Regime = Chop or Bear
+
+These are not scoring factors — they are **eligibility gates** applied after
+scoring. Signals that fail any gate are demoted to WATCH.
+
+### 14.5. Stronger Macro Family (Credit + Rates + Dollar)
+
+v3 Macro (Phase B) is already FRED-backed but narrow. Expand to four signals
+because credit spreads and curve shape are widely regarded as the single best
+leading macro risk indicators:
+
+- **High-yield OAS spread** (BAMLH0A0HYM2) — 20d z-score; spike → risk-off
+- **Curve slope** (10Y − 2Y, DGS10 − DGS2) — sign + change
+- **10Y yield trend** (DGS10) — direction and magnitude of 60d change
+- **Dollar trend** (DTWEXBGS) — trade-weighted; large caps with foreign revenue
+  react inversely
+
+Each feeds the regime classifier and also directly penalizes / boosts
+cyclical vs defensive sub-baskets.
+
+### 14.6. Options Flow — After, Not Instead
+
+Only after 14.1–14.5 are shipped and IC-validated, add options flow (already
+flagged as Phase C). Unusual option activity has high IC at 1–5 day horizons but
+is meaningless until the underlying factor model is clean — you'll misattribute
+alpha to the options signal when it's really momentum + revisions.
+
+### 14.7. ML Meta-Learner — Last
+
+With a robust weighted-factor base and clean daily IC history (minimum 12 months,
+ideally 24), train a LightGBM meta-learner whose features are the **per-factor
+sub-scores and their regime interactions**, not raw prices. The meta-learner's
+job is to reweight — not replace — the factor model. Keep the weighted-factor
+score always available so the meta-learner can be A/B-toggled.
+
+### 14.8. Implementation Order (recommended)
+
+| Step | Work | New data? | Lift source |
+|---|---|---|---|
+| 0 | Per-algorithm IC tracking + dashboard | No | Decision quality for everything below |
+| 1 | Quality / Profitability / Growth split + sector rank | No (FMP) | Fundamentals IC up, decorrelated from Momentum |
+| 2 | Revisions deepening (magnitude + target + rating) | No (FMP + Finnhub) | Revisions family IC up materially |
+| 3 | Earnings event (SUE + guidance + PEAD) | No (FMP) | Better catalyst precision |
+| 4 | Liquidity + spread + low-vol gates | No (Polygon) | Reduced slippage drag on live P&L |
+| 5 | Macro deepening (credit + curve + dollar) | No (FRED free) | Better regime calls |
+| 6 | Options flow — **deferred** | Yes (~$99/mo) | Short-horizon signals |
+| 7 | ML meta-learner | No (compute only) | Reweighting, not replacing |
+
+Each step is independently shippable and can be feature-flagged behind the
+`scoring_weights_v3.yaml` config without a backend release.
