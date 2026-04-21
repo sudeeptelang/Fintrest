@@ -114,9 +114,14 @@ public class TickerEarningsProfile
 
 /// <summary>
 /// Nightly Information Coefficient (Spearman rank correlation between an
-/// algorithm's score and forward return) per algorithm, per regime. Feeds the
-/// weekly weight-tuning report and is the dataset required for an eventual
-/// ML meta-learner.
+/// algorithm's score and realised forward return) per algorithm × sector ×
+/// regime × horizon. Feeds the per-algorithm IC dashboard (§14.0 in
+/// docs/SIGNALS_V3.md) and the dataset required for an eventual ML
+/// meta-learner.
+///
+/// Schema matches migration 017 (redesign of the original 014 shape). Rows
+/// with <c>Sector = "ALL"</c> are the cross-sectional IC; every other row
+/// narrows to a specific GICS sector.
 /// </summary>
 [Table("algorithm_ic_history")]
 public class AlgorithmIcHistory
@@ -128,16 +133,30 @@ public class AlgorithmIcHistory
     [Column("algorithm")]
     public string Algorithm { get; set; } = "";
 
+    /// <summary>GICS sector label (from <c>stocks.sector</c>), or <c>"ALL"</c> for the cross-sectional row.</summary>
+    [Column("sector")]
+    public string Sector { get; set; } = "ALL";
+
     /// <summary>Market regime at the time: trending_bull | trending_bear | chop_low_vol | chop_high_vol.</summary>
     [Column("regime")]
     public string Regime { get; set; } = "";
 
-    [Column("ic_5d")]
-    public double? Ic5d { get; set; }
+    /// <summary>Forward-return horizon in trading days (5, 21, 60 in current usage).</summary>
+    [Column("horizon_days")]
+    public int HorizonDays { get; set; }
 
-    [Column("ic_21d")]
-    public double? Ic21d { get; set; }
+    /// <summary>Spearman rank correlation over <c>HorizonDays</c>. Null when <c>NTickers &lt; 30</c>.</summary>
+    [Column("rank_ic")]
+    public double? RankIc { get; set; }
+
+    /// <summary>Two-sided p-value for <see cref="RankIc"/>; null when sample too small.</summary>
+    [Column("ic_pvalue")]
+    public double? IcPvalue { get; set; }
 
     [Column("n_tickers")]
     public int NTickers { get; set; }
+
+    /// <summary>Top-quintile churn on <c>trade_date</c> — fraction of yesterday's top-20% that dropped out.</summary>
+    [Column("turnover")]
+    public double? Turnover { get; set; }
 }

@@ -64,7 +64,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasKey(t => t.Ticker);
 
         modelBuilder.Entity<AlgorithmIcHistory>()
-            .HasKey(a => new { a.Date, a.Algorithm, a.Regime });
+            .HasKey(a => new { a.Date, a.Algorithm, a.Sector, a.Regime, a.HorizonDays });
 
         // User — Plan is stored as lowercase text to match the DB's
         // `users_plan_check` constraint (free / starter / pro / premium).
