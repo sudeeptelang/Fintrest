@@ -135,6 +135,12 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.V3.AlgorithmIcTracki
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Scoring.V3.AlgorithmIcTrackingJob>());
 
+// Admin health — shared service + daily email at 7:00 AM ET.
+builder.Services.AddScoped<Fintrest.Api.Services.Health.SystemHealthService>();
+builder.Services.AddSingleton<Fintrest.Api.Services.Health.DailyHealthEmailJob>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<Fintrest.Api.Services.Health.DailyHealthEmailJob>());
+
 builder.Services.AddSingleton<Fintrest.Api.Services.Email.EmailService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Billing.StripeService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Email.AlertDispatcher>();

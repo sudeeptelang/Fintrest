@@ -93,186 +93,34 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     /// Single-blob dashboard of nightly-job health. Answers "did today's scan
     /// run, when did the last briefing fire, is any upstream provider red,
     /// what should I be worried about?"
+    ///
+    /// The heavy lifting lives in <c>SystemHealthService</c> so the daily
+    /// health email (<c>DailyHealthEmailJob</c>) produces the same view.
     /// </summary>
     [HttpGet("system-health")]
-    public async Task<IActionResult> SystemHealth()
+    public async Task<IActionResult> SystemHealth([FromServices] Fintrest.Api.Services.Health.SystemHealthService health, CancellationToken ct)
     {
-        var utcNow = DateTime.UtcNow;
-        var etZone = SafeEasternZone();
-        var etNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, etZone);
-        var todayEt = etNow.Date;
-        var todayEtStartUtc = TimeZoneInfo.ConvertTimeToUtc(todayEt, etZone);
+        var report = await health.GatherAsync(ct);
+        return Ok(report);
+    }
 
-        var lastScan = await db.ScanRuns
-            .OrderByDescending(s => s.StartedAt)
-            .FirstOrDefaultAsync();
-        var todaysScan = await db.ScanRuns
-            .Where(s => s.StartedAt >= todayEtStartUtc)
-            .OrderByDescending(s => s.StartedAt)
-            .FirstOrDefaultAsync();
-
-        // Morning briefings aren't persisted to alert_deliveries today (see
-        // AlertDispatcher.DispatchMorningBriefingsAsync — the dispatcher sends
-        // via emailService but doesn't write a row). So the best proxy is:
-        // did the latest completed scan finish today, and how many users are
-        // opted in? Real logging comes in a follow-up.
-        var briefingAudience = await db.Users
-            .Where(u => u.ReceiveMorningBriefing && u.Email != null && u.Email != "")
-            .CountAsync();
-        var weeklyAudience = await db.Users
-            .Where(u => u.ReceiveWeeklyNewsletter && u.Email != null && u.Email != "")
-            .CountAsync();
-
-        var lastFeatureRun = await db.FeatureRunLogs
-            .OrderByDescending(f => f.StartedAt)
-            .FirstOrDefaultAsync();
-
-        var lastIngestion = await db.AdminAuditLogs
-            .Where(a => a.Action == "trigger_ingestion" || a.Action == "trigger_scan")
-            .OrderByDescending(a => a.CreatedAt)
-            .FirstOrDefaultAsync();
-
-        var recentAuditLogs = await db.AdminAuditLogs
-            .OrderByDescending(a => a.CreatedAt)
-            .Take(10)
-            .Select(a => new
-            {
-                a.Id,
-                a.ActorUserId,
-                a.Action,
-                a.EntityType,
-                a.EntityId,
-                a.CreatedAt,
-            })
-            .ToListAsync();
-
-        // Provider rollup — last 24h per provider.
-        var providerSince = utcNow.AddHours(-24);
-        var providerRows = await db.ProviderHealth
-            .Where(p => p.CheckedAt >= providerSince)
-            .ToListAsync();
-        var providers = providerRows
-            .GroupBy(p => p.Provider)
-            .Select(g =>
-            {
-                var last = g.OrderByDescending(p => p.CheckedAt).First();
-                return new
-                {
-                    Provider = g.Key,
-                    TotalChecks = g.Count(),
-                    Successes = g.Count(p => p.Success),
-                    SuccessRate = g.Count() == 0 ? 0.0 : (double)g.Count(p => p.Success) / g.Count(),
-                    LastCheckedAt = last.CheckedAt,
-                    LastOk = last.Success,
-                    LastLatencyMs = last.LatencyMs,
-                };
-            })
-            .OrderBy(p => p.Provider)
-            .ToList();
-
-        // Alerts — only flag items a human should actually act on. Each alert
-        // is a short, specific string so the email's subject line can say
-        // "[ALERT] X, Y" without a template.
-        var alerts = new List<string>();
-        var todayRanScan = todaysScan != null && todaysScan.Status == "COMPLETED";
-        var etPastScan = etNow.Hour > 6 || (etNow.Hour == 6 && etNow.Minute >= 35);
-        var isWeekday = etNow.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday;
-        if (isWeekday && etPastScan && !todayRanScan)
-            alerts.Add($"Daily scan did not complete today (last scan: {FormatAgo(lastScan?.StartedAt, utcNow)})");
-        if (lastScan != null && lastScan.Status == "FAILED")
-            alerts.Add($"Last scan ({lastScan.StartedAt:MMM d HH:mm}Z) ended in FAILED state");
-        foreach (var p in providers.Where(p => p.SuccessRate < 0.5 && p.TotalChecks >= 3))
-            alerts.Add($"Provider {p.Provider} success rate {p.SuccessRate:P0} over last 24h");
-        if (isWeekday && etPastScan && briefingAudience > 0 && !todayRanScan)
-            alerts.Add("Morning briefing would not have sent (scan didn't complete)");
-
-        var overallStatus = alerts.Count == 0 ? "ok" : "alert";
-
-        // Next fire times — simple forward calculation, not DB-backed. These
-        // match the hardcoded schedules in DailyCronJob, MorningBriefingJob,
-        // FeaturePopulationJob, AlgorithmIcTrackingJob.
-        var jobs = new[]
+    /// <summary>
+    /// Fire the daily health email on demand — useful for verifying the
+    /// template + recipient config without waiting for the 7:00 AM ET slot.
+    /// </summary>
+    [HttpPost("system-health/send-email")]
+    public async Task<IActionResult> SendHealthEmail([FromServices] Fintrest.Api.Services.Health.DailyHealthEmailJob job, CancellationToken ct)
+    {
+        db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            new { Name = "DailyCronJob",             Pattern = "Mon–Fri 6:30 AM ET", NextFireEt = NextWeekdayAt(etNow, 6, 30) },
-            new { Name = "MorningBriefingJob",       Pattern = "Daily 6:30 AM ET + Fri 4:30 PM ET newsletter", NextFireEt = NextDailyAt(etNow, 6, 30) },
-            new { Name = "FeaturePopulationJob",     Pattern = "Mon–Fri 5:45 AM ET", NextFireEt = NextWeekdayAt(etNow, 5, 45) },
-            new { Name = "AlgorithmIcTrackingJob",   Pattern = "Mon–Fri 5:30 AM ET (stub)", NextFireEt = NextWeekdayAt(etNow, 5, 30) },
-            new { Name = "IntradayDriftJob",         Pattern = "Every 15m when SPY>1% / VIX>15%", NextFireEt = etNow.AddMinutes(15) },
-        };
-
-        return Ok(new
-        {
-            OverallStatus = overallStatus,
-            Alerts = alerts,
-            NowUtc = utcNow,
-            NowEt = etNow,
-            Scan = new
-            {
-                LastRunAt = lastScan?.StartedAt,
-                LastRunStatus = lastScan?.Status,
-                LastRunSignals = lastScan?.SignalsGenerated,
-                LastRunUniverse = lastScan?.UniverseSize,
-                LastRunCompletedAt = lastScan?.CompletedAt,
-                TodayRan = todayRanScan,
-                HoursSinceLastRun = lastScan == null ? (double?)null : (utcNow - lastScan.StartedAt).TotalHours,
-            },
-            MorningBriefing = new
-            {
-                AudienceSize = briefingAudience,
-                WeeklyAudienceSize = weeklyAudience,
-                BriefingLogNote = "morning briefings are not persisted to alert_deliveries today; add a BriefingRun table to track sends",
-                ProxyLastSentAt = todayRanScan ? todaysScan?.CompletedAt : lastScan?.CompletedAt,
-            },
-            FeaturePopulation = lastFeatureRun == null ? null : new
-            {
-                RunId = lastFeatureRun.RunId,
-                TradeDate = lastFeatureRun.TradeDate,
-                StartedAt = lastFeatureRun.StartedAt,
-                EndedAt = lastFeatureRun.EndedAt,
-                UniverseSize = lastFeatureRun.UniverseSize,
-                SectorFallbacks = lastFeatureRun.SectorFallbacks,
-            },
-            LastIngestion = lastIngestion == null ? null : new
-            {
-                At = lastIngestion.CreatedAt,
-                Action = lastIngestion.Action,
-                ActorUserId = lastIngestion.ActorUserId,
-            },
-            Providers = providers,
-            Jobs = jobs,
-            RecentAdminActions = recentAuditLogs,
+            ActorUserId = AdminUserId,
+            Action = "trigger_health_email",
+            EntityType = "health",
         });
-    }
+        await db.SaveChangesAsync(ct);
 
-    private static TimeZoneInfo SafeEasternZone()
-    {
-        try { return TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
-        catch { return TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); }
-    }
-
-    private static DateTime NextWeekdayAt(DateTime etNow, int hour, int minute)
-    {
-        var candidate = new DateTime(etNow.Year, etNow.Month, etNow.Day, hour, minute, 0, DateTimeKind.Unspecified);
-        if (candidate <= etNow) candidate = candidate.AddDays(1);
-        while (candidate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-            candidate = candidate.AddDays(1);
-        return candidate;
-    }
-
-    private static DateTime NextDailyAt(DateTime etNow, int hour, int minute)
-    {
-        var candidate = new DateTime(etNow.Year, etNow.Month, etNow.Day, hour, minute, 0, DateTimeKind.Unspecified);
-        if (candidate <= etNow) candidate = candidate.AddDays(1);
-        return candidate;
-    }
-
-    private static string FormatAgo(DateTime? whenUtc, DateTime nowUtc)
-    {
-        if (whenUtc is null) return "never";
-        var delta = nowUtc - whenUtc.Value;
-        if (delta.TotalMinutes < 60) return $"{(int)delta.TotalMinutes}m ago";
-        if (delta.TotalHours < 48) return $"{delta.TotalHours:F1}h ago";
-        return $"{delta.TotalDays:F0}d ago";
+        var outcome = await job.SendOnceAsync(ct);
+        return Ok(new { outcome });
     }
 
     [HttpGet("provider-health")]
