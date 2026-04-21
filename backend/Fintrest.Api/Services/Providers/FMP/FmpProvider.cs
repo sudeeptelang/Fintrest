@@ -266,12 +266,13 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
 
     public async Task<List<InsiderTradeEvent>> GetLatestInsiderTradesAsync(int limit = 50, CancellationToken ct = default)
     {
-        // FMP stable: /insider-trading-latest returns the firehose (no symbol filter).
-        // The previous URL had a slash instead of a hyphen — returned empty silently.
-        var url = $"{_baseUrl}/insider-trading-latest?page=0&limit=100&apikey={_apiKey}";
+        // FMP stable firehose: /insider-trading/latest (with slash, not hyphen).
+        // Confirmed by brute-forcing URL variants — FMP's doc page shows a different
+        // URL format than the actual API path here.
+        var url = $"{_baseUrl}/insider-trading/latest?page=0&limit=100&apikey={_apiKey}";
         var rows = await TryFetch<List<FmpInsiderTradeFull>>(url, ct);
         logger.LogInformation(
-            "FMP insider-trading-latest: rows={Rows} (null={Null})",
+            "FMP insider-trading/latest: rows={Rows} (null={Null})",
             rows?.Count ?? 0, rows is null);
         if (rows is null) return [];
 
@@ -408,13 +409,13 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
 
     public async Task<List<CongressTrade>> GetCongressTradesAsync(int limit = 50, CancellationToken ct = default)
     {
-        // FMP stable: /senate-trading-latest + /house-trading-latest (firehose,
-        // no symbol filter). Old paths /senate-latest + /house-latest returned
-        // empty silently on Premier.
+        // FMP stable: /senate-latest + /house-latest are the disclosure firehoses
+        // (no symbol filter). Confirmed via FMP docs at /developer/docs/stable/senate-latest
+        // and /developer/docs/stable/house-latest. Available on Ultimate + Ownership datasets.
         var senateTask = TryFetch<List<FmpCongressTrade>>(
-            $"{_baseUrl}/senate-trading-latest?page=0&limit=100&apikey={_apiKey}", ct);
+            $"{_baseUrl}/senate-latest?page=0&limit=100&apikey={_apiKey}", ct);
         var houseTask = TryFetch<List<FmpCongressTrade>>(
-            $"{_baseUrl}/house-trading-latest?page=0&limit=100&apikey={_apiKey}", ct);
+            $"{_baseUrl}/house-latest?page=0&limit=100&apikey={_apiKey}", ct);
 
         await Task.WhenAll(senateTask, houseTask);
         logger.LogInformation(

@@ -861,7 +861,7 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     {
         var trades = await fundamentalsProvider.GetLatestInsiderTradesAsync(Math.Clamp(limit, 1, 200));
         if (trades.Count == 0)
-            logger.LogWarning("Insider feed empty — provider returned 0 rows. Check FMP plan access to /insider-trading/latest.");
+            logger.LogWarning("Insider feed empty — provider returned 0 rows. Check FMP plan access to /stable/insider-trading/latest.");
         return Ok(trades.Select(t => new InsiderActivityItem(
             t.Ticker, t.TransactionDate, t.FilingDate, t.ReportingName, t.Relationship,
             t.TransactionType, t.SharesTraded, t.Price, t.TotalValue
