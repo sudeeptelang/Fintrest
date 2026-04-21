@@ -56,6 +56,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     // Write-through cache for FMP firehoses — migration 020.
     public DbSet<MarketFirehoseSnapshot> MarketFirehoseSnapshots => Set<MarketFirehoseSnapshot>();
 
+    // Fundamentals Q/P/G sub-scores — migration 021, §14.1.
+    public DbSet<FundamentalSubscore> FundamentalSubscores => Set<FundamentalSubscore>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -77,6 +80,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<JobState>()
             .HasKey(j => j.JobName);
+
+        modelBuilder.Entity<FundamentalSubscore>()
+            .HasKey(f => new { f.Ticker, f.AsOfDate });
 
         // User — Plan is stored as lowercase text to match the DB's
         // `users_plan_check` constraint (free / starter / pro / premium).

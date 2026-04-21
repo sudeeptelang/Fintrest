@@ -142,6 +142,10 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Ingestion.FirehoseIngestJob>
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Ingestion.FirehoseIngestJob>());
 
+// Fundamentals Q/P/G sub-score service — §14.1 (migration 021). Used by a
+// manual admin endpoint for now; nightly job wires in a later commit.
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.FundamentalSubscoreService>();
+
 // Admin health — shared service + daily email at 7:00 AM ET.
 builder.Services.AddScoped<Fintrest.Api.Services.Health.SystemHealthService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Health.DailyHealthEmailJob>();

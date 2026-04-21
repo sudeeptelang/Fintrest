@@ -108,6 +108,30 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     /// Fire the daily health email on demand — useful for verifying the
     /// template + recipient config without waiting for the 7:00 AM ET slot.
     /// </summary>
+    /// <summary>
+    /// Compute + persist Q/P/G sub-scores for today's as-of-date across the
+    /// active universe. §14.1 — manual trigger until the nightly job lands.
+    /// </summary>
+    [HttpPost("fundamentals/subscores/recompute")]
+    public async Task<IActionResult> RecomputeFundamentalSubscores(
+        [FromServices] Fintrest.Api.Services.Scoring.FundamentalSubscoreService svc,
+        CancellationToken ct)
+    {
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            ActorUserId = AdminUserId,
+            Action = "recompute_fundamental_subscores",
+            EntityType = "fundamental_subscore",
+        });
+        await db.SaveChangesAsync(ct);
+
+        var etNow = TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.UtcNow,
+            TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"));
+        var summary = await svc.ComputeAndStoreAsync(DateOnly.FromDateTime(etNow), ct);
+        return Ok(summary);
+    }
+
     [HttpPost("system-health/send-email")]
     public async Task<IActionResult> SendHealthEmail([FromServices] Fintrest.Api.Services.Health.DailyHealthEmailJob job, CancellationToken ct)
     {
