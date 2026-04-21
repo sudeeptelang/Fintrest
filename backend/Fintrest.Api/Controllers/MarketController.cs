@@ -935,7 +935,7 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     }
 
     /// <summary>Manual trigger for the firehose cache — admin-only.</summary>
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "AdminOnly")]
     [HttpPost("admin/firehose/refresh")]
     public async Task<IActionResult> TriggerFirehoseRefresh(
         [FromServices] Fintrest.Api.Services.Ingestion.FirehoseIngestJob job,

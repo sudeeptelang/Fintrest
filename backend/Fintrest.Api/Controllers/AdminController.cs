@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Fintrest.Api.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "AdminOnly")]
 [ApiController]
 [Route("api/v1/admin")]
 public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataIngestionService ingestion) : ControllerBase

@@ -1,4 +1,5 @@
 using System.Text;
+using Fintrest.Api.Core;
 using Fintrest.Api.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +38,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             NameClaimType = "sub",
         };
     });
-builder.Services.AddAuthorization();
+// Import Core namespace for the IsAdmin() ClaimsPrincipal extension.
+// (Named import at-use site to keep the top of file clean.)
+// AdminOnly policy delegates to the IsAdmin() extension in core/deps.cs so
+// admin access works whether the JWT carries ClaimTypes.Role="Admin",
+// user_role="admin" (Supabase app_metadata convention), or role="admin".
+// Supabase's default JWT has role="authenticated" which would otherwise
+// fail a [Authorize(Roles = "Admin")] check. Admin users get marked by
+// setting user_role="admin" in their Supabase app_metadata.
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireAssertion(ctx => ctx.User.IsAdmin()));
+});
 
 // Data Providers
 builder.Services.AddSingleton<Fintrest.Api.Services.Providers.FmpRateLimiter>();
