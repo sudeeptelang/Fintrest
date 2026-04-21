@@ -31,36 +31,34 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://fintrestweb.vercel.app"
   ),
-  title: "Fintrest.ai — Pick Winning Stocks Before The Market Does",
+  title: "Fintrest.ai — Every stock idea, stress-tested before the open.",
   description:
-    "AI-powered swing trade discovery. Explainable signals, transparent scoring, daily research delivered before the open.",
+    "The research layer for self-directed traders. Explainable signals, 7-factor scoring, a public audit log. Research, not recommendations.",
   keywords: [
-    "stock signals",
-    "swing trading",
-    "AI stock picks",
-    "trade discovery",
-    "stock analytics",
+    "stock research",
+    "explainable signals",
+    "7-factor scoring",
+    "audit log",
+    "self-directed traders",
   ],
   icons: {
     icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/logo-icon.png", type: "image/png" },
     ],
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "Fintrest.ai — Pick Winning Stocks Before The Market Does",
+    title: "Fintrest.ai — Every stock idea, stress-tested before the open.",
     description:
-      "AI-powered swing trade discovery. Explainable signals, transparent scoring, daily research delivered before the open.",
-    images: ["/og-image-1200x630.jpg"],
+      "The research layer for self-directed traders. Explainable signals, 7-factor scoring, a public audit log. Research, not recommendations.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Fintrest.ai — Pick Winning Stocks Before The Market Does",
+    title: "Fintrest.ai — Every stock idea, stress-tested before the open.",
     description:
-      "AI-powered swing trade discovery. Explainable signals, transparent scoring, daily research delivered before the open.",
-    images: ["/og-image-1200x630.jpg"],
+      "The research layer for self-directed traders. Explainable signals, 7-factor scoring, a public audit log. Research, not recommendations.",
   },
 };
 

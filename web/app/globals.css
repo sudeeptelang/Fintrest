@@ -86,6 +86,27 @@
   --color-ink-900: var(--ink-900);
   --color-ink-950: var(--ink-950);
 
+  /* ─── Extended v2 tokens (app screens) ─── */
+  --color-lens-bg: var(--lens-bg);
+
+  --color-cover-forest: var(--cover-forest);
+  --color-cover-rust: var(--cover-rust);
+  --color-cover-ink-700: var(--cover-ink-700);
+  --color-cover-ink-500: var(--cover-ink-500);
+  --color-cover-olive: var(--cover-olive);
+  --color-cover-clay: var(--cover-clay);
+  --color-cover-slate: var(--cover-slate);
+  --color-cover-plum: var(--cover-plum);
+
+  --color-heat-up-4: var(--heat-up-4);
+  --color-heat-up-3: var(--heat-up-3);
+  --color-heat-up-2: var(--heat-up-2);
+  --color-heat-up-1: var(--heat-up-1);
+  --color-heat-flat: var(--heat-flat);
+  --color-heat-down-1: var(--heat-down-1);
+  --color-heat-down-2: var(--heat-down-2);
+  --color-heat-down-3: var(--heat-down-3);
+
   /* ─── Radius scale — v2 (4 / 6 / 8 / 12) ─── */
   --radius-sm: calc(var(--radius) * 0.5);   /* 4px */
   --radius-md: var(--radius);               /* 8px (new default) */
@@ -119,6 +140,29 @@
   --forest:       #0F4F3A;
   --forest-light: #E8F1EC;
   --forest-dark:  #0A3528;
+
+  /* Lens card bg — mid-tone between forest-light and ink-100. Only used for Lens thesis cards. */
+  --lens-bg:      #DCEBE2;
+
+  /* Board cover palette — 8 colors, low-saturation, no primaries */
+  --cover-forest: #0F4F3A;
+  --cover-rust:   #B8502F;
+  --cover-ink-700: #344054;
+  --cover-ink-500: #667085;
+  --cover-olive:  #5A6B3E;
+  --cover-clay:   #8A5A3B;
+  --cover-slate:  #4A5A6E;
+  --cover-plum:   #6B4A5E;
+
+  /* Sector heatmap — 8-step diverging ramp around "flat" */
+  --heat-up-4:   #0A7F4F;
+  --heat-up-3:   #228B5C;
+  --heat-up-2:   #4DA67A;
+  --heat-up-1:   #7DBF9B;
+  --heat-flat:   #9DAABF;
+  --heat-down-1: #9E8570;
+  --heat-down-2: #7D6A58;
+  --heat-down-3: #6B5443;
 
   /* Accent — rust */
   --rust:         #B8502F;

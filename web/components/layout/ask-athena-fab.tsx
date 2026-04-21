@@ -2,28 +2,31 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles } from "lucide-react";
 
 /**
- * Floating "Ask Athena" button — persistent across every app page.
- * Replaces the sidebar entry: Athena is a tool, not a feed, so it gets a FAB
- * rather than a nav slot. Hidden on the Athena page itself to avoid covering chat input.
+ * Ask Lens FAB — fixed bottom-right across every app page.
+ *
+ * v2 spec: ink-950 pill, 12px 18px padding, 100px radius, shadow-e2, with a
+ * forest-square "L" mark on the left. Hidden on the Ask Lens page itself so it
+ * doesn't cover the input. File is still named ask-athena-fab for import
+ * compatibility; rename is part of Phase 7 cleanup.
  */
 export function AskAthenaFab() {
-  const pathname = usePathname();
-  if (pathname?.startsWith("/athena")) return null;
+  const pathname = usePathname() ?? "";
+  if (pathname.startsWith("/athena") || pathname.startsWith("/ask")) return null;
 
   return (
     <Link
       href="/athena"
       aria-label="Ask Lens"
-      className="fixed bottom-5 right-5 z-40 group flex items-center gap-2 h-12 px-4 rounded-full bg-[#0d1a2e] text-white shadow-[0_10px_30px_rgba(16,12,8,0.25)] hover:shadow-[0_12px_36px_rgba(0,184,124,0.35)] hover:scale-105 transition-all duration-200"
+      className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 bg-ink-950 text-ink-0 px-[18px] py-3 rounded-full shadow-e2 hover:-translate-y-px transition-transform"
     >
-      <span className="relative flex items-center justify-center h-7 w-7 rounded-full bg-[#00b87c]/15 border border-[#00b87c]/40">
-        <Sparkles className="h-4 w-4 text-[#00b87c]" />
-        <span className="absolute inset-0 rounded-full bg-[#00b87c]/30 animate-ping [animation-duration:3s]" />
+      <span className="inline-flex items-center justify-center h-[18px] w-[18px] rounded-[4px] bg-forest text-ink-0 font-[var(--font-heading)] text-[10px] font-bold leading-none">
+        L
       </span>
-      <span className="text-sm font-semibold pr-1">Ask Lens</span>
+      <span className="text-[13px] font-semibold">Ask Lens</span>
     </Link>
   );
 }
+
+export { AskAthenaFab as AskLensFab };
