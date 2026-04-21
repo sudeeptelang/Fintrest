@@ -212,3 +212,40 @@ export function useApplyRecommendation() {
     },
   });
 }
+
+// --- Admin ---
+
+export function useAdminSystemHealth() {
+  return useQuery({
+    queryKey: ["admin-system-health"],
+    queryFn: api.adminSystemHealth,
+    // System health moves slowly and polling wastes backend work. 60s is
+    // plenty for the dashboard; users can click "Refresh" for a forced pull.
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+}
+
+export function useAdminRunPipeline() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.adminRunPipeline(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
+  });
+}
+
+export function useAdminRunScan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.adminRunScan(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
+  });
+}
+
+export function useAdminRunIngestion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.adminRunIngestion(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
+  });
+}

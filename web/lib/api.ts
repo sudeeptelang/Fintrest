@@ -593,7 +593,76 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ holdings, name, cash }),
     }),
+
+  // Admin (authenticated, admin role)
+  adminSystemHealth: () =>
+    authFetchApi<SystemHealthResponse>("/admin/system-health"),
+  adminRunPipeline: () =>
+    authFetchApi<unknown>("/admin/pipeline/run", { method: "POST" }),
+  adminRunScan: () =>
+    authFetchApi<unknown>("/admin/scan/run", { method: "POST" }),
+  adminRunIngestion: () =>
+    authFetchApi<unknown>("/admin/ingest/run", { method: "POST" }),
 };
+
+// --- Admin Types ---
+
+export interface SystemHealthResponse {
+  overallStatus: "ok" | "alert";
+  alerts: string[];
+  nowUtc: string;
+  nowEt: string;
+  scan: {
+    lastRunAt: string | null;
+    lastRunStatus: string | null;
+    lastRunSignals: number | null;
+    lastRunUniverse: number | null;
+    lastRunCompletedAt: string | null;
+    todayRan: boolean;
+    hoursSinceLastRun: number | null;
+  };
+  morningBriefing: {
+    audienceSize: number;
+    weeklyAudienceSize: number;
+    briefingLogNote: string;
+    proxyLastSentAt: string | null;
+  };
+  featurePopulation: {
+    runId: string;
+    tradeDate: string;
+    startedAt: string;
+    endedAt: string | null;
+    universeSize: number | null;
+    sectorFallbacks: number;
+  } | null;
+  lastIngestion: {
+    at: string;
+    action: string;
+    actorUserId: number | null;
+  } | null;
+  providers: Array<{
+    provider: string;
+    totalChecks: number;
+    successes: number;
+    successRate: number;
+    lastCheckedAt: string;
+    lastOk: boolean;
+    lastLatencyMs: number | null;
+  }>;
+  jobs: Array<{
+    name: string;
+    pattern: string;
+    nextFireEt: string;
+  }>;
+  recentAdminActions: Array<{
+    id: number;
+    actorUserId: number | null;
+    action: string;
+    entityType: string | null;
+    entityId: number | null;
+    createdAt: string;
+  }>;
+}
 
 // --- Portfolio Types ---
 
