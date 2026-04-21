@@ -10,6 +10,9 @@ import { api, type Holding, type PortfolioReturnBreakdown, type RiskMetrics, typ
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { PortfolioAthenaProfile } from "@/components/portfolio/portfolio-athena-profile";
+import { PortfolioStatsGrid } from "@/components/portfolio/portfolio-stats-grid";
+import { LensPortfolioNarrative } from "@/components/portfolio/lens-portfolio-narrative";
+import { ReturnsBreakdown } from "@/components/portfolio/returns-breakdown";
 
 // Sample holdings for the /portfolio/4 demo. Falls back in when the live portfolio has no
 // holdings (empty or error), so the page never renders blank for a demo link. Values are
@@ -269,16 +272,36 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
         </Link>
       </div>
 
-      {/* SimplyWall.st-style 6-card KPI strip. Each card shows $ + % in the
-          same footprint so the whole header tells the full lifetime story at
-          a glance. Falls back to "—" on cards we can't fill for a new
-          portfolio (e.g. no SPY alpha until 7 days of history). */}
-      <PortfolioKpiStrip
+      {/* v2 Portfolio stats — 4-card grid led by a dark primary card. */}
+      <PortfolioStatsGrid
         totalValue={totalValue}
-        holdingsCount={holdings?.length ?? 0}
-        returns={activeReturns}
-        advisorData={advisorData}
+        todayDelta={holdings?.reduce((s, h) => s + (h.dayChangePct ?? 0) * h.currentValue / 100, 0) ?? null}
+        todayDeltaPct={holdings && holdings.length > 0 && totalValue > 0
+          ? (holdings.reduce((s, h) => s + (h.dayChangePct ?? 0) * h.currentValue, 0) / totalValue)
+          : null}
+        totalReturn={activeReturns?.totalReturn}
+        totalReturnPct={activeReturns?.totalReturnPct}
+        totalReturnMeta={activeReturns?.annualizedReturnPct != null ? `${activeReturns.annualizedReturnPct.toFixed(1)}% IRR` : undefined}
+        unrealized={activeReturns?.unrealizedPnl ?? totalPnl}
+        unrealizedPct={activeReturns?.costBasis && activeReturns.costBasis > 0
+          ? (activeReturns.unrealizedPnl / activeReturns.costBasis) * 100
+          : totalPnlPct}
+        dividends={activeReturns?.dividendsReceived}
       />
+
+      {/* Lens's take on the portfolio — gated narrative above the tabs. */}
+      <LensPortfolioNarrative holdings={holdings} rating={activeRating} />
+
+      {/* Legacy KPI strip (hidden for now, v2 stats grid above replaces it).
+          Uncomment if you need the SimplyWall.st-style 6-card view back. */}
+      {false && (
+        <PortfolioKpiStrip
+          totalValue={totalValue}
+          holdingsCount={holdings?.length ?? 0}
+          returns={activeReturns}
+          advisorData={advisorData}
+        />
+      )}
 
       {/* Tabs: Holdings / Returns / Narratives */}
       <div className="border-b border-border">
@@ -317,7 +340,7 @@ export default function PortfolioDetailPage({ params }: PortfolioDetailPageProps
             <PortfolioRatingCard rating={activeRating} />
           )}
           {activeReturns && activeReturns.costBasis > 0 && (
-            <ReturnBreakdownCard data={activeReturns} />
+            <ReturnsBreakdown data={activeReturns} />
           )}
           {activeRisk && <RiskMetricsCard metrics={activeRisk} />}
           {activeTax && <TaxProfileCard tax={activeTax} />}

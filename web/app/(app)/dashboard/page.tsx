@@ -1,136 +1,203 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Lock, Zap } from "lucide-react";
-import { useTopPicks, useMarketIndices, usePlan, planMeets } from "@/lib/hooks";
-import { SetupLensTiles } from "@/components/dashboard/setup-lens-tiles";
-import { HeroSignalCard } from "@/components/dashboard/hero-signal-card";
-import { AthenaPulse } from "@/components/dashboard/athena-pulse";
-import { TrendingLists } from "@/components/dashboard/trending-lists";
-import type { ScreenerKey } from "@/components/dashboard/trending-lists";
-import { MoversTable } from "@/components/dashboard/movers-table";
+import { useTopPicks, usePlan, planMeets } from "@/lib/hooks";
+import { RegimeStrip } from "@/components/today/regime-strip";
+import { FeaturedSignalCard } from "@/components/today/featured-signal-card";
+import { SignalTable } from "@/components/today/signal-table";
+import { LensCardGated } from "@/components/lens/lens-card";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { thesisSnippet } from "@/lib/thesis-snippet";
+import type { Signal } from "@/lib/api";
 
-export default function DashboardPage() {
-  const { data: picks } = useTopPicks(20);
-  const { data: indices } = useMarketIndices();
+type Filter = "all" | "buy" | "watch" | "breakout" | "momentum" | "dip" | "value" | "earnings";
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: "all", label: "All signals" },
+  { key: "buy", label: "BUY TODAY" },
+  { key: "watch", label: "WATCH" },
+  { key: "breakout", label: "Breakout" },
+  { key: "momentum", label: "Momentum" },
+  { key: "dip", label: "Buy the dip" },
+  { key: "value", label: "Value setup" },
+  { key: "earnings", label: "Earnings this week" },
+];
+
+export default function TodayPage() {
+  const [filter, setFilter] = useState<Filter>("all");
+  const { data: picks, isLoading } = useTopPicks(50);
   const { plan } = usePlan();
   const isPro = planMeets(plan, "pro");
 
-  const signals = picks?.signals ?? [];
-  // Free users see top 3; Pro+ see top 5.
-  const visibleSignals = isPro ? signals.slice(0, 5) : signals.slice(0, 3);
-  const lockedSignalsCount = isPro ? 0 : Math.max(0, Math.min(signals.length, 5) - 3);
+  const signals = useMemo(() => picks?.signals ?? [], [picks]);
 
-  const [activeScreener, setActiveScreener] = useState<ScreenerKey | null>(null);
+  const counts = useMemo(() => {
+    const buys = signals.filter((s) => s.signalType.toUpperCase() === "BUY_TODAY").length;
+    return { total: signals.length, buys, watch: signals.length - buys };
+  }, [signals]);
+
+  const filtered = useMemo(() => applyFilter(signals, filter), [signals, filter]);
+  const featured = filtered.slice(0, 3);
+  const tableSignals = filtered.slice(3);
 
   return (
-    <div className="space-y-8">
-      {/* Athena's Pulse — regime + narrative + top picks. Replaces static KPI strip. */}
-      <AthenaPulse />
-
-      {/* Index ticker strip — clickable, shows ticker + % change + price. Each cell links to /markets. */}
-      {indices && indices.length > 0 && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="grid grid-cols-4 md:grid-cols-8">
-            {indices
-              .filter((idx) => ["SPY","QQQ","DIA","IWM","GLD","TLT","IBIT","VWO"].includes(idx.ticker))
-              .map((idx, i, arr) => {
-                const positive = (idx.changePct ?? 0) >= 0;
-                const change = idx.changePct === null
-                  ? null
-                  : `${positive ? "+" : ""}${idx.changePct.toFixed(2)}%`;
-                return (
-                  <Link
-                    key={idx.ticker}
-                    href="/markets"
-                    className={`group flex flex-col gap-0.5 px-3 py-2.5 transition-colors hover:bg-muted/40 ${
-                      i < arr.length - 1 ? "md:border-r border-border" : ""
-                    } ${i < 4 ? "border-b md:border-b-0 border-border" : ""}`}
-                  >
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="font-[var(--font-mono)] text-xs font-bold group-hover:text-primary transition-colors">
-                        {idx.ticker}
-                      </span>
-                      <span
-                        className={`font-[var(--font-mono)] text-[10px] font-semibold ${
-                          positive ? "text-emerald-500" : "text-red-500"
-                        }`}
-                      >
-                        {change ?? "—"}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
-                        {idx.label}
-                      </span>
-                      <span className="font-[var(--font-mono)] text-[10px] text-muted-foreground">
-                        {idx.price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? "—"}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-          </div>
-          <div className="border-t border-border px-3 py-1.5 text-right">
-            <Link href="/markets" className="text-[10px] text-primary hover:underline">
-              View all markets →
-            </Link>
-          </div>
+    <div className="max-w-[1120px] mx-auto space-y-8">
+      {/* Page head */}
+      <header>
+        <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.14em] text-forest mb-3">
+          Research engine · Today
         </div>
-      )}
+        <h1 className="font-[var(--font-heading)] text-[36px] leading-[44px] font-semibold text-ink-950 tracking-[-0.02em] mb-2">
+          Today&apos;s Research
+        </h1>
+        <p className="font-[var(--font-mono)] text-[13px] leading-[20px] text-ink-500">
+          Published {publishedAt()} · {counts.total} signals · {counts.buys} BUY TODAY · {counts.watch} WATCH · Regime: Neutral
+        </p>
+      </header>
 
-      {/* Today's Top Signals — Free sees top 3, Pro+ sees top 5 */}
-      {signals.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              <h2 className="font-[var(--font-heading)] text-sm font-semibold uppercase tracking-wider">
-                Today&apos;s Top Signals
-              </h2>
-              {!isPro && (
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  · Free preview: top 3
-                </span>
-              )}
-            </div>
-            <Link href="/picks" className="text-xs text-primary hover:underline flex items-center gap-1">
-              View all <ArrowUpRight className="h-3 w-3" />
-            </Link>
+      <RegimeStrip />
+
+      {/* Lens morning take — gated for Free */}
+      <LensCardGated
+        eyebrow="Lens's morning take"
+        title={morningTakeTitle(signals)}
+        meta={`${publishedAt()} · ${counts.total} signals passed`}
+        personalizedForElite
+      >
+        <MorningTake signals={signals} />
+      </LensCardGated>
+
+      {/* Filter chips */}
+      <div className="flex gap-2 flex-wrap">
+        {FILTERS.map((f) => (
+          <FilterChip
+            key={f.key}
+            active={filter === f.key}
+            count={filterCount(signals, f.key)}
+            onClick={() => setFilter(f.key)}
+          >
+            {f.label}
+          </FilterChip>
+        ))}
+      </div>
+
+      {/* Featured 3 */}
+      {featured.length > 0 && (
+        <section>
+          <div className="flex items-baseline gap-3 mb-5">
+            <h2 className="font-[var(--font-heading)] text-[20px] leading-[28px] font-semibold text-ink-900 tracking-[-0.005em]">
+              Featured signals
+            </h2>
+            <span className="font-[var(--font-mono)] text-[13px] text-ink-500">
+              Top 3 by score
+            </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-            {visibleSignals.map((s, i) => (
-              <HeroSignalCard key={s.id} signal={s} rank={i + 1} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {featured.map((s, i) => (
+              <FeaturedSignalCard
+                key={s.id}
+                signal={s}
+                thesis={thesisSnippet(s)}
+                locked={!isPro && i > 0}
+              />
             ))}
-            {lockedSignalsCount > 0 && (
-              <Link
-                href="/pricing"
-                className="flex flex-col items-center justify-center rounded-xl border border-dashed border-primary/40 bg-primary/[0.04] p-4 text-center hover:bg-primary/[0.08] transition-colors"
-              >
-                <Lock className="h-5 w-5 text-primary mb-2" />
-                <p className="text-sm font-semibold text-primary">
-                  +{lockedSignalsCount} more with Pro
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  See every signal + Athena thesis
-                </p>
-              </Link>
-            )}
           </div>
+        </section>
+      )}
+
+      {/* Full table */}
+      {tableSignals.length > 0 && (
+        <section>
+          <div className="flex items-baseline gap-3 mb-5">
+            <h2 className="font-[var(--font-heading)] text-[20px] leading-[28px] font-semibold text-ink-900 tracking-[-0.005em]">
+              All signals
+            </h2>
+            <span className="font-[var(--font-mono)] text-[13px] text-ink-500">
+              {tableSignals.length} more passed the bar today
+            </span>
+          </div>
+          <SignalTable
+            signals={tableSignals}
+            getThesis={thesisSnippet}
+            freeTier={!isPro}
+          />
+        </section>
+      )}
+
+      {isLoading && signals.length === 0 && (
+        <div className="rounded-[10px] border border-ink-200 bg-ink-0 py-16 text-center">
+          <p className="font-[var(--font-sans)] text-[13px] text-ink-500">
+            Scanning the market…
+          </p>
         </div>
       )}
 
-      {/* Popular Screeners — clicking a pill repopulates the MoversTable below */}
-      <TrendingLists activeKey={activeScreener} onSelect={setActiveScreener} />
+      {!isLoading && signals.length === 0 && (
+        <div className="rounded-[10px] border border-ink-200 bg-ink-0 py-16 text-center">
+          <p className="font-[var(--font-sans)] text-[13px] text-ink-500">
+            No signals passed the bar today. The next scan publishes tomorrow at 6:30 AM ET.
+          </p>
+        </div>
+      )}
 
-      {/* Movers — Top Gainers / Losers / Most Active / All Signals, OR driven by screener pill */}
-      <MoversTable limit={10} screenerKey={activeScreener} />
-
-      {/* Today's Setups — compact lens-tile strip. Each tile deep-links to /picks?lens=... */}
-      <SetupLensTiles />
-
+      <p className="text-[11px] text-ink-500 italic pt-4">
+        Educational content only — not financial advice. Past signal performance does not guarantee future results.
+        <Link href="/disclaimer" className="text-forest hover:underline ml-1">
+          Full disclaimer →
+        </Link>
+      </p>
     </div>
   );
 }
 
+function applyFilter(signals: Signal[], filter: Filter): Signal[] {
+  if (filter === "all") return signals;
+  if (filter === "buy") return signals.filter((s) => s.signalType.toUpperCase() === "BUY_TODAY");
+  if (filter === "watch") return signals.filter((s) => s.signalType.toUpperCase() !== "BUY_TODAY");
+  if (filter === "momentum") return signals.filter((s) => (s.breakdown?.momentumScore ?? 0) >= 70);
+  if (filter === "breakout") return signals.filter((s) => (s.breakdown?.trendScore ?? 0) >= 70);
+  if (filter === "dip") return signals.filter((s) => (s.changePct ?? 0) < 0 && s.scoreTotal >= 60);
+  if (filter === "value") return signals.filter((s) => (s.breakdown?.fundamentalsScore ?? 0) >= 70);
+  if (filter === "earnings") return signals.filter((s) => (s.breakdown?.fundamentalsScore ?? 0) >= 60);
+  return signals;
+}
+
+function filterCount(signals: Signal[], filter: Filter): number {
+  return applyFilter(signals, filter).length;
+}
+
+function morningTakeTitle(signals: Signal[]): string {
+  if (signals.length === 0) return "Quiet scan today.";
+  const top = signals[0];
+  return `${top.ticker} tops today’s scan at ${Math.round(top.scoreTotal)}.`;
+}
+
+function MorningTake({ signals }: { signals: Signal[] }) {
+  if (signals.length === 0) {
+    return (
+      <p>
+        No signals cleared the 7-factor bar this morning. The tape is sitting in a neutral regime — the next scan publishes tomorrow before the open.
+      </p>
+    );
+  }
+  const top = signals.slice(0, 3);
+  const names = top.map((s) => s.ticker).join(", ");
+  const buys = signals.filter((s) => s.signalType.toUpperCase() === "BUY_TODAY").length;
+  return (
+    <p>
+      Today&apos;s scan surfaced <strong>{signals.length} signals</strong> above the 7-factor bar,
+      {" "}with <strong>{buys} classified BUY TODAY</strong>. The top of the board is carried by{" "}
+      <strong>{names}</strong> — momentum and relative-volume factors are doing most of the work.
+      The broader tape is sitting in a neutral regime, so risk appetite is moderate; tight stops
+      are recommended on anything you choose to act on.
+    </p>
+  );
+}
+
+function publishedAt(): string {
+  const d = new Date();
+  const hh = d.getHours().toString().padStart(2, "0");
+  const mm = d.getMinutes().toString().padStart(2, "0");
+  return `${hh}:${mm} ${Intl.DateTimeFormat("en-US", { timeZoneName: "short" }).format(d).split(" ").pop() ?? "ET"}`;
+}

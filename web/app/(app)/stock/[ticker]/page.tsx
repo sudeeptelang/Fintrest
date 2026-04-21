@@ -2,568 +2,375 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
-  Brain,
-  Target,
-  Newspaper,
-  TrendingUp,
-  Shield,
-  Clock,
-  ArrowUpRight,
-  Star,
-  Bell,
-  Check,
-  Loader2,
-} from "lucide-react";
-import { useStock, useStockSignals, useStockNews, useStockChart, useStockSnapshot, useStockAnalyst, useStockEarnings, useStockOwnership, useWatchlists, useAddWatchlistItem, useCreateWatchlist } from "@/lib/hooks";
-import { Button } from "@/components/ui/button";
-import { ScoreRing } from "@/components/charts/score-ring";
-import { FactorRadar } from "@/components/charts/factor-radar";
+  useStock,
+  useStockSignals,
+  useStockSnapshot,
+  useStockThesis,
+  useStockAnalyst,
+  useStockNews,
+  useStockChart,
+  useStockEarnings,
+  useStockOwnership,
+  useWatchlists,
+  useAddWatchlistItem,
+  useCreateWatchlist,
+} from "@/lib/hooks";
+import { cn } from "@/lib/utils";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { SignalDetailHero } from "@/components/signals/signal-detail-hero";
+import { LensCardGated } from "@/components/lens/lens-card";
+import { PlainEnglishTakeaways } from "@/components/signals/plain-english-takeaways";
+import { RefLevelBar } from "@/components/signals/ref-level-bar";
+import { FactorBreakdown, FactorRow } from "@/components/signals/factor-row";
+import { AnalystRatingCard } from "@/components/signals/analyst-rating-card";
+import { RelatedNews } from "@/components/signals/related-news";
+import { StockSnapshot as StockSnapshotSection } from "@/components/stock/stock-snapshot";
 import { PriceChart } from "@/components/charts/price-chart";
+import { FactorRadar } from "@/components/charts/factor-radar";
 import { FactorGauges } from "@/components/charts/factor-gauges";
-import { StockSnapshot } from "@/components/stock/stock-snapshot";
-import { StockLogo } from "@/components/stock/stock-logo";
-import { AnalystConsensusWidget } from "@/components/stock/analyst-consensus";
-import { TechnicalAnalysis } from "@/components/stock/technical-analysis";
-import { EarningsHistory } from "@/components/stock/earnings-history";
-import { ValuationSection } from "@/components/stock/valuation-section";
-import { EarningsChart } from "@/components/charts/earnings-chart";
-import { PerformanceChart } from "@/components/charts/performance-chart";
 import { FactorBarChart } from "@/components/charts/factor-bar-chart";
 import { AthenaSnowflake } from "@/components/stock/athena-snowflake";
-import { AthenaThesisCard } from "@/components/stock/athena-thesis-card";
 import { RewardsRisks } from "@/components/stock/rewards-risks";
+import { TechnicalAnalysis } from "@/components/stock/technical-analysis";
+import { ValuationSection } from "@/components/stock/valuation-section";
+import { PerformanceChart } from "@/components/charts/performance-chart";
+import { EarningsHistory } from "@/components/stock/earnings-history";
+import { EarningsChart } from "@/components/charts/earnings-chart";
 import { OwnershipStrip } from "@/components/stock/ownership-strip";
-import { PaywallGate } from "@/components/billing/paywall-gate";
+import {
+  expandFactors,
+  buildTakeaways,
+  getTradePlanNarrative,
+  formatMarketCap,
+} from "@/lib/signal-explainer";
 
 interface StockDetailPageProps {
   params: Promise<{ ticker: string }>;
 }
 
-const fadeIn = {
-  hidden: { opacity: 0, y: 10 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.05, duration: 0.4 },
-  }),
-};
-
+// Unified Ticker Detail page (v2 Forest & Rust) — ONE page, no teasers to
+// another route. Card order:
+//
+//   Breadcrumb
+//   Hero                        — ticker + price + actions + composite score ring
+//   Lens's thesis               — full prose (gated for Free)
+//   Key takeaways               — plain-English bullets
+//   Reference levels            — entry / stop / target + R:R
+//   Risk profile                — rewards-vs-risks panel
+//   ─── Technical ───           — section heading, all data below
+//     7-factor breakdown        — the engine's view
+//     Factor profile            — radar + gauges + bar chart detail views
+//     Fundamental scorecard     — 5-dimension Simply-Wall-St-style snowflake
+//     Price chart               — with range selector
+//     Snapshot grid             — valuation · margins · perf · quote · indicators
+//     Technical analysis        — RSI / MAs / ATR interpretation
+//     Performance               — multi-timeframe
+//     Valuation detail          — fair value + street consensus
+//   Earnings history            — per-quarter beats/misses + trend
+//   Ownership                   — insider + institutional strip
+//   Analyst rating              — consensus + target
+//   Related news                — headlines with sentiment
 export default function StockDetailPage({ params }: StockDetailPageProps) {
-  const { ticker } = use(params);
-  const router = useRouter();
+  const { ticker: rawTicker } = use(params);
+  const ticker = rawTicker.toUpperCase();
   const [chartRange, setChartRange] = useState("3m");
 
   const { data: stock } = useStock(ticker);
   const { data: signalsData } = useStockSignals(ticker);
+  const { data: snapshot } = useStockSnapshot(ticker);
+  const { data: thesis } = useStockThesis(ticker);
+  const { data: analyst } = useStockAnalyst(ticker);
   const { data: news } = useStockNews(ticker);
   const { data: chartData } = useStockChart(ticker, chartRange);
-  const { data: snapshot } = useStockSnapshot(ticker);
-  const { data: analystData } = useStockAnalyst(ticker);
-  const { data: earningsData } = useStockEarnings(ticker);
+  const { data: earnings } = useStockEarnings(ticker);
   const { data: ownership } = useStockOwnership(ticker);
   const { data: watchlists } = useWatchlists();
   const addToWatchlist = useAddWatchlistItem();
   const createWatchlist = useCreateWatchlist();
   const [watchlistAdding, setWatchlistAdding] = useState(false);
 
-  const isInWatchlist = watchlists?.some(wl =>
-    wl.items.some(item => item.ticker.toUpperCase() === ticker.toUpperCase())
+  const signal = signalsData?.signals?.[0];
+  const breakdown = signal?.breakdown;
+  const factors = breakdown ? expandFactors(breakdown) : [];
+
+  const entry = signal?.entryLow ?? signal?.currentPrice ?? null;
+  const stop = signal?.stopLoss ?? null;
+  const target = signal?.targetHigh ?? signal?.targetLow ?? null;
+  const hasLevels = entry != null && stop != null && target != null;
+
+  const takeaways = signal ? buildTakeaways({ signal, thesis }) : [];
+  const tradePlanNote = signal ? getTradePlanNarrative(signal, thesis) : null;
+
+  const isInWatchlist = watchlists?.some((wl) =>
+    wl.items.some((item) => item.ticker.toUpperCase() === ticker),
   );
 
   async function handleAddToWatchlist() {
-    if (!stock || watchlistAdding) return;
+    if (!stock || watchlistAdding || isInWatchlist) return;
     setWatchlistAdding(true);
     try {
       let wl = watchlists?.[0];
-      if (!wl) {
-        wl = await createWatchlist.mutateAsync("My Watchlist");
-      }
+      if (!wl) wl = await createWatchlist.mutateAsync("My Watchlist");
       await addToWatchlist.mutateAsync({ watchlistId: wl.id, stockId: stock.id });
     } catch {
-      // already in watchlist or error
+      /* already in watchlist or error */
     } finally {
       setWatchlistAdding(false);
     }
   }
 
-  const latestSignal = signalsData?.signals?.[0];
-  const breakdown = latestSignal?.breakdown;
-
-  // Parse explanation
-  let explanation: {
-    Summary?: string;
-    BullishFactors?: string[];
-    BearishFactors?: string[];
-    TradeZoneNarrative?: string;
-  } = {};
-  if (breakdown?.explanationJson) {
-    try {
-      explanation = JSON.parse(breakdown.explanationJson);
-    } catch {
-      /* */
-    }
-  }
-
-  const factors = breakdown
-    ? [
-        { label: "Momentum", score: breakdown.momentumScore, weight: "25%", icon: TrendingUp },
-        { label: "Rel. Volume", score: breakdown.relVolumeScore, weight: "15%", icon: ArrowUpRight },
-        { label: "News Catalyst", score: breakdown.newsScore, weight: "15%", icon: Newspaper },
-        { label: "Fundamentals", score: breakdown.fundamentalsScore, weight: "15%", icon: Target },
-        { label: "Sentiment", score: breakdown.sentimentScore, weight: "10%", icon: Brain },
-        { label: "Trend Strength", score: breakdown.trendScore, weight: "10%", icon: TrendingUp },
-        { label: "Risk Filter", score: breakdown.riskScore, weight: "10%", icon: Shield },
-      ]
-    : [];
-
   return (
-    <div className="space-y-6">
-      {/* Hero header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <StockLogo ticker={ticker} size={56} className="rounded-2xl" />
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="font-[var(--font-heading)] text-2xl font-bold uppercase">
-                {ticker}
-              </h1>
-              {latestSignal && (
-                <span
-                  className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                    latestSignal.signalType === "BUY_TODAY"
-                      ? "bg-emerald-500/10 text-emerald-400"
-                      : latestSignal.signalType === "WATCH"
-                        ? "bg-amber-500/10 text-amber-400"
-                        : "bg-red-500/10 text-red-400"
-                  }`}
-                >
-                  {latestSignal.signalType.replace("_", " ")}
-                </span>
-              )}
-            </div>
-            {latestSignal?.currentPrice && (
-              <div className="flex items-center gap-3 mt-0.5">
-                <p className="font-[var(--font-mono)] text-xl font-bold">
-                  ${latestSignal.currentPrice.toFixed(2)}
-                </p>
-                {latestSignal.changePct !== null && (
-                  <span className={`font-[var(--font-mono)] text-sm font-bold px-2 py-0.5 rounded-md ${
-                    latestSignal.changePct >= 0
-                      ? "bg-emerald-500/10 text-emerald-500"
-                      : "bg-red-500/10 text-red-500"
-                  }`}>
-                    {latestSignal.changePct >= 0 ? "+" : ""}{latestSignal.changePct.toFixed(2)}%
-                  </span>
-                )}
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground">
-              {stock?.name ?? "Loading..."}{" "}
-              {stock?.exchange ? `· ${stock.exchange}` : ""}{" "}
-              {stock?.sector ? `· ${stock.sector}` : ""}
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAddToWatchlist}
-            disabled={isInWatchlist || watchlistAdding}
-            className={isInWatchlist ? "border-primary/30 text-primary" : ""}
-          >
-            {watchlistAdding ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            ) : isInWatchlist ? (
-              <Check className="h-3.5 w-3.5 mr-1.5" />
-            ) : (
-              <Star className="h-3.5 w-3.5 mr-1.5" />
-            )}
-            {isInWatchlist ? "In Watchlist" : "Watchlist"}
-          </Button>
-          <Button
-            size="sm"
-            className="bg-primary hover:bg-primary/90 text-white"
-            onClick={() => router.push(`/alerts/create?ticker=${ticker.toUpperCase()}`)}
-          >
-            <Bell className="h-3.5 w-3.5 mr-1.5" /> Set Alert
-          </Button>
-        </div>
-      </div>
+    <div className="max-w-[1120px] mx-auto space-y-6 pt-2 pb-16">
+      <Breadcrumb
+        items={[
+          { label: "Today", href: "/dashboard" },
+          { label: ticker },
+        ]}
+      />
 
-      {/* Score ring + Radar + Key metrics row */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Score ring — tap to open full score breakdown (screen 21) */}
-        <motion.div
-          custom={0}
-          initial="hidden"
-          animate="visible"
-          variants={fadeIn}
-        >
-          <Link
-            href={`/stock/${ticker}/score`}
-            className="block h-full rounded-2xl border border-border bg-card p-6 flex flex-col items-center justify-center hover:border-primary/40 transition-colors"
-          >
-          {latestSignal ? (
-            <ScoreRing score={latestSignal.scoreTotal} size={180} />
-          ) : (
-            <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
-              No signal data
-            </div>
-          )}
-          <div className="mt-4 grid grid-cols-2 gap-4 w-full">
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Risk</p>
-              <p
-                className={`text-sm font-semibold ${
-                  latestSignal?.riskLevel === "LOW"
-                    ? "text-emerald-400"
-                    : latestSignal?.riskLevel === "HIGH"
-                      ? "text-red-400"
-                      : "text-amber-400"
-                }`}
-              >
-                {latestSignal?.riskLevel ?? "—"}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Horizon</p>
-              <p className="text-sm font-semibold">
-                {latestSignal?.horizonDays ? `${latestSignal.horizonDays}d` : "—"}
-              </p>
-            </div>
-          </div>
-          <p className="mt-3 text-[10px] text-muted-foreground uppercase tracking-widest">
-            Tap for full breakdown →
-          </p>
-          </Link>
-        </motion.div>
-
-        {/* Radar chart */}
-        <motion.div
-          custom={1}
-          initial="hidden"
-          animate="visible"
-          variants={fadeIn}
-          className="rounded-2xl border border-border bg-card p-6"
-        >
-          <h3 className="text-sm font-semibold text-muted-foreground mb-2">
-            Factor Profile
-          </h3>
-          {breakdown ? (
-            <FactorRadar breakdown={breakdown} />
-          ) : (
-            <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
-              No breakdown data
-            </div>
-          )}
-        </motion.div>
-
-        {/* Trade zone + details */}
-        <motion.div
-          custom={2}
-          initial="hidden"
-          animate="visible"
-          variants={fadeIn}
-          className="rounded-2xl border border-border bg-card p-6 space-y-5"
-        >
-          <div>
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3">
-              Trade Zone
-            </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Entry</span>
-                <span className="font-[var(--font-mono)] font-semibold">
-                  {latestSignal?.entryLow
-                    ? `$${latestSignal.entryLow.toFixed(2)} – $${latestSignal.entryHigh?.toFixed(2)}`
-                    : "—"}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Target</span>
-                <span className="font-[var(--font-mono)] font-semibold text-emerald-400">
-                  {latestSignal?.targetHigh
-                    ? `$${latestSignal.targetLow?.toFixed(2)} – $${latestSignal.targetHigh.toFixed(2)}`
-                    : "—"}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Stop Loss</span>
-                <span className="font-[var(--font-mono)] font-semibold text-red-400">
-                  {latestSignal?.stopLoss ? `$${latestSignal.stopLoss.toFixed(2)}` : "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="h-px bg-border" />
-
-          <div>
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3">
-              Details
-            </h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Market Cap</span>
-                <span className="font-[var(--font-mono)]">
-                  {stock?.marketCap ? `$${(stock.marketCap / 1e9).toFixed(1)}B` : "—"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Sector</span>
-                <span className="text-xs">{stock?.sector ?? "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Exchange</span>
-                <span className="text-xs">{stock?.exchange ?? "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Float</span>
-                <span className="font-[var(--font-mono)] text-xs">
-                  {stock?.floatShares
-                    ? `${(stock.floatShares / 1e6).toFixed(0)}M`
-                    : "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Athena Snowflake + Rewards/Risks (Simply Wall St-style) */}
-      {snapshot && (
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1">
-            <AthenaSnowflake
-              snapshot={snapshot}
-              breakdown={breakdown}
-              dividendYield={null}
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <RewardsRisks snapshot={snapshot} signal={latestSignal} />
-          </div>
-        </div>
-      )}
-
-      {/* Finviz-style snapshot */}
-      {snapshot && <StockSnapshot snapshot={snapshot} />}
-
-      {/* Athena's Take — Pro+ only. Full thesis (why/when/what). Placed first, before the chart. */}
-      <motion.div custom={2.5} initial="hidden" animate="visible" variants={fadeIn}>
-        <PaywallGate tier="pro">
-          <AthenaThesisCard ticker={ticker.toUpperCase()} />
-        </PaywallGate>
-      </motion.div>
-
-      {/* Price Chart */}
-      <motion.div
-        custom={3}
-        initial="hidden"
-        animate="visible"
-        variants={fadeIn}
-        className="rounded-2xl border border-border bg-card p-6"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-[var(--font-heading)] text-lg font-semibold">
-            Price Chart
-          </h2>
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1">
-              {["1m", "3m", "6m", "1y"].map((range) => (
-                <button
-                  key={range}
-                  onClick={() => setChartRange(range)}
-                  className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
-                    chartRange === range
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {range.toUpperCase()}
-                </button>
-              ))}
-            </div>
+      <SignalDetailHero
+        ticker={ticker}
+        signal={signal}
+        stock={stock}
+        marketCap={formatMarketCap(stock?.marketCap ?? snapshot?.marketCap)}
+        volume={formatVolumeShort(snapshot?.volume)}
+        actions={
+          <>
             <Link
-              href={`/stock/${ticker}/chart`}
-              className="text-xs text-primary hover:underline whitespace-nowrap"
+              href="/boards"
+              className="inline-flex items-center px-4 py-2.5 rounded-md bg-forest text-ink-0 text-[13px] font-semibold hover:bg-forest-dark transition-colors"
             >
-              Full chart →
+              Pin to board
             </Link>
+            <button
+              type="button"
+              onClick={handleAddToWatchlist}
+              disabled={isInWatchlist || watchlistAdding}
+              className={cn(
+                "inline-flex items-center px-4 py-2.5 rounded-md border text-[13px] font-semibold transition-colors",
+                isInWatchlist
+                  ? "border-forest bg-forest-light text-forest"
+                  : "bg-ink-0 text-ink-800 border-ink-300 hover:border-ink-500",
+              )}
+            >
+              {isInWatchlist ? "In watchlist" : watchlistAdding ? "Adding…" : "Add to watchlist"}
+            </button>
+            <Link
+              href={`/alerts/create?ticker=${ticker}`}
+              className="inline-flex items-center px-4 py-2.5 rounded-md text-ink-700 text-[13px] font-semibold hover:bg-ink-100 transition-colors"
+            >
+              Set alert
+            </Link>
+          </>
+        }
+      />
+
+      {/* 1. Lens's thesis */}
+      <LensCardGated
+        eyebrow="Lens's thesis"
+        title={thesisTitle(thesis, signal)}
+        meta={signal ? `Signal #${String(signal.id).padStart(2, "0")}` : undefined}
+        personalizedForElite
+      >
+        {thesis?.thesis ? (
+          <>{thesis.thesis}</>
+        ) : (
+          <ThesisFallback ticker={ticker} signal={signal ?? null} />
+        )}
+      </LensCardGated>
+
+      {/* 2. Key takeaways */}
+      {takeaways.length > 0 && <PlainEnglishTakeaways items={takeaways} />}
+
+      {/* 3. Reference levels */}
+      {hasLevels && (
+        <RefLevelBar entry={entry} stop={stop} target={target} note={tradePlanNote} />
+      )}
+
+      {/* 4. Risk profile */}
+      {snapshot && <RewardsRisks snapshot={snapshot} signal={signal ?? null} />}
+
+      {/* 5. Technical section */}
+      <section className="pt-2">
+        <div className="border-t border-ink-200 pt-6 space-y-6">
+          <div className="flex items-baseline gap-3">
+            <h2 className="font-[var(--font-heading)] text-[22px] leading-[28px] font-semibold text-ink-900 tracking-[-0.01em]">
+              Technical
+            </h2>
+            <span className="font-[var(--font-mono)] text-[13px] text-ink-500">
+              What the engine saw
+            </span>
+          </div>
+
+          {/* 7-factor breakdown rows */}
+          {factors.length > 0 && (
+            <div>
+              <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.14em] text-forest-dark mb-3">
+                7-factor breakdown
+              </div>
+              <FactorBreakdown>
+                {factors.map((f) => (
+                  <FactorRow key={f.name} name={f.name} score={f.score} summary={f.summary} />
+                ))}
+              </FactorBreakdown>
+            </div>
+          )}
+
+          {/* Factor profile detail views — radar / gauges / bar chart */}
+          {breakdown && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
+                  Factor radar
+                </div>
+                <FactorRadar breakdown={breakdown} />
+              </div>
+              <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6 lg:col-span-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
+                  Factor gauges
+                </div>
+                <FactorGauges breakdown={breakdown} />
+              </div>
+              <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6 lg:col-span-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
+                  Factor scores
+                </div>
+                <FactorBarChart breakdown={breakdown} />
+              </div>
+            </div>
+          )}
+
+          {/* Fundamental scorecard (5-dim) */}
+          {snapshot && (
+            <AthenaSnowflake snapshot={snapshot} breakdown={breakdown} dividendYield={null} />
+          )}
+
+          {/* Price chart */}
+          <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-[var(--font-heading)] text-[14px] font-semibold text-ink-900">
+                Price chart
+              </h3>
+              <div className="inline-flex gap-0.5 bg-ink-50 border border-ink-200 rounded-md p-0.5">
+                {["1m", "3m", "6m", "1y"].map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => setChartRange(range)}
+                    className={cn(
+                      "px-2.5 py-1 text-[11px] font-medium rounded transition-colors",
+                      chartRange === range
+                        ? "bg-ink-0 text-ink-900 shadow-e1"
+                        : "text-ink-600 hover:text-ink-900",
+                    )}
+                  >
+                    {range.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <PriceChart data={chartData ?? []} height={320} />
+          </div>
+
+          {/* Snapshot grid — valuation, margins, performance, quote/volume, indicators */}
+          {snapshot && <StockSnapshotSection snapshot={snapshot} />}
+
+          {/* Detailed technical analysis + multi-timeframe performance */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {snapshot && <TechnicalAnalysis snapshot={snapshot} />}
+            {snapshot && <PerformanceChart snapshot={snapshot} />}
+          </div>
+
+          {/* Valuation detail — fair value + street consensus */}
+          {snapshot && signal && (
+            <ValuationSection ticker={ticker} signal={signal} snapshot={snapshot} earnings={earnings} />
+          )}
+        </div>
+      </section>
+
+      {/* 6. Earnings history */}
+      {earnings && earnings.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <EarningsHistory earnings={earnings} />
+          <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
+              Earnings trend
+            </div>
+            <EarningsChart earnings={earnings} />
           </div>
         </div>
-        <PriceChart data={chartData ?? []} height={350} />
-      </motion.div>
-
-      {/* 7-Factor Gauges (Prospero.ai style) */}
-      {breakdown && (
-        <motion.div
-          custom={4}
-          initial="hidden"
-          animate="visible"
-          variants={fadeIn}
-        >
-          <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-4 flex items-center gap-2">
-            <Target className="h-4.5 w-4.5 text-muted-foreground" /> Factor Profile
-          </h2>
-          <FactorGauges breakdown={breakdown} />
-        </motion.div>
       )}
 
-      {/* Valuation Section — Alva-style SOTP/comparables analysis */}
-      {snapshot && latestSignal && (
-        <ValuationSection
-          ticker={ticker}
-          signal={latestSignal}
-          snapshot={snapshot}
-          earnings={earningsData}
-        />
-      )}
-
-      {/* Performance + Factor Score Charts */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {snapshot && <PerformanceChart snapshot={snapshot} />}
-        {breakdown && <FactorBarChart breakdown={breakdown} />}
-      </div>
-
-      {/* Analyst Consensus + Technical Analysis */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {analystData && analystData.totalAnalysts > 0 && (
-          <AnalystConsensusWidget data={analystData} currentPrice={latestSignal?.currentPrice} />
-        )}
-        {snapshot && <TechnicalAnalysis snapshot={snapshot} />}
-      </div>
-
-      {/* Ownership & Insider Activity */}
+      {/* 7. Ownership */}
       {ownership && <OwnershipStrip data={ownership} />}
 
-      {/* Earnings History + Charts */}
-      {earningsData && earningsData.length > 0 && (
-        <div className="grid lg:grid-cols-2 gap-6">
-          <EarningsHistory earnings={earningsData} />
-          <div className="rounded-2xl border border-border bg-card p-6">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-4">
-              Earnings Trend
-            </h3>
-            <EarningsChart earnings={earningsData} />
-          </div>
-        </div>
+      {/* 8. Analyst rating */}
+      {analyst && (
+        <AnalystRatingCard data={analyst} currentPrice={signal?.currentPrice ?? snapshot?.price} />
       )}
 
-      {/* AI + News */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="space-y-6">
-          {/* AI Explanation */}
-          {explanation.Summary && (
-            <motion.div
-              custom={5}
-              initial="hidden"
-              animate="visible"
-              variants={fadeIn}
-              className="rounded-2xl border border-border bg-card p-6"
-            >
-              <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-3 flex items-center gap-2">
-                <Brain className="h-4.5 w-4.5 text-muted-foreground" /> AI
-                Analysis
-              </h2>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {explanation.Summary}
-              </p>
-              {(explanation.BullishFactors?.length ?? 0) > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide">
-                    Bullish
-                  </p>
-                  {explanation.BullishFactors?.map((f, i) => (
-                    <p
-                      key={i}
-                      className="text-xs text-muted-foreground flex items-start gap-2 pl-2 border-l-2 border-emerald-500/30"
-                    >
-                      {f}
-                    </p>
-                  ))}
-                </div>
-              )}
-              {(explanation.BearishFactors?.length ?? 0) > 0 && (
-                <div className="mt-3 space-y-2">
-                  <p className="text-xs font-semibold text-red-400 uppercase tracking-wide">
-                    Bearish
-                  </p>
-                  {explanation.BearishFactors?.map((f, i) => (
-                    <p
-                      key={i}
-                      className="text-xs text-muted-foreground flex items-start gap-2 pl-2 border-l-2 border-red-500/30"
-                    >
-                      {f}
-                    </p>
-                  ))}
-                </div>
-              )}
-              {explanation.TradeZoneNarrative && (
-                <p className="mt-4 text-xs text-muted-foreground italic border-t border-border pt-3">
-                  {explanation.TradeZoneNarrative}
-                </p>
-              )}
-            </motion.div>
-          )}
+      {/* 9. Related news */}
+      {news && news.length > 0 && <RelatedNews items={news} limit={6} />}
 
-          {/* News */}
-          <motion.div
-            custom={6}
-            initial="hidden"
-            animate="visible"
-            variants={fadeIn}
-            className="rounded-2xl border border-border bg-card p-6"
-          >
-            <h2 className="font-[var(--font-heading)] text-lg font-semibold mb-3 flex items-center gap-2">
-              <Newspaper className="h-4.5 w-4.5 text-muted-foreground" /> Recent
-              News
-            </h2>
-            <div className="space-y-3">
-              {(news ?? []).slice(0, 6).map((item, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <div
-                    className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${
-                      (item.sentimentScore ?? 0) > 0.2
-                        ? "bg-emerald-500"
-                        : (item.sentimentScore ?? 0) < -0.2
-                          ? "bg-red-500"
-                          : "bg-amber-400"
-                    }`}
-                  />
-                  <div>
-                    <p className="text-sm leading-snug">{item.headline}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] text-muted-foreground">
-                        {item.source}
-                      </span>
-                      {item.publishedAt && (
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(item.publishedAt).toLocaleDateString()}
-                        </span>
-                      )}
-                      {item.catalystType && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                          {item.catalystType}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {(!news || news.length === 0) && (
-                <p className="text-sm text-muted-foreground">
-                  No recent news for this ticker.
-                </p>
-              )}
-            </div>
-          </motion.div>
-        </div>
-      </div>
+      <p className="text-[11px] text-ink-500 italic pt-4">
+        Educational content only — not financial advice. Past signal performance does not guarantee future results.
+        <Link href="/disclaimer" className="text-forest hover:underline ml-1">
+          Full disclaimer →
+        </Link>
+      </p>
     </div>
+  );
+}
+
+function thesisTitle(
+  thesis: { verdict?: string } | null | undefined,
+  signal: { signalType?: string } | null | undefined,
+): string {
+  if (thesis?.verdict) return thesis.verdict;
+  const type = signal?.signalType?.toUpperCase() ?? "";
+  if (type === "BUY_TODAY") return "Composite setup above the 7-factor bar.";
+  if (type === "AVOID") return "Factors flagging avoid — risks outweigh the setup.";
+  return "Setup forming — waiting for confirmation.";
+}
+
+function formatVolumeShort(v: number | null | undefined): string | undefined {
+  if (v == null) return undefined;
+  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(0)}K`;
+  return v.toString();
+}
+
+function ThesisFallback({
+  ticker,
+  signal,
+}: {
+  ticker: string;
+  signal: { scoreTotal: number; breakdown: { momentumScore: number; trendScore: number; riskScore: number } | null } | null;
+}) {
+  if (!signal) {
+    return <p>Loading Lens&apos;s thesis for {ticker}…</p>;
+  }
+  const b = signal.breakdown;
+  return (
+    <>
+      <p>
+        {ticker} scored <strong>{Math.round(signal.scoreTotal)}/100</strong> on today&apos;s scan
+        {b ? (
+          <>
+            {" "}— with momentum at <strong>{Math.round(b.momentumScore)}</strong>,
+            trend at <strong>{Math.round(b.trendScore)}</strong>, and risk at <strong>{Math.round(b.riskScore)}</strong>.
+          </>
+        ) : (
+          "."
+        )}
+      </p>
+      <p className="mt-3">
+        The 7-factor breakdown below shows what drove the score. Reference levels give
+        a structural view of where the setup activates, invalidates, and targets — the
+        decision to act is yours.
+      </p>
+    </>
   );
 }
