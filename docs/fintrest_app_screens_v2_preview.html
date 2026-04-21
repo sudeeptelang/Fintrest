@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fintrest · App Screens · Design Language v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink-0:#FFFFFF;--ink-50:#FAFBFC;--ink-100:#F2F4F7;--ink-200:#E4E7EC;--ink-300:#D0D5DD;
+  --ink-400:#98A2B3;--ink-500:#667085;--ink-600:#475467;--ink-700:#344054;--ink-800:#1D2939;
+  --ink-900:#101828;--ink-950:#060C1A;
+  --forest:#0F4F3A;--forest-lt:#E8F1EC;--forest-dk:#0A3528;
+  --lens-bg:#DCEBE2;
+  --rust:#B8502F;--rust-lt:#FBF0EA;--rust-dk:#8A3B1F;
+  --up:#0A7F4F;--down:#6B5443;
+  --warn:#B25E09;--warn-lt:#FEF6E7;--danger:#912018;--danger-lt:#FEE4E2;
+  --e1:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
+  --e2:0 4px 8px rgba(16,24,40,0.08),0 12px 24px rgba(16,24,40,0.10);
+  --t:120ms ease-out;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body { font: 400 14px/22px 'DM Sans', system-ui, sans-serif; color: var(--ink-900); background: var(--ink-50); -webkit-font-smoothing: antialiased; }
+
+.controls { position: fixed; top: 12px; right: 12px; z-index: 200; background: var(--ink-950); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--e2); max-width: 220px; }
+.controls-row { display: flex; gap: 2px; border-radius: 6px; overflow: hidden; background: rgba(255,255,255,0.05); padding: 2px; }
+.controls-label { font: 600 9px/1 'DM Sans', sans-serif; color: var(--ink-400); letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 8px 2px; }
+.controls button { flex: 1; background: transparent; color: var(--ink-300); border: none; padding: 7px 10px; font: 600 11px/1 'DM Sans', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; border-radius: 4px; transition: all var(--t); white-space: nowrap; }
+.controls button:hover { color: var(--ink-0); background: rgba(255,255,255,0.05); }
+.controls button.active { background: var(--forest); color: var(--ink-0); }
+.controls-tier button.active { background: var(--rust); }
+
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: block; }
+
+.app-nav { position: sticky; top: 0; z-index: 50; background: var(--ink-0); border-bottom: 1px solid var(--ink-200); height: 56px; display: flex; align-items: center; padding: 0 24px; gap: 24px; }
+.app-logo { font: 700 16px/1 'Sora', sans-serif; color: var(--ink-900); display: flex; align-items: center; gap: 8px; }
+.app-logo-mark { width: 22px; height: 22px; background: var(--forest); border-radius: 5px; color: var(--ink-0); display: inline-flex; align-items: center; justify-content: center; font: 700 13px/1 'Sora', sans-serif; }
+.app-logo em { color: var(--ink-500); font-style: normal; font-weight: 400; }
+.app-nav-search { flex: 1; max-width: 560px; position: relative; }
+.app-nav-search input { width: 100%; padding: 8px 12px 8px 36px; font: 400 13px/1 'DM Sans', sans-serif; border: 1px solid var(--ink-200); border-radius: 6px; background: var(--ink-50); color: var(--ink-800); transition: all var(--t); }
+.app-nav-search input:focus { outline: none; border-color: var(--forest); background: var(--ink-0); box-shadow: 0 0 0 3px rgba(15,79,58,0.08); }
+.app-nav-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; stroke: var(--ink-500); fill: none; stroke-width: 2; }
+.app-nav-search kbd { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font: 500 10px/1 'DM Mono', monospace; padding: 3px 6px; border: 1px solid var(--ink-200); border-radius: 3px; color: var(--ink-500); background: var(--ink-0); }
+.app-nav-right { display: flex; align-items: center; gap: 6px; }
+.icon-btn { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; transition: background var(--t); border: none; background: transparent; }
+.icon-btn:hover { background: var(--ink-100); }
+.icon-btn svg { width: 18px; height: 18px; stroke: var(--ink-600); fill: none; stroke-width: 1.5; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--forest); color: var(--ink-0); display: inline-flex; align-items: center; justify-content: center; font: 600 13px/1 'DM Sans', sans-serif; cursor: pointer; margin-left: 4px; }
+.tier-badge { font: 600 10px/1 'DM Sans', sans-serif; padding: 5px 8px; border-radius: 4px; letter-spacing: 0.1em; text-transform: uppercase; margin-right: 8px; }
+.tier-badge.free { background: var(--ink-100); color: var(--ink-600); }
+.tier-badge.pro { background: var(--forest-lt); color: var(--forest-dk); border: 1px solid rgba(15,79,58,0.2); }
+.tier-badge.elite { background: #1D2939; color: var(--ink-0); border: 1px solid var(--ink-700); }
+
+.app-shell { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 56px); }
+.side-rail { background: var(--ink-50); border-right: 1px solid var(--ink-200); padding: 24px 0; }
+.rail-section { padding: 0 12px; margin-bottom: 32px; }
+.rail-section-label { font: 600 10px/1 'DM Sans', sans-serif; color: var(--ink-500); letter-spacing: 0.14em; text-transform: uppercase; padding: 0 12px; margin-bottom: 8px; }
+.rail-item { display: flex; align-items: center; gap: 12px; padding: 9px 12px; font: 500 14px/1 'DM Sans', sans-serif; color: var(--ink-700); border-radius: 6px; cursor: pointer; transition: all var(--t); margin-bottom: 2px; position: relative; border-left: 2px solid transparent; margin-left: -2px; }
+.rail-item:hover { background: var(--ink-100); color: var(--ink-900); }
+.rail-item.active { color: var(--forest); background: var(--forest-lt); border-left-color: var(--forest); font-weight: 600; }
+.rail-item svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.7; flex-shrink: 0; }
+.rail-item-count { margin-left: auto; font: 500 11px/1 'DM Mono', monospace; color: var(--ink-500); background: var(--ink-200); padding: 2px 6px; border-radius: 10px; }
+.rail-item.active .rail-item-count { background: var(--forest); color: var(--ink-0); }
+.content { padding: 40px 40px 96px; max-width: 1200px; }
+
+.eyebrow { font: 600 10px/16px 'DM Sans', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: var(--forest); margin-bottom: 12px; }
+.eyebrow-rust { color: var(--rust); }
+.page-title { font: 600 36px/44px 'Sora', sans-serif; color: var(--ink-950); letter-spacing: -0.02em; margin-bottom: 8px; }
+.page-meta { font: 400 13px/20px 'DM Mono', monospace; color: var(--ink-500); margin-bottom: 40px; }
+.section-title { font: 600 20px/28px 'Sora', sans-serif; color: var(--ink-900); letter-spacing: -0.005em; margin-bottom: 20px; display: flex; align-items: baseline; gap: 12px; }
+.section-title-count { font: 500 13px/1 'DM Mono', monospace; color: var(--ink-500); }
+
+.lens-card { background: var(--lens-bg); border: 1px solid rgba(15,79,58,0.18); border-radius: 10px; padding: 28px 32px; margin-bottom: 32px; position: relative; }
+.lens-card-eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.lens-card-mark { width: 22px; height: 22px; background: var(--forest); color: var(--ink-0); border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font: 700 12px/1 'Sora', sans-serif; }
+.lens-card-label { font: 600 11px/1 'DM Sans', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: var(--forest-dk); }
+.lens-card-meta { font: 400 11px/1 'DM Mono', monospace; color: var(--ink-500); margin-left: auto; }
+.lens-card-title { font: 600 22px/30px 'Sora', sans-serif; color: var(--ink-950); letter-spacing: -0.01em; margin-bottom: 12px; }
+.lens-card-body { font: 400 16px/28px 'DM Sans', sans-serif; color: var(--ink-800); max-width: 720px; }
+.lens-card-body strong { font-weight: 600; color: var(--ink-950); }
+.lens-card-sig { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(15,79,58,0.15); font: 400 12px/1 'DM Sans', sans-serif; color: var(--ink-600); font-style: italic; }
+.lens-card-sig::before { content: ''; width: 24px; height: 1px; background: var(--forest); display: inline-block; }
+.lens-card.personalized { background: linear-gradient(135deg, var(--lens-bg) 0%, #D4E3DA 100%); border-color: rgba(184,80,47,0.25); }
+.personalized-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; background: var(--rust); color: var(--ink-0); font: 600 10px/1 'DM Sans', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; border-radius: 3px; margin-left: 8px; }
+
+.btn { font: 600 13px/1 'DM Sans', sans-serif; padding: 9px 16px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all var(--t); white-space: nowrap; }
+.btn-primary { background: var(--forest); color: var(--ink-0); }
+.btn-primary:hover { background: var(--forest-dk); }
+.btn-secondary { background: var(--ink-0); color: var(--ink-800); border-color: var(--ink-300); }
+.btn-secondary:hover { border-color: var(--ink-500); }
+.btn-rust { background: var(--rust); color: var(--ink-0); }
+.btn-rust:hover { background: var(--rust-dk); }
+.btn-ghost { background: transparent; color: var(--ink-700); }
+.btn-ghost:hover { background: var(--ink-100); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+.signal-badge { display: inline-flex; align-items: center; padding: 3px 8px; font: 600 10px/1 'DM Sans', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; border-radius: 3px; border: 1px solid; }
+.signal-badge.buy { background: var(--forest-lt); color: var(--forest-dk); border-color: rgba(15,79,58,0.3); }
+.signal-badge.watch { background: var(--ink-100); color: var(--ink-700); border-color: var(--ink-300); }
+.signal-badge.avoid { background: var(--ink-50); color: var(--ink-500); border-color: var(--ink-200); font-style: italic; }
+
+.chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; font: 500 13px/1 'DM Sans', sans-serif; color: var(--ink-700); background: var(--ink-0); border: 1px solid var(--ink-200); border-radius: 16px; cursor: pointer; transition: all var(--t); }
+.chip:hover { border-color: var(--ink-400); }
+.chip.active { background: var(--forest-lt); color: var(--forest-dk); border-color: var(--forest); }
+.chip-count { font: 500 11px/1 'DM Mono', monospace; color: var(--ink-500); }
+.chip.active .chip-count { color: var(--forest); }
+
+/* Omitted for brevity: screen-specific CSS (regime-strip, featured-signals, signal-table,
+   signal-detail-hero, score-ring-lg, ref-bar, factor-breakdown, fundamental-scorecard,
+   takeaways, lens-locked, portfolio-stats, returns-breakdown, holdings-table, ticker-hero,
+   price-chart, valuation-grid, ask-lens-fab, news-list, technicals-section, technicals-strip,
+   boards-grid, editorial-boards, ask-layout/sidebar/messages/input, markets-tabs,
+   sector-heatmap, markets-table, audit-banner, audit-metrics-grid, audit-table, etc.)
+
+   These are specified verbatim in docs/DESIGN_LANGUAGE_V2.md §8 (App atoms 8a–8v) and
+   §12 (App screen specs). The full markup for all 8 screens (Today, Signal, Portfolio,
+   Ticker, Boards, Markets, Audit, Ask Lens) with Free/Pro/Elite tier toggle was received
+   in chat and is the ground truth for the port. Keep your local copy of
+   Fintrest_App_Screens_v2.html open as the visual reference while building. */
+
+.free-only, .pro-only, .elite-only { display: none; }
+body[data-tier="free"] .free-only { display: block; }
+body[data-tier="pro"] .pro-only { display: block; }
+body[data-tier="elite"] .elite-only { display: block; }
+body[data-tier="free"] .not-free,
+body[data-tier="pro"] .not-pro,
+body[data-tier="elite"] .not-elite { display: none !important; }
+</style>
+</head>
+<body data-tier="pro">
+  <div style="max-width: 900px; margin: 80px auto; padding: 48px;">
+    <div class="app-logo" style="margin-bottom: 32px;">
+      <span class="app-logo-mark">F</span>
+      Fintrest<em>.ai</em>
+    </div>
+
+    <div class="eyebrow">Design language v2 · App screens</div>
+    <h1 class="page-title" style="font-size: 32px; line-height: 40px; margin-bottom: 8px;">App screens preview — v2 Forest &amp; Rust</h1>
+    <p class="page-meta" style="margin-bottom: 32px;">8 screens · Free / Pro / Elite tier variants · source of truth for Phase 4–5 rebuild</p>
+
+    <div class="lens-card" style="margin-bottom: 24px;">
+      <div class="lens-card-eyebrow">
+        <span class="lens-card-mark">L</span>
+        <span class="lens-card-label">Canonical preview</span>
+      </div>
+      <div class="lens-card-title">The full interactive preview lives locally.</div>
+      <div class="lens-card-body">
+        The full 8-screen preview with tier-toggle (~85KB of HTML) is kept as <strong>Fintrest_App_Screens_v2.html</strong> on your machine and should be opened in a browser as the visual ground-truth while building. Every atom and every screen is captured verbatim in <strong>docs/DESIGN_LANGUAGE_V2.md</strong> — sections 2 (tokens + lens-bg + board palette + sector ramp), 8 (app atoms 8a–8v), 12 (per-screen layout specs), 14 (gap audit: mobile, state atoms, compliance, accessibility, deprecation).
+      </div>
+      <div class="lens-card-sig">Reference only — implementation ground truth is the MD spec.</div>
+    </div>
+
+    <div class="section-title" style="font-size: 16px;">8 app screens</div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 32px;">
+      <div style="padding: 16px; background: var(--ink-0); border: 1px solid var(--ink-200); border-radius: 8px;">
+        <div style="font: 600 13px/1 'Sora', sans-serif; color: var(--ink-950); margin-bottom: 4px;">1. Today</div>
+        <div style="font: 400 12px/18px 'DM Sans'; color: var(--ink-600);">Regime strip · Lens morning take · filter chips · featured signals · full signal table</div>
+      </div>
+      <div style="padding: 16px; background: var(--ink-0); border: 1px solid var(--ink-200); border-radius: 8px;">
+        <div style="font: 600 13px/1 'Sora', sans-serif; color: var(--ink-950); margin-bottom: 4px;">2. Signal detail</div>
+        <div style="font: 400 12px/18px 'DM Sans'; color: var(--ink-600);">Hero + score ring · Lens thesis · takeaways · reference bar · 7-factor · technicals strip</div>
+      </div>
+      <div style="padding: 16px; background: var(--ink-0); border: 1px solid var(--ink-200); border-radius: 8px;">
+        <div style="font: 600 13px/1 'Sora', sans-serif; color: var(--ink-950); margin-bottom: 4px;">3. Portfolio</div>
+        <div style="font: 400 12px/18px 'DM Sans'; color: var(--ink-600);">Stat cards · Lens take · returns breakdown · holdings table with sparklines</div>
+      </div>
+      <div style="padding: 16px; background: var(--ink-0); border: 1px solid var(--ink-200); border-radius: 8px;">
+        <div style="font: 600 13px/1 'Sora', sans-serif; color: var(--ink-950); margin-bottom: 4px;">4. Ticker detail</div>
+        <div style="font: 400 12px/18px 'DM Sans'; color: var(--ink-600);">Hero · Lens · takeaways · ref bar · fundamental scorecard · 7-factor · full technicals</div>
+      </div>
+      <div style="padding: 16px; background: var(--ink-0); border: 1px solid var(--ink-200); border-radius: 8px;">
+        <div style="font: 600 13px/1 'Sora', sans-serif; color: var(--ink-950); margin-bottom: 4px;">5. Boards</div>
+        <div style="font: 400 12px/18px 'DM Sans'; color: var(--ink-600);">Stats strip · editorial boards (rust) · 6-card grid · Lens board suggestion</div>
+      </div>
+      <div style="padding: 16px; background: var(--ink-0); border: 1px solid var(--ink-200); border-radius: 8px;">
+        <div style="font: 600 13px/1 'Sora', sans-serif; color: var(--ink-950); margin-bottom: 4px;">6. Markets</div>
+        <div style="font: 400 12px/18px 'DM Sans'; color: var(--ink-600);">4 tabs: Sector heatmap · Congress · Insiders · Regime. Absorbs /insiders + /congress.</div>
+      </div>
+      <div style="padding: 16px; background: var(--ink-0); border: 1px solid var(--ink-200); border-radius: 8px;">
+        <div style="font: 600 13px/1 'Sora', sans-serif; color: var(--ink-950); margin-bottom: 4px;">7. Audit log</div>
+        <div style="font: 400 12px/18px 'DM Sans'; color: var(--ink-600);">Dark banner · 4 metric boxes · hypothetical disclaimer · signal history table</div>
+      </div>
+      <div style="padding: 16px; background: var(--ink-0); border: 1px solid var(--ink-200); border-radius: 8px;">
+        <div style="font: 600 13px/1 'Sora', sans-serif; color: var(--ink-950); margin-bottom: 4px;">8. Ask Lens</div>
+        <div style="font: 400 12px/18px 'DM Sans'; color: var(--ink-600);">260px sidebar · chat messages (user + Lens cards) · sources · rate limit</div>
+      </div>
+    </div>
+
+    <div class="section-title" style="font-size: 16px;">Tier variants baked into every screen</div>
+    <div style="display: flex; gap: 8px; margin-bottom: 24px;">
+      <span class="tier-badge free" style="margin-right: 0;">Free</span>
+      <span style="font: 400 13px/20px 'DM Sans'; color: var(--ink-700);">Lock chips, upgrade gate rows, Lens locked cards with gradient fade cut-off</span>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 24px;">
+      <span class="tier-badge pro" style="margin-right: 0;">Pro</span>
+      <span style="font: 400 13px/20px 'DM Sans'; color: var(--ink-700);">Standard Lens cards, full signal board, all theses unlocked, rate-limit indicator</span>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 40px;">
+      <span class="tier-badge elite" style="margin-right: 0;">Elite</span>
+      <span style="font: 400 13px/20px 'DM Sans'; color: var(--ink-700);">Personalized Lens variant (rust-tinted badge), unlimited queries, priority routing</span>
+    </div>
+
+    <p style="font: 400 13px/20px 'DM Sans'; color: var(--ink-500); padding-top: 24px; border-top: 1px solid var(--ink-200);">
+      This preview is a pointer. For the full clickable prototype with all screens and tier toggle, open your local <code style="font-family: 'DM Mono'; background: var(--ink-100); padding: 2px 6px; border-radius: 3px; font-size: 12px;">Fintrest_App_Screens_v2.html</code> in a browser.
+    </p>
+  </div>
+</body>
+</html>
