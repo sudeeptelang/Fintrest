@@ -31,6 +31,19 @@ public class SystemHealthService(AppDbContext db, ILogger<SystemHealthService> l
             .Where(u => u.ReceiveWeeklyNewsletter && u.Email != null && u.Email != "")
             .CountAsync(ct);
 
+        var lastMorningBriefing = await db.BriefingRuns
+            .Where(b => b.Kind == "morning")
+            .OrderByDescending(b => b.StartedAt)
+            .FirstOrDefaultAsync(ct);
+        var todaysMorningBriefing = await db.BriefingRuns
+            .Where(b => b.Kind == "morning" && b.StartedAt >= todayEtStartUtc)
+            .OrderByDescending(b => b.StartedAt)
+            .FirstOrDefaultAsync(ct);
+        var lastWeeklyNewsletter = await db.BriefingRuns
+            .Where(b => b.Kind == "weekly")
+            .OrderByDescending(b => b.StartedAt)
+            .FirstOrDefaultAsync(ct);
+
         var lastFeatureRun = await db.FeatureRunLogs.OrderByDescending(f => f.StartedAt).FirstOrDefaultAsync(ct);
 
         var lastIngestion = await db.AdminAuditLogs
@@ -68,7 +81,9 @@ public class SystemHealthService(AppDbContext db, ILogger<SystemHealthService> l
 
         var alerts = new List<string>();
         var todayRanScan = todaysScan is { Status: "COMPLETED" };
+        var todaySentBriefing = todaysMorningBriefing is { Status: "completed", SentCount: > 0 };
         var etPastScan = etNow.Hour > 6 || (etNow.Hour == 6 && etNow.Minute >= 35);
+        var etPastBriefing = etNow.Hour > 6 || (etNow.Hour == 6 && etNow.Minute >= 40);
         var isWeekday = etNow.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday;
         if (isWeekday && etPastScan && !todayRanScan)
             alerts.Add($"Daily scan did not complete today (last scan: {FormatAgo(lastScan?.StartedAt, utcNow)})");
@@ -76,8 +91,12 @@ public class SystemHealthService(AppDbContext db, ILogger<SystemHealthService> l
             alerts.Add($"Last scan ({lastScan.StartedAt:MMM d HH:mm}Z) ended in FAILED state");
         foreach (var p in providers.Where(p => p.SuccessRate < 0.5 && p.TotalChecks >= 3))
             alerts.Add($"Provider {p.Provider} success rate {p.SuccessRate:P0} over last 24h");
-        if (isWeekday && etPastScan && briefingAudience > 0 && !todayRanScan)
-            alerts.Add("Morning briefing would not have sent (scan didn't complete)");
+        if (isWeekday && etPastBriefing && briefingAudience > 0 && !todaySentBriefing)
+            alerts.Add($"Morning briefing did not send today (last briefing: {FormatAgo(lastMorningBriefing?.StartedAt, utcNow)})");
+        if (lastMorningBriefing is { Status: "failed" })
+            alerts.Add($"Last morning briefing failed: {lastMorningBriefing.ErrorMessage ?? "no message"}");
+        if (lastMorningBriefing is { Status: "completed", FailedCount: > 0 } lmb)
+            alerts.Add($"Last morning briefing had {lmb.FailedCount} failed send{(lmb.FailedCount == 1 ? "" : "s")} of {lmb.AudienceSize}");
 
         var overallStatus = alerts.Count == 0 ? "ok" : "alert";
 
@@ -124,8 +143,16 @@ public class SystemHealthService(AppDbContext db, ILogger<SystemHealthService> l
             MorningBriefing: new BriefingStatus(
                 AudienceSize: briefingAudience,
                 WeeklyAudienceSize: weeklyAudience,
-                BriefingLogNote: "morning briefings are not persisted to alert_deliveries today; add a BriefingRun table to track sends",
-                ProxyLastSentAt: todayRanScan ? todaysScan?.CompletedAt : lastScan?.CompletedAt),
+                TodaySent: todaySentBriefing,
+                TodaySentCount: todaysMorningBriefing?.SentCount ?? 0,
+                TodayFailedCount: todaysMorningBriefing?.FailedCount ?? 0,
+                TodayStatus: todaysMorningBriefing?.Status,
+                LastSentAt: lastMorningBriefing?.CompletedAt ?? lastMorningBriefing?.StartedAt,
+                LastSentCount: lastMorningBriefing?.SentCount,
+                LastStatus: lastMorningBriefing?.Status,
+                LastError: lastMorningBriefing?.ErrorMessage,
+                LastWeeklyAt: lastWeeklyNewsletter?.CompletedAt ?? lastWeeklyNewsletter?.StartedAt,
+                LastWeeklySentCount: lastWeeklyNewsletter?.SentCount),
             FeaturePopulation: featurePop,
             LastIngestion: ingestion,
             Providers: providers,
@@ -190,8 +217,16 @@ public record ScanStatus(
 public record BriefingStatus(
     int AudienceSize,
     int WeeklyAudienceSize,
-    string BriefingLogNote,
-    DateTime? ProxyLastSentAt);
+    bool TodaySent,
+    int TodaySentCount,
+    int TodayFailedCount,
+    string? TodayStatus,
+    DateTime? LastSentAt,
+    int? LastSentCount,
+    string? LastStatus,
+    string? LastError,
+    DateTime? LastWeeklyAt,
+    int? LastWeeklySentCount);
 
 public record FeaturePopStatus(
     Guid RunId,

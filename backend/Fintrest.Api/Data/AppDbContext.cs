@@ -50,6 +50,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     // Job state — cron robustness; migration 018.
     public DbSet<JobState> JobStates => Set<JobState>();
 
+    // Briefing run history — migration 019.
+    public DbSet<BriefingRun> BriefingRuns => Set<BriefingRun>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

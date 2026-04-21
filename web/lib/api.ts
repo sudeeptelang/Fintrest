@@ -624,8 +624,16 @@ export interface SystemHealthResponse {
   morningBriefing: {
     audienceSize: number;
     weeklyAudienceSize: number;
-    briefingLogNote: string;
-    proxyLastSentAt: string | null;
+    todaySent: boolean;
+    todaySentCount: number;
+    todayFailedCount: number;
+    todayStatus: string | null;
+    lastSentAt: string | null;
+    lastSentCount: number | null;
+    lastStatus: string | null;
+    lastError: string | null;
+    lastWeeklyAt: string | null;
+    lastWeeklySentCount: number | null;
   };
   featurePopulation: {
     runId: string;

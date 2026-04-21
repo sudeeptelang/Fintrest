@@ -148,18 +148,33 @@ function ScanCard({ data }: { data: SystemHealthResponse }) {
 
 function BriefingCard({ data }: { data: SystemHealthResponse }) {
   const m = data.morningBriefing;
+  const headline = m.todaySent
+    ? `${m.todaySentCount} sent today`
+    : m.todayStatus === "running"
+      ? "Running…"
+      : m.todayStatus === "failed"
+        ? "Failed today"
+        : "Not sent yet";
+  const tone = m.todaySent
+    ? "text-up"
+    : m.todayStatus === "failed"
+      ? "text-down"
+      : "text-ink-950";
   return (
     <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
       <Label>Morning briefing</Label>
-      <div className="mt-2 font-[var(--font-mono)] text-[28px] font-medium text-ink-950 leading-none tracking-[-0.015em]">
-        {m.audienceSize} <span className="text-[14px] text-ink-500">opt-ins</span>
+      <div className={cn("mt-2 font-[var(--font-mono)] text-[28px] font-medium leading-none tracking-[-0.015em]", tone)}>
+        {headline}
       </div>
       <div className="mt-3 space-y-1 font-[var(--font-mono)] text-[12px] text-ink-500">
-        <div>Weekly: <span className="text-ink-800">{m.weeklyAudienceSize}</span></div>
-        <div>Proxy last sent: {fmt(m.proxyLastSentAt)}</div>
-        <div className="pt-1 italic text-ink-400 text-[11px]">
-          {m.briefingLogNote}
-        </div>
+        <div>Audience: <span className="text-ink-800">{m.audienceSize} opt-ins</span></div>
+        <div>Failed today: <span className={m.todayFailedCount > 0 ? "text-down" : "text-ink-800"}>{m.todayFailedCount}</span></div>
+        <div>Last sent: {fmt(m.lastSentAt)}{m.lastSentCount != null && ` (${m.lastSentCount})`}</div>
+        <div>Weekly audience: <span className="text-ink-800">{m.weeklyAudienceSize}</span></div>
+        {m.lastWeeklyAt && <div>Last weekly: {fmt(m.lastWeeklyAt)}</div>}
+        {m.lastError && (
+          <div className="pt-1 text-down text-[11px] italic">Last error: {m.lastError}</div>
+        )}
       </div>
     </div>
   );

@@ -152,8 +152,12 @@ public class DailyHealthEmailJob(
         // Briefing
         sb.Append("<h2 style=\"font-size:14px; margin:24px 0 8px 0; text-transform:uppercase; letter-spacing:0.1em; color:#475467;\">Morning briefing</h2>");
         sb.Append("<table style=\"width:100%; border-collapse:collapse; font-size:13px;\">");
+        var sentColor = r.MorningBriefing.TodaySent ? "#0A7F4F" : (r.MorningBriefing.TodayStatus == "failed" ? "#6B5443" : "#475467");
+        sb.Append($"<tr><td style=\"padding:6px 0; color:#667085;\">Today sent</td><td style=\"text-align:right; font-family:monospace; color:{sentColor};\">{(r.MorningBriefing.TodaySent ? $"{r.MorningBriefing.TodaySentCount} sent" : (r.MorningBriefing.TodayStatus ?? "not sent"))}</td></tr>");
+        sb.Append($"<tr><td style=\"padding:6px 0; color:#667085;\">Today failed</td><td style=\"text-align:right; font-family:monospace; color:{(r.MorningBriefing.TodayFailedCount > 0 ? "#6B5443" : "#475467")};\">{r.MorningBriefing.TodayFailedCount}</td></tr>");
         sb.Append($"<tr><td style=\"padding:6px 0; color:#667085;\">Audience</td><td style=\"text-align:right; font-family:monospace;\">{r.MorningBriefing.AudienceSize} opt-ins</td></tr>");
-        sb.Append($"<tr><td style=\"padding:6px 0; color:#667085;\">Weekly</td><td style=\"text-align:right; font-family:monospace;\">{r.MorningBriefing.WeeklyAudienceSize} opt-ins</td></tr>");
+        sb.Append($"<tr><td style=\"padding:6px 0; color:#667085;\">Last sent</td><td style=\"text-align:right; font-family:monospace;\">{r.MorningBriefing.LastSentAt?.ToString("MMM d HH:mm") ?? "never"}{(r.MorningBriefing.LastSentCount != null ? $" ({r.MorningBriefing.LastSentCount})" : "")}</td></tr>");
+        sb.Append($"<tr><td style=\"padding:6px 0; color:#667085;\">Weekly audience</td><td style=\"text-align:right; font-family:monospace;\">{r.MorningBriefing.WeeklyAudienceSize} opt-ins</td></tr>");
         sb.Append("</table>");
 
         // Providers
