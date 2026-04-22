@@ -1,36 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Star } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
-// FTC 16 CFR § 255 requires each testimonial to carry a compensation disclosure
-// adjacent to the testimonial — not in a footnote.
-const testimonials = [
-  {
-    name: "Marcus T.",
-    role: "Swing Trader",
-    content:
-      "Fintrest replaced 3 hours of morning research with one glance at my dashboard. The Lens explanations walk me through what the model saw and why — the research is the value, not just the list.",
-    rating: 5,
-    compensated: false,
-  },
-  {
-    name: "Sarah K.",
-    role: "Part-time Investor",
-    content:
-      "I love that every signal tells me why it scored high. No other platform does this with such clarity. The research drop before the open is the part I never miss.",
-    rating: 5,
-    compensated: false,
-  },
-  {
-    name: "James L.",
-    role: "Day Trader",
-    content:
-      "The 7-factor breakdown is brilliant. I can see exactly what's driving each signal — momentum, catalysts, sentiment — all in one view. It's the quality-assurance layer I used to build myself in a spreadsheet.",
-    rating: 5,
-    compensated: false,
-  },
-];
+// Honest trust block — replaces the old fake-testimonial layout per
+// FINTREST_UX_SPEC §20 rule 1. We don't have named beta users with
+// linkable profiles yet, and shipping generic "Marcus T., Swing Trader"
+// testimonials is an FTC 16 CFR § 255 risk even with disclosure.
+//
+// Instead: the audit log IS the proof. Three stats + a link to the
+// public log that includes wins AND losses. When we have real named
+// beta users later, a testimonial row can slot in above this block.
+//
+// File name kept as social-proof.tsx so app/page.tsx imports don't
+// break. The section is "audit log preview" in spirit; the export
+// stays `SocialProof` for stability.
 
 export function SocialProof() {
   return (
@@ -41,67 +26,71 @@ export function SocialProof() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
-          className="text-center max-w-2xl mx-auto mb-16"
+          className="text-center max-w-2xl mx-auto mb-12"
         >
           <span className="inline-block text-xs font-semibold text-forest mb-4 tracking-[0.1em] uppercase">
-            What Fintrest users say
+            The trust mechanism
           </span>
-          <h2 className="font-[var(--font-heading)] text-3xl sm:text-4xl font-bold tracking-[-0.015em] text-ink-950">
-            What users say about{" "}
-            <span className="gradient-text">the research</span>
+          <h2 className="font-[var(--font-heading)] text-3xl sm:text-4xl font-semibold tracking-[-0.015em] text-ink-950">
+            Every signal is public —
+            <span className="gradient-text"> wins and losses.</span>
           </h2>
+          <p className="mt-4 text-base text-ink-600">
+            We don&apos;t hide the losers. Every signal Fintrest has ever
+            published lives in the audit log, with its entry, exit, and
+            outcome. This is how you tell a research platform that&apos;s
+            earned your attention from one that hasn&apos;t.
+          </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-4">
-          {testimonials.map((t, i) => (
-            <motion.div
-              key={t.name}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.08, duration: 0.4 }}
-              className="rounded-lg border border-ink-200 bg-ink-0 p-6 flex flex-col hover:border-ink-300 hover:shadow-e1 transition-all"
-            >
-              <div className="flex gap-0.5 mb-4">
-                {Array.from({ length: t.rating }).map((_, j) => (
-                  <Star
-                    key={j}
-                    className="h-4 w-4 fill-[color:var(--up)] text-[color:var(--up)]"
-                  />
-                ))}
-              </div>
-              <p className="text-sm text-ink-700 leading-relaxed mb-5 flex-1">
-                &ldquo;{t.content}&rdquo;
-              </p>
-              <div>
-                <p className="text-sm font-semibold text-ink-950">{t.name}</p>
-                <p className="text-xs text-ink-500 mt-0.5">{t.role}</p>
-              </div>
-              <div className="mt-4 pt-4 border-t border-ink-200 text-[11px] leading-snug text-ink-500">
-                <p className="font-medium text-ink-700">
-                  Testimonial from a Fintrest.ai user.{" "}
-                  {t.compensated ? (
-                    <span>
-                      Compensated — this user received consideration in
-                      exchange for this testimonial.
-                    </span>
-                  ) : (
-                    <span>
-                      Not compensated — this user was not paid for this
-                      testimonial.
-                    </span>
-                  )}
-                </p>
-                <p className="mt-1">
-                  Individual results vary. This testimonial reflects one
-                  user&apos;s experience and is not representative of all
-                  users. Past results do not guarantee future results.
-                </p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.1, duration: 0.5 }}
+          className="rounded-[12px] border border-ink-200 bg-ink-0 p-8 shadow-e1 max-w-3xl mx-auto"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <TrustStat label="Losers not hidden" value="100%" sub="Every stopped-out signal published" />
+            <TrustStat label="Factor scores shown" value="All 8" sub="Every factor that drove the composite" />
+            <TrustStat label="Data provenance" value="Every row" sub="Source + staleness disclosed" />
+          </div>
+          <div className="border-t border-ink-100 pt-5 flex items-center justify-between gap-4 flex-wrap">
+            <p className="text-sm text-ink-600">
+              Read the methodology, then open the audit log. Decide for yourself.
+            </p>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/methodology"
+                className="text-sm font-semibold text-ink-700 hover:text-ink-950"
+              >
+                Methodology
+              </Link>
+              <Link
+                href="/audit"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-forest hover:text-forest-dark"
+              >
+                See the audit log
+                <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
+              </Link>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </section>
+  );
+}
+
+function TrustStat({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+        {label}
+      </p>
+      <p className="mt-2 font-[var(--font-heading)] text-[28px] leading-none font-semibold text-ink-950">
+        {value}
+      </p>
+      <p className="mt-1.5 text-[12px] text-ink-500 leading-snug">{sub}</p>
+    </div>
   );
 }

@@ -67,7 +67,7 @@ export function Hero() {
           variants={fadeUp}
           className="mt-6 text-base sm:text-lg text-ink-600 max-w-[680px] leading-relaxed"
         >
-          Fintrest runs 500+ US stocks through a 7-factor research engine every
+          Fintrest runs 500+ US stocks through an 8-factor research engine every
           morning. You see which setups passed the test, exactly why they
           passed, and the full audit trail — including the losers.{" "}
           <span className="text-ink-900 font-medium">
@@ -178,12 +178,12 @@ function HeroScoreRingPanel() {
           The signature
         </p>
         <h2 className="font-[var(--font-heading)] text-2xl lg:text-3xl font-semibold text-ink-950 tracking-[-0.01em] mb-4">
-          The 7-factor score, visible at a glance.
+          The 8-factor score, visible at a glance.
         </h2>
         <p className="text-ink-600 text-base leading-relaxed max-w-md">
-          Every signal carries a score ring. Seven segments, one per factor.
+          Every signal carries a score ring. Eight segments, one per factor.
           Segment length = factor strength. One look tells you whether the
-          score is driven by one great factor — or seven good ones.
+          score is driven by one great factor — or eight good ones.
         </p>
       </div>
 
@@ -229,7 +229,7 @@ function HeroScoreRingPanel() {
             out of 100
           </span>
           <span className="text-[10px] font-semibold text-forest-dark tracking-[0.1em] uppercase mt-2.5">
-            NVDA · BUY TODAY
+            NVDA · In research set
           </span>
         </div>
       </div>

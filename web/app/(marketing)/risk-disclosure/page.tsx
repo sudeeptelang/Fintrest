@@ -30,13 +30,14 @@ export default function RiskDisclosurePage() {
 
       <h2 className="mt-6 text-xl font-semibold">2. Signals are not certainties</h2>
       <p>
-        Fintrest signals are the output of a 7-factor quantitative model
+        Fintrest signals are the output of an 8-factor quantitative model
         combined with an AI research layer (Lens). The model is built, tuned,
         and maintained by humans; it reflects assumptions about how markets
         behave. Those assumptions can be wrong — particularly in unusual
         market conditions, regime changes, macro shocks, or company-specific
-        events the model did not anticipate. A BUY TODAY designation is a
-        research classification, not a prediction that the stock will rise.
+        events the model did not anticipate. An &ldquo;In research set&rdquo;
+        designation is a research classification, not a prediction that the
+        stock will rise.
       </p>
 
       <h2 className="mt-6 text-xl font-semibold">3. Reference levels are not instructions</h2>
@@ -65,11 +66,11 @@ export default function RiskDisclosurePage() {
       <h2 className="mt-6 text-xl font-semibold">5. Concentrated risk</h2>
       <p>
         Acting on a small number of signals concentrates your risk in a
-        handful of stocks. Following only the &ldquo;BUY TODAY&rdquo; signals
-        in a narrow time window may over-concentrate your exposure in a
-        single sector or factor regime. Diversification is a basic
-        risk-management principle, and Fintrest does not assess or manage
-        your portfolio-level diversification. That is your responsibility.
+        handful of stocks. Following only the highest-scoring signals in a
+        narrow time window may over-concentrate your exposure in a single
+        sector or factor regime. Diversification is a basic risk-management
+        principle, and Fintrest does not assess or manage your
+        portfolio-level diversification. That is your responsibility.
       </p>
 
       <h2 className="mt-6 text-xl font-semibold">6. Volatility, gaps, and overnight risk</h2>
