@@ -17,8 +17,9 @@ const nextConfig: NextConfig = {
       { source: "/my/boards/:slug*",    destination: "/boards/:slug*" },
 
       // Audit log canonical path aliases the existing performance page.
+      // /audit/:signalId has its own dedicated page (signal detail), so
+      // only alias the index route here.
       { source: "/audit",               destination: "/performance" },
-      { source: "/audit/:slug*",        destination: "/performance/:slug*" },
 
       // /inbox is now a real page; /inbox/create aliases the existing
       // alert creation flow until a dedicated inbox-create ships.

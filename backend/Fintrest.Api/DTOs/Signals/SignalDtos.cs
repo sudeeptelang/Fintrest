@@ -44,3 +44,48 @@ public record PerformanceOverviewResponse(
     double AvgReturn,
     double AvgDrawdown
 );
+
+public record AuditLogEntry(
+    long SignalId,
+    string Ticker,
+    string StockName,
+    string SignalType,
+    double ScoreTotal,
+    DateTime IssuedAt,
+    DateTime? ClosedAt,
+    double? EntryPrice,
+    double? ExitPrice,
+    double? ReturnPct,
+    int? DurationDays,
+    string Outcome
+);
+
+public record FactorProfileSnapshot(
+    double Momentum,
+    double RelVolume,
+    double News,
+    double Fundamentals,
+    double Sentiment,
+    double Trend,
+    double Risk
+);
+
+public record AuditLogDetail(
+    long SignalId,
+    string Ticker,
+    string StockName,
+    string SignalType,
+    double ScoreTotal,
+    DateTime IssuedAt,
+    DateTime? ClosedAt,
+    double? EntryPrice,
+    double? StopPrice,
+    double? TargetPrice,
+    double? ExitPrice,
+    double? ReturnPct,
+    double? MaxRunupPct,
+    double? MaxDrawdownPct,
+    int? DurationDays,
+    string Outcome,
+    FactorProfileSnapshot? FactorProfile
+);

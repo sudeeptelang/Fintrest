@@ -1195,6 +1195,110 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         ));
     }
 
+    /// <summary>
+    /// Public audit log list. Every signal ever issued with its outcome —
+    /// wins and losses both — per FINTREST_UX_SPEC §12. Sorted newest
+    /// first. Optional ?status=win|loss|open filters the feed.
+    /// </summary>
+    [HttpGet("audit-log")]
+    public async Task<ActionResult<List<AuditLogEntry>>> AuditLog(
+        [FromQuery] string? status = null,
+        [FromQuery] int limit = 100,
+        CancellationToken ct = default)
+    {
+        limit = Math.Clamp(limit, 1, 500);
+
+        var query =
+            from signal in db.Signals
+            join perf in db.PerformanceTracking.Where(p => p.Outcome != null)
+                on signal.Id equals perf.SignalId into perfs
+            from perf in perfs.DefaultIfEmpty()
+            join stock in db.Stocks on signal.StockId equals stock.Id
+            select new { signal, perf, stock };
+
+        var rows = await query
+            .OrderByDescending(x => x.signal.CreatedAt)
+            .Take(limit)
+            .ToListAsync(ct);
+
+        var entries = rows.Select(x => new AuditLogEntry(
+            x.signal.Id,
+            x.stock.Ticker,
+            x.stock.Name,
+            x.signal.SignalType.ToString(),
+            Math.Round(x.signal.ScoreTotal, 0),
+            x.signal.CreatedAt,
+            x.perf?.ClosedAt,
+            x.perf?.EntryPrice,
+            x.perf?.ExitPrice,
+            x.perf == null ? null : Math.Round(x.perf.ReturnPct ?? 0, 2),
+            x.perf?.DurationDays,
+            x.perf?.Outcome ?? "open"
+        )).ToList();
+
+        if (!string.IsNullOrEmpty(status))
+        {
+            entries = status.ToLowerInvariant() switch
+            {
+                "win"  => entries.Where(e => e.Outcome == "target_hit").ToList(),
+                "loss" => entries.Where(e => e.Outcome == "stop_hit").ToList(),
+                "open" => entries.Where(e => e.Outcome == "open").ToList(),
+                _      => entries,
+            };
+        }
+
+        return Ok(entries);
+    }
+
+    /// <summary>Audit-log detail for one signal — entry/exit/outcome + factor profile at issue.</summary>
+    [HttpGet("audit-log/{signalId:long}")]
+    public async Task<ActionResult<AuditLogDetail>> AuditLogDetail(long signalId, CancellationToken ct)
+    {
+        var row = await (
+            from signal in db.Signals
+            join perf in db.PerformanceTracking.Where(p => p.Outcome != null)
+                on signal.Id equals perf.SignalId into perfs
+            from perf in perfs.DefaultIfEmpty()
+            join stock in db.Stocks on signal.StockId equals stock.Id
+            join breakdown in db.SignalBreakdowns on signal.Id equals breakdown.SignalId into breakdowns
+            from breakdown in breakdowns.DefaultIfEmpty()
+            where signal.Id == signalId
+            select new { signal, perf, stock, breakdown }
+        ).FirstOrDefaultAsync(ct);
+
+        if (row is null) return NotFound();
+
+        var factorProfile = row.breakdown is null ? null : new FactorProfileSnapshot(
+            Math.Round(row.breakdown.MomentumScore, 0),
+            Math.Round(row.breakdown.RelVolumeScore, 0),
+            Math.Round(row.breakdown.NewsScore, 0),
+            Math.Round(row.breakdown.FundamentalsScore, 0),
+            Math.Round(row.breakdown.SentimentScore, 0),
+            Math.Round(row.breakdown.TrendScore, 0),
+            Math.Round(row.breakdown.RiskScore, 0)
+        );
+
+        return Ok(new AuditLogDetail(
+            row.signal.Id,
+            row.stock.Ticker,
+            row.stock.Name,
+            row.signal.SignalType.ToString(),
+            Math.Round(row.signal.ScoreTotal, 0),
+            row.signal.CreatedAt,
+            row.perf?.ClosedAt,
+            row.signal.EntryLow,
+            row.signal.StopLoss,
+            row.signal.TargetHigh ?? row.signal.TargetLow,
+            row.perf?.ExitPrice,
+            row.perf?.ReturnPct,
+            row.perf?.MaxRunupPct,
+            row.perf?.MaxDrawdownPct,
+            row.perf?.DurationDays,
+            row.perf?.Outcome ?? "open",
+            factorProfile
+        ));
+    }
+
     [HttpGet("blog/{slug}")]
     public async Task<IActionResult> GetBlogPost(string slug)
     {

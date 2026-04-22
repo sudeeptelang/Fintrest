@@ -10,6 +10,23 @@ const FIVE_MIN = 1000 * 60 * 5;
 const TWO_MIN = 1000 * 60 * 2;
 const TEN_MIN = 1000 * 60 * 10;
 
+export function useAuditLog(status?: "win" | "loss" | "open") {
+  return useQuery({
+    queryKey: ["audit-log", status ?? "all"],
+    queryFn: () => api.auditLog(status, 100),
+    staleTime: FIVE_MIN,
+  });
+}
+
+export function useAuditLogDetail(signalId: number) {
+  return useQuery({
+    queryKey: ["audit-log-detail", signalId],
+    queryFn: () => api.auditLogDetail(signalId),
+    staleTime: FIVE_MIN,
+    enabled: signalId > 0,
+  });
+}
+
 export function useMarketSummary() {
   return useQuery({ queryKey: ["market-summary"], queryFn: api.marketSummary, staleTime: TWO_MIN });
 }

@@ -140,6 +140,51 @@ export interface PerformanceOverview {
   avgDrawdown: number;
 }
 
+export interface AuditLogEntry {
+  signalId: number;
+  ticker: string;
+  stockName: string;
+  signalType: string;
+  scoreTotal: number;
+  issuedAt: string;
+  closedAt: string | null;
+  entryPrice: number | null;
+  exitPrice: number | null;
+  returnPct: number | null;
+  durationDays: number | null;
+  outcome: string; // target_hit | stop_hit | horizon_expired | open
+}
+
+export interface FactorProfileSnapshot {
+  momentum: number;
+  relVolume: number;
+  news: number;
+  fundamentals: number;
+  sentiment: number;
+  trend: number;
+  risk: number;
+}
+
+export interface AuditLogDetail {
+  signalId: number;
+  ticker: string;
+  stockName: string;
+  signalType: string;
+  scoreTotal: number;
+  issuedAt: string;
+  closedAt: string | null;
+  entryPrice: number | null;
+  stopPrice: number | null;
+  targetPrice: number | null;
+  exitPrice: number | null;
+  returnPct: number | null;
+  maxRunupPct: number | null;
+  maxDrawdownPct: number | null;
+  durationDays: number | null;
+  outcome: string;
+  factorProfile: FactorProfileSnapshot | null;
+}
+
 export interface SectorPerformance {
   sector: string;
   stockCount: number;
@@ -507,8 +552,16 @@ export const api = {
   searchStocks: (q: string, limit = 8) =>
     fetchApi<StockSearchResult[]>(`/stocks/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 
-  // Performance (public)
+  // Performance + audit log (public — trust surface)
   performanceOverview: () => fetchApi<PerformanceOverview>("/performance/overview"),
+  auditLog: (status?: "win" | "loss" | "open", limit = 100) => {
+    const qs = new URLSearchParams();
+    if (status) qs.set("status", status);
+    qs.set("limit", String(limit));
+    return fetchApi<AuditLogEntry[]>(`/market/audit-log?${qs.toString()}`);
+  },
+  auditLogDetail: (signalId: number) =>
+    fetchApi<AuditLogDetail>(`/market/audit-log/${signalId}`),
 
   // Auth (authenticated)
   me: () => authFetchApi<UserResponse>("/auth/me"),
