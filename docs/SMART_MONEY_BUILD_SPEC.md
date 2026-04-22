@@ -25,6 +25,52 @@ The plan assumes one developer working full-time with Claude Code. Multiply by
 > - Treat the Python code as pseudocode — the scoring formulas, thresholds,
 >   and schemas are the canonical part; the language is not.
 
+> **Budget reality (2026-04-22) — supersedes cost tables below:**
+> Existing data spend is FMP Ultimate $139 + Polygon $200 = **$339/mo**.
+> Quiver Quantitative ($50–100) and Unusual Whales ($200–400) are **not
+> affordable** right now. Revised sub-signal plan:
+>
+> | Sub-signal | Revised source | Cost |
+> |---|---|---|
+> | Insider activity | SEC EDGAR Form 4 direct | **$0** |
+> | Institutional flow | SEC EDGAR 13F direct parse (not Whale Wisdom) | **$0** |
+> | Congressional | **FMP `/stable/senate-latest` + `/stable/house-latest`** (already paid for; skip Quiver). Per-member forward-accuracy weighting computed in-house from accumulated disclosure history once ≥6 months of data is on file. | **$0** |
+> | Short dynamics | **FINRA bi-monthly only** (skip Fintel). Days-to-cover + borrow-rate color deferred. | **$0** |
+> | Options positioning | **Deferred** — Unusual Whales waits for Pro revenue. Row renders greyed with "deferred until Pro revenue justifies the feed" message. | **deferred** |
+> | Macro regime | FRED API (no auth beyond free key) | **$0** |
+>
+> **Smart Money ships as 4-of-5 sub-signals at $0 incremental cost.** The
+> Options positioning row stays visible in the UI as a deferred state — same
+> honest empty-state discipline as Peer Comparison. Re-enable with the
+> Unusual Whales feed when revenue changes the math.
+
+> **Claude API cost (~$3–5/Pro user/mo at 50 theses) — must come down.**
+> Operating principle (confirmed 2026-04-22): **"only provide where required."**
+> No speculative Lens generation. Every Claude call is tied to a concrete
+> user request.
+>
+> Implementation:
+>
+> 1. **On-demand generation only.** Zero-out the nightly universe-wide
+>    narration job. Lens text is generated the first time a user opens a
+>    ticker (or it appears in a Top Today card) and then cached in Redis for
+>    14 hours. Cache key: `lens:{sub_signal}:{ticker}:{as_of_date}`. Unread
+>    tickers pay zero Claude dollars.
+> 2. **Pre-warm only the Top Today list (~15 tickers)** so the morning
+>    research drop hits a warm cache. That's ~15 × 6 calls = 90 calls/day of
+>    guaranteed spend.
+> 3. **Haiku 4.5 for sub-signal blurbs** (insider / institutional /
+>    congressional / short). Sonnet only for the 8-factor thesis that has to
+>    weave factors into prose. ~5× cost drop on ~80% of calls.
+> 4. **Batch sub-signal narrations** — one Haiku call returning all 4–5
+>    sentences costs ~1.2× a single call, not 5×.
+> 5. **Compress prompts** — current templates are ~280 tokens and can be cut
+>    to ~100 without quality loss.
+>
+> Combined with on-demand: projected $0.30–$0.80 per Pro user / month, or
+> roughly 1/10 the ChatGPT estimate. Margin at $29/mo becomes comfortable
+> rather than thin.
+
 ---
 
 ## Table of contents
