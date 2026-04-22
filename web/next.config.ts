@@ -16,11 +16,6 @@ const nextConfig: NextConfig = {
       { source: "/my/boards",           destination: "/boards" },
       { source: "/my/boards/:slug*",    destination: "/boards/:slug*" },
 
-      // "Research" pillar — Today's drop is the default sub-tab; the
-      // existing /dashboard page carries that content until a dedicated
-      // /research/page.tsx is built.
-      { source: "/research",            destination: "/dashboard" },
-
       // Audit log canonical path aliases the existing performance page.
       { source: "/audit",               destination: "/performance" },
       { source: "/audit/:slug*",        destination: "/performance/:slug*" },
