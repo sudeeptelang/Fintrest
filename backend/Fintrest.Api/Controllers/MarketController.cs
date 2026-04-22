@@ -1234,16 +1234,44 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     private async Task<SignalListResponse> ToSignalList(List<Signal> signals)
     {
         var prices = await GetLatestPricesAsync(signals);
+        var subscores = await GetFundamentalSubscoresAsync(signals);
         return new SignalListResponse(
             signals.Select(s =>
             {
                 var (close, changePct) = prices.GetValueOrDefault(s.StockId);
-                return ToDto(s, close > 0 ? close : null, changePct);
+                subscores.TryGetValue(s.Stock.Ticker, out var sub);
+                return ToDto(s, close > 0 ? close : null, changePct, sub);
             }).ToList(),
             signals.Count);
     }
 
-    private static SignalResponse ToDto(Signal s, double? currentPrice = null, double? changePct = null) => new(
+    /// <summary>
+    /// Batch-load the latest fundamental_subscore row per ticker for the
+    /// signals being returned. One query regardless of list size. Returns
+    /// empty dict if the table is empty (e.g. first boot before
+    /// FundamentalSubscoreJob has run).
+    /// </summary>
+    private async Task<Dictionary<string, (double? Quality, double? Profitability, double? Growth)>> GetFundamentalSubscoresAsync(List<Signal> signals)
+    {
+        if (signals.Count == 0) return new();
+        var tickers = signals.Select(s => s.Stock.Ticker).Distinct().ToList();
+        var rows = await db.FundamentalSubscores
+            .AsNoTracking()
+            .Where(f => tickers.Contains(f.Ticker))
+            .GroupBy(f => f.Ticker)
+            .Select(g => g.OrderByDescending(f => f.AsOfDate).First())
+            .Select(f => new { f.Ticker, f.QualityScore, f.ProfitabilityScore, f.GrowthScore })
+            .ToListAsync();
+        return rows.ToDictionary(
+            r => r.Ticker,
+            r => (r.QualityScore, r.ProfitabilityScore, r.GrowthScore));
+    }
+
+    private static SignalResponse ToDto(
+        Signal s,
+        double? currentPrice = null,
+        double? changePct = null,
+        (double? Quality, double? Profitability, double? Growth) sub = default) => new(
         s.Id, s.Stock.Ticker, s.Stock.Name, s.SignalType.ToString(), s.ScoreTotal,
         currentPrice, changePct,
         s.EntryLow, s.EntryHigh, s.StopLoss, s.TargetLow, s.TargetHigh,
@@ -1251,7 +1279,10 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         s.Breakdown is not null ? new SignalBreakdownDto(
             s.Breakdown.MomentumScore, s.Breakdown.RelVolumeScore, s.Breakdown.NewsScore,
             s.Breakdown.FundamentalsScore, s.Breakdown.SentimentScore, s.Breakdown.TrendScore,
-            s.Breakdown.RiskScore, s.Breakdown.ExplanationJson, s.Breakdown.WhyNowSummary
+            s.Breakdown.RiskScore, s.Breakdown.ExplanationJson, s.Breakdown.WhyNowSummary,
+            QualityScore: sub.Quality,
+            ProfitabilityScore: sub.Profitability,
+            GrowthScore: sub.Growth
         ) : null,
         s.CreatedAt
     );

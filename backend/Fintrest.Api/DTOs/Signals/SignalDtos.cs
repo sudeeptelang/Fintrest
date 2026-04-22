@@ -28,7 +28,12 @@ public record SignalBreakdownDto(
     double TrendScore,
     double RiskScore,
     string? ExplanationJson,
-    string? WhyNowSummary
+    string? WhyNowSummary,
+    // §14.1 — decomposition of the Fundamentals factor. Nullable because older
+    // signals scored before the sub-score table was populated have no backing row.
+    double? QualityScore = null,
+    double? ProfitabilityScore = null,
+    double? GrowthScore = null
 );
 
 public record SignalListResponse(List<SignalResponse> Signals, int Count);

@@ -43,6 +43,7 @@ import {
   buildTakeaways,
   getTradePlanNarrative,
   formatMarketCap,
+  fundamentalDecomposition,
 } from "@/lib/signal-explainer";
 
 interface StockDetailPageProps {
@@ -93,6 +94,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const signal = signalsData?.signals?.[0];
   const breakdown = signal?.breakdown;
   const factors = breakdown ? expandFactors(breakdown) : [];
+  const fundDecomp = breakdown ? fundamentalDecomposition(breakdown) : null;
 
   const entry = signal?.entryLow ?? signal?.currentPrice ?? null;
   const stop = signal?.stopLoss ?? null;
@@ -214,6 +216,24 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
                   <FactorRow key={f.name} name={f.name} score={f.score} summary={f.summary} />
                 ))}
               </FactorBreakdown>
+            </div>
+          )}
+
+          {/* §14.1 — Fundamentals decomposition (Quality / Profitability / Growth).
+              Sits under the 7-factor breakdown when sub-scores are available. */}
+          {fundDecomp && (
+            <div>
+              <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.14em] text-forest-dark mb-3">
+                Fundamentals decomposition
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <FundamentalSubscoreCard label="Quality" score={fundDecomp.quality} hint="gross margin + leverage discipline" />
+                <FundamentalSubscoreCard label="Profitability" score={fundDecomp.profitability} hint="ROE + op margin + net margin" />
+                <FundamentalSubscoreCard label="Growth" score={fundDecomp.growth} hint="revenue + EPS year-over-year" />
+              </div>
+              <p className="mt-3 text-[11px] text-ink-500 italic">
+                Each sub-score is sector-normalized — ranked against peers in the same GICS sector.
+              </p>
             </div>
           )}
 
@@ -372,5 +392,34 @@ function ThesisFallback({
         decision to act is yours.
       </p>
     </>
+  );
+}
+
+function FundamentalSubscoreCard({
+  label,
+  score,
+  hint,
+}: {
+  label: string;
+  score: number | null;
+  hint: string;
+}) {
+  const tone =
+    score == null ? "text-ink-400" :
+    score >= 70 ? "text-up" :
+    score >= 40 ? "text-ink-900" :
+    "text-down";
+  return (
+    <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-5">
+      <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-2">
+        {label}
+      </div>
+      <div className={cn("font-[var(--font-mono)] text-[28px] font-medium leading-none tracking-[-0.015em]", tone)}>
+        {score == null ? "—" : Math.round(score)}
+      </div>
+      <div className="mt-2 font-[var(--font-sans)] text-[11px] text-ink-500">
+        {hint}
+      </div>
+    </div>
   );
 }

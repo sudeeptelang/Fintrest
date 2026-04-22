@@ -60,6 +60,11 @@ export interface SignalBreakdown {
   riskScore: number;
   explanationJson: string | null;
   whyNowSummary: string | null;
+  // §14.1 — Quality/Profitability/Growth decomposition of the Fundamentals
+  // factor. Null for signals scored before FundamentalSubscoreJob ran.
+  qualityScore: number | null;
+  profitabilityScore: number | null;
+  growthScore: number | null;
 }
 
 export interface SignalListResponse {

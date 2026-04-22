@@ -13,11 +13,31 @@ export function expandFactors(b: SignalBreakdown): FactorSummary[] {
     { name: "Momentum",        score: b.momentumScore,     summary: momentumSummary(b.momentumScore) },
     { name: "Relative volume", score: b.relVolumeScore,    summary: relVolSummary(b.relVolumeScore) },
     { name: "News catalyst",   score: b.newsScore,         summary: newsSummary(b.newsScore) },
-    { name: "Earnings",        score: b.fundamentalsScore, summary: earningsSummary(b.fundamentalsScore) },
+    { name: "Fundamentals",    score: b.fundamentalsScore, summary: fundamentalsSummary(b) },
     { name: "Sentiment",       score: b.sentimentScore,    summary: sentimentSummary(b.sentimentScore) },
     { name: "Trend",           score: b.trendScore,        summary: trendSummary(b.trendScore) },
     { name: "Risk",            score: b.riskScore,         summary: riskSummary(b.riskScore) },
   ];
+}
+
+/**
+ * Q/P/G sub-component of the fundamentals factor — exposed on the signal
+ * detail page as a three-card decomposition below the 7-factor breakdown.
+ * Returns null when none of the sub-scores are present.
+ */
+export type FundamentalDecomposition = {
+  quality: number | null;
+  profitability: number | null;
+  growth: number | null;
+};
+
+export function fundamentalDecomposition(b: SignalBreakdown): FundamentalDecomposition | null {
+  if (b.qualityScore == null && b.profitabilityScore == null && b.growthScore == null) return null;
+  return {
+    quality: b.qualityScore,
+    profitability: b.profitabilityScore,
+    growth: b.growthScore,
+  };
 }
 
 function momentumSummary(s: number): string {
@@ -41,7 +61,17 @@ function newsSummary(s: number): string {
   return "Limited positive flow. News not the driver here.";
 }
 
-function earningsSummary(s: number): string {
+function fundamentalsSummary(b: SignalBreakdown): string {
+  const s = b.fundamentalsScore;
+  // If Q/P/G are present (§14.1), compose a specific summary.
+  if (b.qualityScore != null || b.profitabilityScore != null || b.growthScore != null) {
+    const parts: string[] = [];
+    if (b.qualityScore != null) parts.push(`Quality ${Math.round(b.qualityScore)}`);
+    if (b.profitabilityScore != null) parts.push(`Profitability ${Math.round(b.profitabilityScore)}`);
+    if (b.growthScore != null) parts.push(`Growth ${Math.round(b.growthScore)}`);
+    const prefix = s >= 75 ? "Strong fundamentals" : s >= 55 ? "Solid fundamentals" : s >= 40 ? "Mixed fundamentals" : "Weak fundamentals";
+    return `${prefix}. Decomposition: ${parts.join(" · ")}.`;
+  }
   if (s >= 80) return "Fundamentals strong. Beat history supports the setup.";
   if (s >= 60) return "Solid fundamentals. Earnings event risk worth tracking.";
   if (s >= 40) return "Mixed fundamentals. Earnings read-through uncertain.";
