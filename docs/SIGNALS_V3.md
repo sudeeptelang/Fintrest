@@ -456,3 +456,94 @@ score always available so the meta-learner can be A/B-toggled.
 
 Each step is independently shippable and can be feature-flagged behind the
 `scoring_weights_v3.yaml` config without a backend release.
+
+---
+
+## 14.9. Smart Money — 8th composite factor
+
+A fifth addition proposed separately from the §14.1–§14.7 sequence. Composite
+factor combining five insider-and-institutional sub-signals. Built in three
+phases so Phase 1 ships as a standalone signal before the full composite
+lands.
+
+### 14.9.0 Scope note
+
+Existing infrastructure we can already reuse: the `market_firehose_snapshot`
+table (migration 020) ingests insider + Senate + House rows daily from FMP.
+Phase 1's Week 1 ingestion is largely done — only the scoring service is new.
+
+### 14.9.1 Inputs and sub-weights
+
+Five data streams, each scored 0–100. Starting weights (backtest required):
+
+```
+Insider 35 · Institutional 25 · Congressional 15 · Options 15 · Short 10 = 100
+```
+
+Prior guess after honest 2022–2024 backtest: Insider may deserve **40**,
+Congressional may deserve **10**. Don't ship defaults without measurement.
+
+| # | Sub-signal | Source | Weight | Key filter |
+|---|---|---|---|---|
+| 1 | Insider transactions | SEC EDGAR Form 4 (primary) + OpenInsider (backup) | 35 | Open-market buys by officer/director/10% owner. Exclude option exercise, 10b5-1, gifts, tax-withholding. Cluster buys (3+ insiders in 30d) > lone purchases. CFO/CEO > director. Weight by size relative to prior holding. |
+| 2 | Institutional accumulation | 13F filings (EDGAR) or Whale Wisdom / Fintel | 25 | QoQ change in institutional ownership %, count of initiations vs closes, tracked-fund flags. Avoid survivorship bias in the tracked list. |
+| 3 | Congressional trades | Quiver Quantitative, Capitol Trades | 15 | Member-weighted by historical 90d forward-return accuracy. Recompute monthly. Hardcoding "Pelosi = high" is wrong — let data decide. |
+| 4 | Options flow | Unusual Whales, Cboe DataShop | 15 | Short-dated aggressive call buying at ask; unusual blocks vs open interest. Noisy but leading — a "something is about to happen" flag. |
+| 5 | Short-interest dynamics | Fintel, FINRA bi-monthly | 10 | Rising SI + rising price → squeeze setup. Falling SI + rising price → institutional conviction. Situational. |
+
+### 14.9.2 UI — 8th ring segment with tap-to-expand
+
+- Score ring goes 7 → 8 segments. Smart Money uses a distinctive color
+  (green, thematically right — check palette collision with `up` /
+  `forest`).
+- **Tap on the Smart Money segment** opens a secondary 5-segment mini-ring
+  showing the sub-components (insider / institutional / congressional /
+  options / short). No other factor gets this; Smart Money earns it
+  because it's composite.
+
+### 14.9.3 Lens explanation
+
+Generated nightly via Claude against raw transaction data, cached at
+`lens_smartmoney:{ticker}:{date}` with a 36h TTL. Don't regenerate per
+request. Template reads like a sell-side morning note:
+
+> **Smart Money · 82/100**
+>
+> Three insiders bought a combined $4.2M of open-market shares in the
+> last 30 days, including the CFO's largest purchase since joining in
+> 2023. Institutional ownership rose 3.1% QoQ, with Tiger Global
+> initiating a new $180M position. Unusual call buying on the Nov 22
+> expiry — 4× average volume, weighted toward the ask. No material
+> Congressional trades this quarter. The cluster of discretionary insider
+> buying is the dominant driver here.
+
+Structure: lead with strongest sub-component, cover others in descending
+order of contribution, end with the driver.
+
+### 14.9.4 Edge cases to design around
+
+- **Data freshness honesty.** Form 4 lag ~2 business days; 13F lag 45d;
+  Congressional lag up to 45d. Lens must timestamp: "based on insider
+  activity through Nov 18." Hiding staleness is a published-takedown
+  risk.
+- **10b5-1 planned sales look bearish but aren't** — automatic
+  dispositions. Exclude them at ingestion.
+- **Member-weighted Congressional recalibration** monthly.
+- **Survivorship in tracked-fund list** — publish transparently or use
+  aggregate counts only.
+- **Adverse selection over time** as Congressional visibility grows —
+  quarterly weight recalibration so the factor doesn't go stale.
+
+### 14.9.5 Build sequence
+
+| Phase | Scope | New data | Estimate |
+|---|---|---|---|
+| Phase 1 | SEC EDGAR Form 4 ingestion + OpenInsider backup. `insider_transactions` table. Nightly scoring `smart_money_insider_score`. Ship **standalone** signal in UI, not yet in main ring. | No — reuse `market_firehose_snapshot` | 1–2 weeks |
+| Phase 2 | Add 13F parsing + Quiver Congressional client. Wire all three into composite. Start Claude-generated Lens explanations. | 13F ingestion + Quiver key | 2–3 weeks |
+| Phase 3 | Add Unusual Whales options flow + Fintel short interest. Ship expanded 8-segment ring with tap-to-expand. | Options feed (~$99/mo), short-interest feed | 3–4 weeks |
+
+### 14.9.6 Acceptance
+
+Smart Money must **measurably improve** forward 5-day and 20-day returns vs
+the 7-factor baseline. If IC doesn't improve, weights are wrong — don't ship
+on aesthetics.
