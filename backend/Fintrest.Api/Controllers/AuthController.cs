@@ -125,6 +125,60 @@ public class AuthController(AppDbContext db) : ControllerBase
         return Ok(ToDto(user));
     }
 
+    /// <summary>
+    /// Save / update onboarding state. Called from the 4-step onboarding
+    /// funnel (docs/FINTREST_UX_SPEC.md §16). Every field is optional so the
+    /// step 2/3/4 UI can PATCH just what that step collects without
+    /// disturbing earlier answers. Setting `completed: true` stamps
+    /// `onboarding_completed_at` and the user exits the funnel.
+    /// </summary>
+    [Authorize]
+    [HttpPatch("me/onboarding")]
+    public async Task<ActionResult<OnboardingResponse>> UpdateOnboarding(
+        [FromBody] OnboardingRequest request)
+    {
+        var supabaseUuid = GetSupabaseUuid();
+        if (supabaseUuid is null) return Unauthorized();
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.SupabaseId == supabaseUuid.Value);
+        if (user is null) return NotFound();
+
+        if (request.ExperienceLevel is not null)
+            user.ExperienceLevel = request.ExperienceLevel;
+        if (request.RiskAppetite is not null)
+            user.RiskAppetite = request.RiskAppetite;
+        if (request.PreferredSectors is not null)
+            user.PreferredSectors = System.Text.Json.JsonSerializer.Serialize(request.PreferredSectors);
+        if (request.ReceiveMorningBriefing.HasValue)
+            user.ReceiveMorningBriefing = request.ReceiveMorningBriefing.Value;
+        if (request.ReceiveSignalAlerts.HasValue)
+            user.ReceiveSignalAlerts = request.ReceiveSignalAlerts.Value;
+        if (request.ReceiveWeeklyNewsletter.HasValue)
+            user.ReceiveWeeklyNewsletter = request.ReceiveWeeklyNewsletter.Value;
+
+        if (request.Completed == true)
+        {
+            user.OnboardingCompletedAt = DateTime.UtcNow;
+            user.OnboardingSkipped = false;
+        }
+        else if (request.Skipped == true)
+        {
+            user.OnboardingSkipped = true;
+            user.OnboardingCompletedAt = DateTime.UtcNow;
+        }
+
+        user.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        return Ok(new OnboardingResponse(
+            user.OnboardingCompletedAt != null,
+            user.OnboardingSkipped,
+            user.ExperienceLevel,
+            user.RiskAppetite,
+            user.PreferredSectors
+        ));
+    }
+
     private Guid? GetSupabaseUuid()
     {
         var sub = User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -139,8 +193,27 @@ public class AuthController(AppDbContext db) : ControllerBase
         user.Plan.ToString(),
         user.ReceiveMorningBriefing,
         user.ReceiveSignalAlerts,
-        user.ReceiveWeeklyNewsletter
+        user.ReceiveWeeklyNewsletter,
+        user.OnboardingCompletedAt != null,
+        user.OnboardingSkipped
     );
 }
 
 public record SyncProfileRequest(string? FullName);
+
+public record OnboardingRequest(
+    string? ExperienceLevel,
+    string? RiskAppetite,
+    List<string>? PreferredSectors,
+    bool? ReceiveMorningBriefing,
+    bool? ReceiveSignalAlerts,
+    bool? ReceiveWeeklyNewsletter,
+    bool? Completed,
+    bool? Skipped);
+
+public record OnboardingResponse(
+    bool Completed,
+    bool Skipped,
+    string? ExperienceLevel,
+    string? RiskAppetite,
+    string? PreferredSectors);

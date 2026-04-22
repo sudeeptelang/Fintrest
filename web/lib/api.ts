@@ -401,6 +401,8 @@ export interface UserResponse {
   receiveMorningBriefing: boolean;
   receiveSignalAlerts: boolean;
   receiveWeeklyNewsletter: boolean;
+  onboardingCompleted: boolean;
+  onboardingSkipped: boolean;
 }
 
 export interface UpdatePreferencesRequest {

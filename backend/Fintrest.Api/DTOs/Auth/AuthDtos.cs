@@ -22,7 +22,12 @@ public record UserResponse(
     string Plan,
     bool ReceiveMorningBriefing,
     bool ReceiveSignalAlerts,
-    bool ReceiveWeeklyNewsletter
+    bool ReceiveWeeklyNewsletter,
+    // Onboarding state — lets the frontend decide whether to redirect a
+    // user to /onboarding on first app load. Null completed + not skipped
+    // = greet the user; otherwise land on /markets.
+    bool OnboardingCompleted,
+    bool OnboardingSkipped
 );
 
 public record UpdatePreferencesRequest(
