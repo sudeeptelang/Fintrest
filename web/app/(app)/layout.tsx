@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
-import { AskAthenaFab } from "@/components/layout/ask-athena-fab";
 
 // v2 shell — 240px left rail + 56px top nav. Content area inherits ink-50 page bg
 // so every app route starts on the v2 canvas without a per-page change.
+// Ask Lens FAB removed for MVP — chat feature deferred.
 export default function AppLayout({
   children,
 }: {
@@ -26,7 +26,6 @@ export default function AppLayout({
           {children}
         </main>
       </div>
-      <AskAthenaFab />
     </div>
   );
 }

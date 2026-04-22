@@ -25,10 +25,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ProviderHealth> ProviderHealth => Set<ProviderHealth>();
     public DbSet<LlmTraceLog> LlmTraceLogs => Set<LlmTraceLog>();
 
-    // Chat
-    public DbSet<ChatSession> ChatSessions => Set<ChatSession>();
-
-    // Athena AI thesis per (scan_run, stock)
+    // Athena AI thesis per (scan_run, stock). (Chat feature removed for MVP —
+    // Fintrest's value is research + published outcome; conversational chat
+    // was not core and carried variable Claude cost per Pro user.)
     public DbSet<AthenaThesis> AthenaTheses => Set<AthenaThesis>();
 
     // Portfolio

@@ -29,8 +29,7 @@ export const PLANS = [
     annual:  { price: "$299", period: "/yr", slug: "pro-annual", savings: "Save 14% ($49)" },
     features: [
       "Full signal board (50+) with Lens filter chips",
-      "Unlimited Lens thesis",
-      "Ask Lens — unlimited research chat",
+      "Unlimited Lens thesis on every signal",
       "Unlimited research pages",
       "3 watchlists · 30 items",
       "Portfolio import + Lens research layer (3 portfolios)",
@@ -52,7 +51,6 @@ export const PLANS = [
       "Lens Personalized — thesis tuned to your holdings and risk profile",
       "Weekly portfolio research PDF (JPM-style layout)",
       "Backtest runner — historical what-if on any Lens filter",
-      "Priority Lens — no rate limits",
       "Early access to new research modules",
     ],
     cta: "Go Elite",

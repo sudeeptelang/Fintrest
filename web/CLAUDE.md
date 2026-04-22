@@ -48,21 +48,25 @@ Every screen is one of three. If a screen doesn't fit, the screen is wrong.
 |---|---|---|---|---|---|
 | Marketing | `/`, `/pricing`, `/about`, `/disclaimer`, `/risk-disclosure`, legal | 64px | none | 1200px | body 14px |
 | App-data | `/today`, `/boards`, `/markets`, `/audit`, `/watchlist/*`, `/alerts`, `/insiders`, `/congress` | 56px | 240px | 1120px | body 14px |
-| Focus-reading | `/signal/[id]`, `/ticker/[sym]`, `/boards/[id]`, `/ask`, `/settings/*` | 56px | 240px | 800px | body-lg 16px |
+| Focus-reading | `/signal/[id]`, `/ticker/[sym]`, `/boards/[id]`, `/settings/*` | 56px | 240px | 800px | body-lg 16px |
 
 ## App IA — 5 Primary Nav Items
 
 1. **Today** `/today` — today's research drop. Lands here on login.
 2. **Boards** `/boards` — user boards + editorial boards + discovery.
-3. **Markets** `/markets` — sector heatmap + regime + macro. Absorbs Insiders + Congress as filters.
-4. **Ask Lens** `/ask` — research chat (rename from `/athena`).
+3. **Portfolio** `/portfolio` — holdings, returns, factor analysis.
+4. **Markets** `/markets` — sector heatmap + regime + macro. Absorbs Insiders + Congress as filters.
 5. **Audit log** `/audit` — public signal performance (rename from `/performance`).
+
+> **Ask Lens chat removed for MVP** (docs/MVP_PUNCHLIST.md §6) — the
+> conversational chat surface was cut; thesis narration per signal stays.
+> Reinstatable post-launch once unit economics support it.
 
 **Secondary (More popover):** Watchlist, Alerts, Insiders, Congress, Notifications, Upload.
 
-**Top nav utilities (right side):** ticker search (`/` to focus), Ask Lens shortcut (⌘K), notifications bell, avatar menu.
+**Top nav utilities (right side):** ticker search (`/` to focus), notifications bell, avatar menu.
 
-**Mobile (< 1024px):** Left rail collapses to bottom tab bar (5 icons). Top nav 56px with logo + search + avatar only. Ask Lens becomes a floating button bottom-right.
+**Mobile (< 1024px):** Left rail collapses to bottom tab bar (5 icons). Top nav 56px with logo + search + avatar only.
 
 ## Key Component Patterns (v2)
 
@@ -128,8 +132,8 @@ app/
     layout.tsx          # Shell with top nav + left rail (desktop) or bottom tab (mobile)
     today/              # Primary landing (replaces /dashboard for logged-in flow)
     boards/             # Primary nav #2
-    markets/            # Primary nav #3 (absorbs /insiders, /congress as filters)
-    ask/                # Primary nav #4 (Ask Lens — rename from /athena)
+    portfolio/          # Primary nav #3
+    markets/            # Primary nav #4 (absorbs /insiders, /congress as filters)
     audit/              # Primary nav #5 (rename from /performance)
     signal/[id]         # Focus-reading
     ticker/[sym]        # Focus-reading (stock detail)

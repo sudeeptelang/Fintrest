@@ -551,18 +551,8 @@ export const api = {
       body: JSON.stringify(req),
     }),
 
-  // Athena Chat (authenticated)
-  athenaChat: (message: string, sessionId?: number) =>
-    authFetchApi<{ reply: string; sessionId: number | null }>("/athena/chat", {
-      method: "POST",
-      body: JSON.stringify({ message, sessionId }),
-    }),
-  athenaSessions: () =>
-    authFetchApi<{ id: number; title: string; createdAt: string; updatedAt: string }[]>("/athena/sessions"),
-  athenaSession: (id: number) =>
-    authFetchApi<{ id: number; title: string; messages: { Role: string; Content: string }[]; createdAt: string }>(`/athena/sessions/${id}`),
-  deleteAthenaSession: (id: number) =>
-    authFetchApi<void>(`/athena/sessions/${id}`, { method: "DELETE" }),
+  // Ask Lens chat removed for MVP. Thesis generation per-signal still lives
+  // under `/market/...` + `/stocks/{ticker}/thesis` and is unaffected.
 
   // Portfolio (authenticated)
   portfolios: () => authFetchApi<PortfolioSummary[]>("/portfolios"),

@@ -75,7 +75,7 @@ builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.PortfolioAiAdvisor>()
 builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.RiskAnalytics>();
 builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.PortfolioImporter>();
 builder.Services.AddScoped<Fintrest.Api.Services.Portfolio.ClaudeFinancialAdvisor>();
-builder.Services.AddScoped<Fintrest.Api.Services.AthenaService>();
+// AthenaService (chat) removed for MVP — see docs/MVP_PUNCHLIST.md §6.
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.AthenaThesisService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.AthenaNewsService>();
 

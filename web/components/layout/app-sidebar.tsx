@@ -8,7 +8,6 @@ import {
   LayoutGrid,
   Briefcase,
   BarChart3,
-  MessageSquare,
   ClipboardList,
   Star,
   Bell,
@@ -25,15 +24,14 @@ import { LogoMark } from "@/components/layout/logo";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/auth";
 
-// v2 IA — 6 primary nav items (matches docs/fintrest_app_screens_v2_preview.html)
-// Labels follow v2 copy; URLs point at the current route files until Phase 6 consolidation
-// renames /dashboard→/today, /athena→/ask, /performance→/audit.
+// v2 IA — 5 primary nav items (Ask Lens removed for MVP; chat deferred).
+// URLs point at the current route files until Phase 6 consolidation renames
+// /dashboard→/today and /performance→/audit.
 const primary = [
   { label: "Today",     href: "/dashboard",   icon: Clock3,         matchPaths: ["/dashboard", "/today", "/picks"] },
   { label: "Boards",    href: "/boards",      icon: LayoutGrid,     matchPaths: ["/boards"] },
   { label: "Portfolio", href: "/portfolio",   icon: Briefcase,      matchPaths: ["/portfolio"] },
   { label: "Markets",   href: "/markets",     icon: BarChart3,      matchPaths: ["/markets", "/heatmap"] },
-  { label: "Ask Lens",  href: "/athena",      icon: MessageSquare,  matchPaths: ["/athena", "/ask"] },
   { label: "Audit log", href: "/performance", icon: ClipboardList,  matchPaths: ["/performance", "/audit"] },
 ] as const;
 
