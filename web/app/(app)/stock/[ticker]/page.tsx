@@ -393,7 +393,12 @@ function fundamentalsSummary(
   return `${prefix} · ${populated} of 3 sub-scores populated`;
 }
 
-function relatedNewsSummary(news: { source?: string | null }[] | null | undefined): string {
+function relatedNewsSummary(
+  news:
+    | { source?: string | null; sentimentScore?: number | null; contributedToScore?: boolean | null }[]
+    | null
+    | undefined,
+): string {
   if (!news || news.length === 0) return "No recent articles.";
   const sources = Array.from(
     new Set(
@@ -403,8 +408,19 @@ function relatedNewsSummary(news: { source?: string | null }[] | null | undefine
         .slice(0, 3),
     ),
   );
-  const base = `${news.length} articles`;
-  return sources.length > 0 ? `${base} · ${sources.join(" · ")}` : base;
+  const contributed = news.filter((n) => n.contributedToScore === true).length;
+  // Pre-flag fallback: high-sentiment items are a reasonable proxy for
+  // "contributed" until the scoring pipeline writes the flag.
+  const contributedFallback =
+    contributed === 0
+      ? news.filter((n) => n.sentimentScore != null && Math.abs(n.sentimentScore) >= 0.3).length
+      : 0;
+  const effective = contributed > 0 ? contributed : contributedFallback;
+
+  const parts = [`${news.length} articles`];
+  if (effective > 0) parts.push(`${effective} contributed to news score`);
+  if (sources.length > 0) parts.push(sources.join(" · "));
+  return parts.join(" · ");
 }
 
 // §14.9 — Smart Money placeholder. The sub-feeds ship in phases; until each

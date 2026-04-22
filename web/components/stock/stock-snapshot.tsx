@@ -89,6 +89,15 @@ function Section({ title, items }: { title: string; items: DataItem[] }) {
   );
 }
 
+// Honest empty-state per QA-P0-3: hide a section when more than half the
+// cells are `—`. Without this filter we ship cards that look like data but
+// carry no information, which is the main complaint from the MSFT review.
+function density(items: DataItem[]): number {
+  if (items.length === 0) return 0;
+  const filled = items.filter((i) => i.value !== "—").length;
+  return filled / items.length;
+}
+
 export function StockSnapshot({ snapshot: s }: Props) {
   const valuation: DataItem[] = [
     { label: "Market Cap", value: fmtMarketCap(s.marketCap) },
@@ -235,6 +244,16 @@ export function StockSnapshot({ snapshot: s }: Props) {
     },
   ];
 
+  const sections: { title: string; items: DataItem[] }[] = [
+    { title: "Valuation", items: valuation },
+    { title: "Margins · Estimates", items: margins },
+    { title: "Performance", items: performance },
+    { title: "Quote · Volume", items: volume },
+    { title: "Technicals", items: technicals },
+  ].filter((s) => density(s.items) >= 0.5);
+
+  if (sections.length < 2) return null;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -244,11 +263,9 @@ export function StockSnapshot({ snapshot: s }: Props) {
     >
       <h2 className="font-[var(--font-heading)] text-lg font-semibold">Snapshot</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <Section title="Valuation" items={valuation} />
-        <Section title="Margins · Estimates" items={margins} />
-        <Section title="Performance" items={performance} />
-        <Section title="Quote · Volume" items={volume} />
-        <Section title="Technicals" items={technicals} />
+        {sections.map((s) => (
+          <Section key={s.title} title={s.title} items={s.items} />
+        ))}
       </div>
     </motion.div>
   );

@@ -113,6 +113,11 @@ export interface NewsItem {
   catalystType: string | null;
   publishedAt: string | null;
   ticker: string | null;
+  // §14.5 related — the news-catalyst factor picks a subset of articles per
+  // signal to fold into the score. This flag is set by the scoring pipeline
+  // on each item that was actually consumed. Null = pre-flag data; we fall
+  // back to sentiment heuristics for the UI summary in that case.
+  contributedToScore?: boolean | null;
 }
 
 export interface NewsAthenaSummary {
