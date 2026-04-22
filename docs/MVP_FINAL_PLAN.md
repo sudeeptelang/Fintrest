@@ -57,19 +57,46 @@ v2. The work is restructure + rename + polish, not greenfield.
 
 ---
 
-## Mobile — honest scope
+## Mobile — honest scope (updated per user direction: iOS App Store launch)
 
-Full native Flutter mobile app is in the spec but realistically 3–4 weeks
-of work minimum (re-theme + v2 alignment + platform polish + store
-submission). **Cannot ship native mobile by May 10.**
+User wants web AND iOS App Store launch for MVP-1. Native Flutter from
+the existing `mobile/` scaffold is 3–4 weeks minimum — doesn't fit the
+timeline. The shippable path is **Capacitor-wrapped web app**: the same
+responsive Next.js codebase, wrapped as a native iOS shell for App Store
+submission. One codebase, two distribution channels.
 
-**MVP-1 mobile approach: responsive web.** The existing web app is built
-on Tailwind + next.js; making it work at 390px is polish, not rebuild.
-Native Flutter app becomes MVP-2 (June track).
+**What this adds to the plan:**
+- ~1 week of Capacitor integration + iOS-specific polish (safe-areas,
+  status bar, native gestures, splash screen, app icons)
+- Apple Developer account + TestFlight setup
+- App Store Connect listing (name, description, screenshots, privacy
+  labels, review notes)
+- 1–3 day App Store review buffer (can be up to a week for a new app)
 
-The spec's phone mockups map 1:1 to responsive web at mobile breakpoint.
-Users can add to home screen for an app-like feel. Not ideal for the
-launch story, but honest given timeline.
+**Realistic iOS public availability: May 13–17**, even if we submit
+on May 10. Web ships May 10 regardless.
+
+### Apple IAP decision — hard gate
+
+Apple requires In-App Purchase for digital subscriptions (guideline
+3.1.3). Stripe-only subs inside an iOS app = rejection. Two options:
+
+- **Option A (recommended for MVP-1)**: iOS app is login + read-only for
+  Free tier. Upgrade to Pro/Elite happens on web (allowed in 2024
+  guideline update — "reader apps" pattern). No Apple cut. Cheapest to
+  ship. Small UX friction for iOS users who want to subscribe.
+- **Option B (MVP-2)**: StoreKit2 implementation alongside Stripe. iOS
+  users subscribe in-app; server-side reconciliation. +1 week + 15%
+  Apple cut on iOS-originated subs.
+
+**MVP-1 = Option A.** Move to Option B after iOS conversion data.
+
+### Flutter app status
+
+Existing `mobile/` Flutter scaffold gets **parked**. Codebase is v1 theme
+with minimal screens; re-doing it within timeline doesn't make sense when
+the web app already contains every screen. Revisit post-launch if
+Capacitor-wrap performance isn't acceptable.
 
 ---
 
@@ -89,8 +116,12 @@ launch story, but honest given timeline.
 | 14 (May 6) | **Settings + Billing** | Upgrade/downgrade flow · plan change |
 | 15 (May 7) | **Landing page fixes** | Remove fake testimonials · replace badges · add screenshots |
 | 16 (May 8) | **Methodology stub** | Trust page with minimum content |
-| 17 (May 9) | **Responsive mobile QA** | 390px audit every screen · fix breaks |
-| 18 (May 10) | **Launch polish + ship** | Sentry · sitemap · email unsubscribe · final QA |
+| 15 (May 7) | **Landing fixes + methodology stub** | Both in parallel (compressed) |
+| 16 (May 8) | **Responsive mobile QA at 390px** | Audit every screen · fix breaks |
+| 16 (May 8) | **Capacitor iOS wrap** | Parallel track: install Capacitor, configure iOS project, app icon, splash, safe-areas |
+| 17 (May 9) | **iOS TestFlight + Apple Dev + store listing** | Submit to TestFlight internal · prep App Store Connect listing (screenshots, description, privacy labels) |
+| 17 (May 9) | **Launch polish (web)** | Sentry · sitemap · email unsubscribe |
+| 18 (May 10) | **Web ship + iOS submit to App Store review** | Web goes live; iOS submits and waits on Apple review 1–3 days |
 
 Each day is narrow enough to ship something working end-of-day. If any
 day overruns, the work slips into a buffer weekend (May 4, May 11)
