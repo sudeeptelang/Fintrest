@@ -14,6 +14,18 @@ export function useMarketSummary() {
   return useQuery({ queryKey: ["market-summary"], queryFn: api.marketSummary, staleTime: TWO_MIN });
 }
 
+// Lands with the §14.5 macro pipeline. While the endpoint is not yet
+// implemented the 404 is silently swallowed — the header pill hides and
+// the Deep Dive macro row stays in its greyed state.
+export function useMarketRegime() {
+  return useQuery({
+    queryKey: ["market-regime"],
+    queryFn: () => api.marketRegime().catch(() => null),
+    staleTime: FIVE_MIN,
+    retry: false,
+  });
+}
+
 export function useMarketSectors() {
   return useQuery({ queryKey: ["market-sectors"], queryFn: api.marketSectors, staleTime: FIVE_MIN });
 }

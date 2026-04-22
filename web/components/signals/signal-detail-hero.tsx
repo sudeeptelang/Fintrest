@@ -3,7 +3,29 @@
 import { cn } from "@/lib/utils";
 import type { Signal, StockInfo } from "@/lib/api";
 import { ScoreRing } from "@/components/signals/score-ring";
-import { SignalBadge, signalTypeToVariant } from "@/components/signals/signal-badge";
+import { SignalBadge } from "@/components/signals/signal-badge";
+
+// Non-directive variant per QA-P0-4 + docs/DESIGN_TICKER_DEEP_DIVE.md.
+// "BUY TODAY" reads like investment advice; "In research set" reads like an
+// editorial label. Avoid / setup / high-score cover the other buckets.
+function researchSetVariant(signalType: string, scoreTotal: number) {
+  const t = signalType.toUpperCase();
+  if (t === "AVOID" || t === "HIGH_RISK") return "avoid" as const;
+  if (scoreTotal >= 85) return "high-score" as const;
+  if (t === "BUY_TODAY" || t === "BUY") return "setup" as const;
+  return "research" as const;
+}
+
+// Signal horizon is a single int on the wire today; the UI presents it as a
+// range because the scoring engine writes the center of a window. Soft range
+// of ±25% around the center — replace with real horizonMin/horizonMax when
+// the DTO picks them up.
+function formatHorizon(horizonDays: number | null): string | null {
+  if (horizonDays == null || horizonDays <= 0) return null;
+  const lo = Math.max(1, Math.round(horizonDays * 0.8));
+  const hi = Math.max(lo + 1, Math.round(horizonDays * 1.25));
+  return `${lo}–${hi} day horizon`;
+}
 
 /**
  * Signal/Ticker detail hero — ticker + badge, company, price/change, action
@@ -33,15 +55,21 @@ export function SignalDetailHero({
   className?: string;
 }) {
   const up = (signal?.changePct ?? 0) >= 0;
-  const variant = signal ? signalTypeToVariant(signal.signalType) : "watch";
+  const variant = signal
+    ? researchSetVariant(signal.signalType, signal.scoreTotal)
+    : "research";
 
-  const companyLine = [
+  const horizonLabel = signal ? formatHorizon(signal.horizonDays) : null;
+  // Company + signal meta on one line, mockup order:
+  //   Microsoft Corp · Signal #106 · 15–20 day horizon
+  // Sector + exchange move into the Fundamentals deep-dive row — keeps the
+  // hero tight on the ticker identity.
+  const metaParts = [
     stock?.name,
-    stock?.sector,
-    stock?.exchange,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+    signal ? `Signal #${signal.id}` : null,
+    horizonLabel,
+  ].filter((v): v is string => !!v);
+  const companyLine = metaParts.join(" · ");
 
   return (
     <section

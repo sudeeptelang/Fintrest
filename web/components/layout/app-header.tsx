@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { Bell, Menu } from "lucide-react";
-import { useCurrentUser, useSubscription } from "@/lib/hooks";
+import { useCurrentUser, useSubscription, useMarketRegime } from "@/lib/hooks";
 import { TickerSearch } from "@/components/stock/ticker-search";
+import { RegimePill } from "@/components/layout/regime-pill";
 import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
@@ -16,6 +17,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const router = useRouter();
   const { data: user } = useCurrentUser();
   const { data: sub } = useSubscription();
+  const { data: regime } = useMarketRegime();
 
   const initials = user?.fullName
     ? user.fullName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
@@ -51,8 +53,9 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         </div>
       </div>
 
-      {/* Right cluster: tier badge · bell · avatar */}
-      <div className="flex items-center gap-1.5">
+      {/* Right cluster: regime pill · tier badge · bell · avatar */}
+      <div className="flex items-center gap-2">
+        <RegimePill regime={regime ?? null} />
         <span
           className={cn(
             "hidden sm:inline-flex items-center px-2 py-[5px] rounded text-[10px] font-semibold tracking-[0.1em] uppercase border",

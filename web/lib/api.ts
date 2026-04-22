@@ -452,9 +452,18 @@ export interface AlertResponse {
 
 // --- API Functions ---
 
+export interface MarketRegimeDto {
+  state: "risk-on" | "neutral" | "risk-off";
+  vix: number | null;
+  tenYear: number | null;
+  dxy: number | null;
+  updatedAt: string | null;
+}
+
 export const api = {
   // Market (public)
   marketSummary: () => fetchApi<MarketSummary>("/market/summary"),
+  marketRegime: () => fetchApi<MarketRegimeDto>("/market/regime"),
   marketSectors: () => fetchApi<SectorPerformance[]>("/market/sectors"),
   marketIndices: () => fetchApi<MarketIndex[]>("/market/indices"),
   marketTrending: (limit = 10) => fetchApi<TrendingStock[]>(`/market/trending?limit=${limit}`),
