@@ -138,6 +138,11 @@ public class AlertDispatcher(
                 .Where(u => u.ReceiveMorningBriefing && !string.IsNullOrEmpty(u.Email))
                 .ToListAsync(ct);
 
+            // Top movers block — built once per briefing, same data for
+            // every recipient. Mirrors the web /markets TopMovers card
+            // (gainers / losers / unusual volume × 5 each).
+            var topMovers = await ComputeTopMoversAsync(ct);
+
             int sent = 0, failed = 0;
             var subject = $"Your Morning Signals — {latestScan.CompletedAt:MMM d}";
 
@@ -147,7 +152,8 @@ public class AlertDispatcher(
                     user.FullName ?? "",
                     topSignals,
                     latestScan.CompletedAt ?? DateTime.UtcNow,
-                    UnsubscribeUrlFor(user.Id));
+                    UnsubscribeUrlFor(user.Id),
+                    topMovers);
 
                 var result = await emailService.SendAsync(user.Email, subject, html, null, ct);
                 if (result.Success) sent++; else failed++;
@@ -272,6 +278,59 @@ public class AlertDispatcher(
 
         await FinaliseBriefing(run, "completed", audience: users.Count, sent: sent, failed: failed, error: null, ct);
         return new DispatchResult(users.Count, sent, failed == 0 ? null : $"{failed} sends failed");
+    }
+
+    /// <summary>
+    /// Top movers for the morning-briefing email. Mirrors the web
+    /// /markets TopMovers card: gainers, losers, unusual volume × 5
+    /// rows each. Same raw data source (latest stocks + day change %),
+    /// rendered as email-safe HTML in EmailTemplates.MorningBriefing.
+    /// </summary>
+    private async Task<EmailTemplates.TopMoversBlock> ComputeTopMoversAsync(CancellationToken ct)
+    {
+        // Pull latest 2 bars per stock for change-% and volume ratio.
+        // Mirrors MarketController.Screener shape but smaller + simpler.
+        var cutoff = DateTime.UtcNow.AddDays(-10);
+        var bars = await db.MarketData
+            .Where(m => m.Ts >= cutoff)
+            .Select(m => new { m.StockId, m.Ts, m.Close, m.Volume })
+            .ToListAsync(ct);
+
+        var stocks = await db.Stocks
+            .Select(s => new { s.Id, s.Ticker })
+            .ToListAsync(ct);
+
+        var byStock = bars
+            .GroupBy(b => b.StockId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(b => b.Ts).Take(31).ToList());
+
+        var rows = new List<(string Ticker, double ChangePct, double RelVolume, double Close)>();
+        foreach (var stock in stocks)
+        {
+            if (!byStock.TryGetValue(stock.Id, out var sBars) || sBars.Count < 2) continue;
+            var latest = sBars[0];
+            var prev = sBars[1];
+            if (prev.Close <= 0) continue;
+            var changePct = (latest.Close - prev.Close) / prev.Close * 100.0;
+            var avgVol = sBars.Skip(1).Take(30).Select(b => (double)b.Volume).DefaultIfEmpty(0).Average();
+            var relVol = avgVol > 0 ? (double)latest.Volume / avgVol : 0;
+            rows.Add((stock.Ticker, changePct, relVol, latest.Close));
+        }
+
+        static EmailTemplates.TopMoverRow Row(string ticker, string primary, bool up) =>
+            new(ticker, primary, up);
+
+        var gainers = rows.OrderByDescending(r => r.ChangePct).Take(5)
+            .Select(r => Row(r.Ticker, $"+{r.ChangePct:F2}%", true)).ToList();
+        var losers = rows.OrderBy(r => r.ChangePct).Take(5)
+            .Select(r => Row(r.Ticker, $"{r.ChangePct:F2}%", false)).ToList();
+        var unusual = rows.Where(r => r.RelVolume >= 1.5)
+            .OrderByDescending(r => r.RelVolume).Take(5)
+            .Select(r => Row(r.Ticker, $"{r.RelVolume:F1}×", true)).ToList();
+
+        return new EmailTemplates.TopMoversBlock(gainers, losers, unusual);
     }
 }
 

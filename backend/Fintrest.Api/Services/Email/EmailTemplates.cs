@@ -23,7 +23,18 @@ public static class EmailTemplates
     // MORNING BRIEFING — daily signal recap
     // ════════════════════════════════════════════════════════════════
 
-    public static string MorningBriefing(string userName, List<Signal> topSignals, DateTime scanDate, string? unsubscribeUrl = null)
+    public record TopMoverRow(string Ticker, string Primary, bool IsUp);
+    public record TopMoversBlock(
+        List<TopMoverRow> Gainers,
+        List<TopMoverRow> Losers,
+        List<TopMoverRow> UnusualVolume);
+
+    public static string MorningBriefing(
+        string userName,
+        List<Signal> topSignals,
+        DateTime scanDate,
+        string? unsubscribeUrl = null,
+        TopMoversBlock? topMovers = null)
     {
         var sb = new StringBuilder();
         sb.Append(Header("Your Morning Signals"));
@@ -92,8 +103,55 @@ public static class EmailTemplates
   </div>
 </div>");
 
+        if (topMovers is not null)
+            sb.Append(TopMoversSection(topMovers));
+
         sb.Append(Footer(unsubscribeUrl));
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// 3-column "Top movers today" block appended to the MorningBriefing.
+    /// Table-based layout for email client compatibility. Same three
+    /// buckets as the web TopMovers card: gainers, losers, unusual volume.
+    /// </summary>
+    private static string TopMoversSection(TopMoversBlock m)
+    {
+        string Column(string title, List<TopMoverRow> rows, string toneDefault)
+        {
+            var body = rows.Count == 0
+                ? $@"<div style='padding:14px; font-size:11px; color:{MutedText}; text-align:center; font-style:italic;'>No matches today.</div>"
+                : string.Join("", rows.Take(5).Select(r => {
+                    var tone = r.IsUp ? Gain : (toneDefault == Loss ? Loss : Brand);
+                    return $@"
+            <tr>
+              <td style='padding:6px 12px; border-top:1px solid {Border};'>
+                <a href='https://fintrest.ai/stock/{r.Ticker}' style='font-family:Monaco,Courier,monospace; font-weight:700; color:{TextColor}; text-decoration:none; font-size:12px;'>{r.Ticker}</a>
+              </td>
+              <td style='padding:6px 12px; border-top:1px solid {Border}; text-align:right; font-family:Monaco,Courier,monospace; font-size:12px; font-weight:600; color:{tone};'>{r.Primary}</td>
+            </tr>";
+                }));
+
+            return $@"
+      <td valign='top' style='width:33%; padding:0 6px;'>
+        <div style='border:1px solid {Border}; border-radius:8px; overflow:hidden;'>
+          <div style='padding:8px 12px; background:{Background}; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:{MutedText};'>{title}</div>
+          <table width='100%' cellspacing='0' cellpadding='0'>{body}</table>
+        </div>
+      </td>";
+        }
+
+        return $@"
+<div style='padding:0 24px 24px;'>
+  <h3 style='margin:8px 0 12px; font-size:14px; font-weight:700; color:{TextColor};'>Top movers today</h3>
+  <table width='100%' cellspacing='0' cellpadding='0'>
+    <tr>
+      {Column("Gainers", m.Gainers, Gain)}
+      {Column("Losers", m.Losers, Loss)}
+      {Column("Unusual volume", m.UnusualVolume, Brand)}
+    </tr>
+  </table>
+</div>";
     }
 
     // ════════════════════════════════════════════════════════════════
