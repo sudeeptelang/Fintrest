@@ -23,7 +23,7 @@ public static class EmailTemplates
     // MORNING BRIEFING — daily signal recap
     // ════════════════════════════════════════════════════════════════
 
-    public static string MorningBriefing(string userName, List<Signal> topSignals, DateTime scanDate)
+    public static string MorningBriefing(string userName, List<Signal> topSignals, DateTime scanDate, string? unsubscribeUrl = null)
     {
         var sb = new StringBuilder();
         sb.Append(Header("Your Morning Signals"));
@@ -92,7 +92,7 @@ public static class EmailTemplates
   </div>
 </div>");
 
-        sb.Append(Footer());
+        sb.Append(Footer(unsubscribeUrl));
         return sb.ToString();
     }
 
@@ -100,7 +100,7 @@ public static class EmailTemplates
     // SIGNAL ALERT — single stock triggered alert
     // ════════════════════════════════════════════════════════════════
 
-    public static string SignalAlert(string userName, Signal signal, string alertReason)
+    public static string SignalAlert(string userName, Signal signal, string alertReason, string? unsubscribeUrl = null)
     {
         var sb = new StringBuilder();
         sb.Append(Header("Signal Alert"));
@@ -144,7 +144,7 @@ public static class EmailTemplates
   </div>
 </div>");
 
-        sb.Append(Footer());
+        sb.Append(Footer(unsubscribeUrl));
         return sb.ToString();
     }
 
@@ -156,7 +156,8 @@ public static class EmailTemplates
         string userName,
         string marketSummary,
         List<Signal> weeklyPicks,
-        DateTime weekOf)
+        DateTime weekOf,
+        string? unsubscribeUrl = null)
     {
         var sb = new StringBuilder();
         sb.Append(Header($"Week of {weekOf:MMM d}"));
@@ -210,7 +211,7 @@ public static class EmailTemplates
   </div>
 </div>");
 
-        sb.Append(Footer());
+        sb.Append(Footer(unsubscribeUrl));
         return sb.ToString();
     }
 
@@ -223,7 +224,8 @@ public static class EmailTemplates
         string ticker,
         string alertType,
         double trigger,
-        double latestPrice)
+        double latestPrice,
+        string? unsubscribeUrl = null)
     {
         var sb = new StringBuilder();
         sb.Append(Header("Price alert"));
@@ -256,7 +258,7 @@ public static class EmailTemplates
   </p>
 </div>");
 
-        sb.Append(Footer());
+        sb.Append(Footer(unsubscribeUrl));
         return sb.ToString();
     }
 
@@ -280,7 +282,15 @@ public static class EmailTemplates
       </div>
     </div>";
 
-    private static string Footer() => $@"
+    private static string Footer(string? unsubscribeUrl = null)
+    {
+        // CAN-SPAM requires a functional unsubscribe link. When the caller
+        // passes a per-user signed URL, use it; otherwise fall back to the
+        // marketing /unsubscribe page which prompts for a signed link.
+        var link = string.IsNullOrEmpty(unsubscribeUrl)
+            ? "https://fintrest.ai/unsubscribe"
+            : unsubscribeUrl;
+        return $@"
     <div style='padding:20px 24px; background:{Background}; border-top:1px solid {Border};'>
       <p style='margin:0 0 8px; font-size:11px; color:{MutedText}; text-align:center;'>
         <strong>Educational content only — not financial advice.</strong>
@@ -292,12 +302,13 @@ public static class EmailTemplates
       <p style='margin:0; font-size:10px; color:{MutedText}; text-align:center;'>
         <a href='https://fintrest.ai/settings' style='color:{MutedText}; text-decoration:underline;'>Manage preferences</a>
         &nbsp;·&nbsp;
-        <a href='https://fintrest.ai/unsubscribe' style='color:{MutedText}; text-decoration:underline;'>Unsubscribe</a>
+        <a href='{link}' style='color:{MutedText}; text-decoration:underline;'>Unsubscribe</a>
       </p>
     </div>
   </div>
 </body>
 </html>";
+    }
 
     private static string TradeLevel(string label, string value, string color) => $@"
     <div style='flex:1; background:{Background}; border:1px solid {Border}; border-radius:10px; padding:12px; text-align:center;'>

@@ -179,6 +179,36 @@ public class AuthController(AppDbContext db) : ControllerBase
         ));
     }
 
+    /// <summary>
+    /// One-click unsubscribe — CAN-SPAM honours the request immediately.
+    /// Anonymous: signed URL validates the user_id; no login required.
+    /// Flips all three email opt-ins to false. Idempotent — re-hitting
+    /// the endpoint is a no-op.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("unsubscribe")]
+    public async Task<IActionResult> Unsubscribe(
+        [FromQuery] long uid,
+        [FromQuery] string sig,
+        [FromServices] Fintrest.Api.Services.Email.UnsubscribeTokenService tokens,
+        CancellationToken ct)
+    {
+        if (!tokens.Verify(uid, sig))
+            return Ok(new UnsubscribeResponse(false, "Invalid or expired unsubscribe link."));
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == uid, ct);
+        if (user is null)
+            return Ok(new UnsubscribeResponse(false, "Account not found."));
+
+        user.ReceiveMorningBriefing = false;
+        user.ReceiveSignalAlerts = false;
+        user.ReceiveWeeklyNewsletter = false;
+        user.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new UnsubscribeResponse(true, $"Unsubscribed {user.Email} from all Fintrest emails."));
+    }
+
     private Guid? GetSupabaseUuid()
     {
         var sub = User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -200,6 +230,8 @@ public class AuthController(AppDbContext db) : ControllerBase
 }
 
 public record SyncProfileRequest(string? FullName);
+
+public record UnsubscribeResponse(bool Success, string Message);
 
 public record OnboardingRequest(
     string? ExperienceLevel,

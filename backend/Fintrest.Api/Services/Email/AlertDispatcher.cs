@@ -11,8 +11,19 @@ namespace Fintrest.Api.Services.Email;
 public class AlertDispatcher(
     AppDbContext db,
     EmailService emailService,
+    UnsubscribeTokenService unsubscribeTokens,
+    IConfiguration config,
     ILogger<AlertDispatcher> logger)
 {
+    private readonly string _siteUrl =
+        config["Site:Url"] ?? "https://fintrest.ai";
+
+    private string UnsubscribeUrlFor(long userId)
+    {
+        var sig = unsubscribeTokens.Sign(userId);
+        return $"{_siteUrl}/unsubscribe?uid={userId}&sig={sig}";
+    }
+
     /// <summary>
     /// Check all active alerts against the latest scan's signals.
     /// Fire emails for matches. Returns number of emails sent.
@@ -63,7 +74,8 @@ public class AlertDispatcher(
             var html = EmailTemplates.SignalAlert(
                 alert.User.FullName ?? "",
                 signal,
-                reason);
+                reason,
+                UnsubscribeUrlFor(alert.User.Id));
 
             var subject = signal.SignalType == SignalType.BUY_TODAY
                 ? $"🟢 BUY signal: {signal.Stock.Ticker}"
@@ -134,7 +146,8 @@ public class AlertDispatcher(
                 var html = EmailTemplates.MorningBriefing(
                     user.FullName ?? "",
                     topSignals,
-                    latestScan.CompletedAt ?? DateTime.UtcNow);
+                    latestScan.CompletedAt ?? DateTime.UtcNow,
+                    UnsubscribeUrlFor(user.Id));
 
                 var result = await emailService.SendAsync(user.Email, subject, html, null, ct);
                 if (result.Success) sent++; else failed++;
@@ -247,7 +260,8 @@ public class AlertDispatcher(
         foreach (var user in users)
         {
             var html = EmailTemplates.WeeklyNewsletter(
-                user.FullName ?? "", marketSummary, weeklyPicks, DateTime.UtcNow);
+                user.FullName ?? "", marketSummary, weeklyPicks, DateTime.UtcNow,
+                UnsubscribeUrlFor(user.Id));
             var result = await emailService.SendAsync(user.Email, subject, html, null, ct);
             if (result.Success) sent++; else failed++;
         }

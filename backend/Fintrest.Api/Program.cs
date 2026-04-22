@@ -187,6 +187,7 @@ builder.Services.AddHostedService(sp =>
 builder.Services.AddScoped<Fintrest.Api.Services.JobState.JobStateService>();
 
 builder.Services.AddSingleton<Fintrest.Api.Services.Email.EmailService>();
+builder.Services.AddSingleton<Fintrest.Api.Services.Email.UnsubscribeTokenService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Billing.StripeService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Email.AlertDispatcher>();
 builder.Services.AddHostedService<Fintrest.Api.Services.Email.MorningBriefingJob>();

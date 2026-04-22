@@ -30,8 +30,18 @@ namespace Fintrest.Api.Services.Email;
 public class AlertEvaluator(
     AppDbContext db,
     EmailService emailService,
+    UnsubscribeTokenService unsubscribeTokens,
+    IConfiguration config,
     ILogger<AlertEvaluator> logger)
 {
+    private readonly string _siteUrl = config["Site:Url"] ?? "https://fintrest.ai";
+
+    private string UnsubscribeUrlFor(long userId)
+    {
+        var sig = unsubscribeTokens.Sign(userId);
+        return $"{_siteUrl}/unsubscribe?uid={userId}&sig={sig}";
+    }
+
     public record EvaluateResult(int Evaluated, int Matched, int Sent, int Failed);
 
     public async Task<EvaluateResult> RunOnceAsync(CancellationToken ct = default)
@@ -99,7 +109,8 @@ public class AlertEvaluator(
                 ticker,
                 alert.AlertType,
                 trigger.Value,
-                latest.Close);
+                latest.Close,
+                UnsubscribeUrlFor(alert.User.Id));
 
             var result = await emailService.SendAsync(alert.User.Email, subject, html, null, ct);
             if (result.Success)
