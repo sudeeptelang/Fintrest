@@ -17,11 +17,11 @@ interface TierCopy {
 const COPY: Record<Tier, TierCopy> = {
   pro: {
     title: "Upgrade to Pro",
-    tagline: "Unlock the full signal board + real-time research alerts + Lens chat.",
-    price: "$19/mo",
+    tagline: "Unlock the full signal board + real-time research alerts + unlimited Lens thesis.",
+    price: "$29/mo",
     bullets: [
       "All 50+ signals with Lens filter chips (Buy the Dip, Momentum Run, …)",
-      "Unlimited Lens thesis + chat",
+      "Unlimited Lens thesis on every signal",
       "Real-time research alerts on watchlist triggers",
       "Congress + Insider trade feeds",
       "Portfolio factor profile + signal mix",
@@ -29,14 +29,14 @@ const COPY: Record<Tier, TierCopy> = {
   },
   elite: {
     title: "Upgrade to Elite",
-    tagline: "Lens tuned to your portfolio — the institutional-grade tier.",
-    price: "$45/mo",
+    tagline: "Lens applied to your portfolio — the institutional-grade tier.",
+    price: "$99/mo",
     bullets: [
       "Everything in Pro",
-      "Lens Personalized — thesis tuned to your holdings",
+      "Lens Personalized — thesis applied to your holdings",
       "Weekly JPM-style portfolio research PDF",
       "Backtest runner — historical what-if on any Lens filter",
-      "Priority Lens — no rate limits",
+      "Early access to new research modules",
     ],
   },
 };

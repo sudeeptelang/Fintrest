@@ -41,9 +41,6 @@ const primary: readonly NavItem[] = [
     subItems: [
       { label: "Overview",  href: "/markets" },
       { label: "Screeners", href: "/markets/screeners" },
-      { label: "Sectors",   href: "/markets/sectors" },
-      { label: "Regime",    href: "/markets/regime" },
-      { label: "Earnings",  href: "/markets/earnings" },
     ],
   },
   {
