@@ -16,6 +16,7 @@ import type { MarketIndex, NewsItem } from "@/lib/api";
 import { StockLogo } from "@/components/stock/stock-logo";
 import { NewsReaderDrawer } from "@/components/news/news-reader-drawer";
 import { PaywallGate } from "@/components/billing/paywall-gate";
+import { RegimeStrip } from "@/components/markets/regime-strip";
 import { Newspaper, Sparkles } from "lucide-react";
 
 export default function MarketsPage() {
@@ -72,24 +73,28 @@ export default function MarketsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-[1120px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-[var(--font-heading)] text-2xl font-bold">Markets</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="font-[var(--font-heading)] text-2xl font-semibold text-ink-900">Markets</h1>
+          <p className="text-sm text-ink-600 mt-1">
             {market?.marketStatus === "open" ? "Market Open" : "Pre-Market"} ·{" "}
             {market?.signalsToday || 0} signals · {stocks.length} stocks tracked
           </p>
         </div>
-        <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center gap-1.5">
+        <span className="px-3 py-1 rounded-full bg-forest-light text-forest-dark text-xs font-semibold flex items-center gap-1.5 border border-forest">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-forest opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-forest"></span>
           </span>
           Live
         </span>
       </div>
+
+      {/* Regime strip — renders when /market/regime has data. §05 of spec.
+          Silently hides when the macro classifier endpoint hasn't shipped. */}
+      <RegimeStrip />
 
       {/* Market Pulse + Global Indices grid */}
       <div className="grid lg:grid-cols-4 gap-5">
