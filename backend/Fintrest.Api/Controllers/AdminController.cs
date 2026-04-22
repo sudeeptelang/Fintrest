@@ -155,6 +155,29 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         return Ok(summary);
     }
 
+    /// <summary>
+    /// Manually fire one pass of the user-defined price/target/stop/volume
+    /// alert evaluator. Useful during off-hours or for smoke-testing a new
+    /// alert condition. Idempotent within a single tick: already-deactivated
+    /// alerts are skipped.
+    /// </summary>
+    [HttpPost("alerts/evaluate")]
+    public async Task<IActionResult> EvaluateAlerts(
+        [FromServices] Fintrest.Api.Services.Email.AlertEvaluator evaluator,
+        CancellationToken ct)
+    {
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            ActorUserId = AdminUserId,
+            Action = "evaluate_user_alerts",
+            EntityType = "alerts",
+        });
+        await db.SaveChangesAsync(ct);
+
+        var result = await evaluator.RunOnceAsync(ct);
+        return Ok(result);
+    }
+
     [HttpPost("system-health/send-email")]
     public async Task<IActionResult> SendHealthEmail([FromServices] Fintrest.Api.Services.Health.DailyHealthEmailJob job, CancellationToken ct)
     {

@@ -191,6 +191,12 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Billing.StripeService>();
 builder.Services.AddScoped<Fintrest.Api.Services.Email.AlertDispatcher>();
 builder.Services.AddHostedService<Fintrest.Api.Services.Email.MorningBriefingJob>();
 
+// User-defined price / target / stop / volume alerts — evaluator walks every
+// active alert every 15 min during market hours, fires one-shot emails,
+// deactivates the alert after sending. MVP Blocker 3.
+builder.Services.AddScoped<Fintrest.Api.Services.Email.AlertEvaluator>();
+builder.Services.AddHostedService<Fintrest.Api.Services.Email.AlertEvaluatorJob>();
+
 // Background Jobs
 builder.Services.AddHostedService<Fintrest.Api.Services.Pipeline.DailyCronJob>();
 builder.Services.AddHostedService<Fintrest.Api.Services.Pipeline.IntradayDriftJob>();

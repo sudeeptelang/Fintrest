@@ -215,6 +215,52 @@ public static class EmailTemplates
     }
 
     // ════════════════════════════════════════════════════════════════
+    // PRICE ALERT — user-defined trigger fired (price, target, stop, volume)
+    // ════════════════════════════════════════════════════════════════
+
+    public static string PriceAlert(
+        string userName,
+        string ticker,
+        string alertType,
+        double trigger,
+        double latestPrice)
+    {
+        var sb = new StringBuilder();
+        sb.Append(Header("Price alert"));
+
+        var (label, phrase) = alertType switch
+        {
+            "price"     => ("Price alert", $"crossed your set level of <strong>${trigger:F2}</strong>"),
+            "target"    => ("Target reached", $"reached your target of <strong>${trigger:F2}</strong>"),
+            "stop_loss" => ("Stop triggered", $"fell to your stop of <strong>${trigger:F2}</strong>"),
+            "volume"    => ("Volume spike", $"traded <strong>{trigger:F0}%</strong> of average volume"),
+            _           => ("Alert fired", $"hit your trigger of <strong>${trigger:F2}</strong>"),
+        };
+
+        sb.Append($@"
+<div style='padding:28px 24px;'>
+  <p style='margin:0 0 8px; color:{TextColor}; font-size:16px;'>Hi{(string.IsNullOrEmpty(userName) ? "" : $", {userName}")},</p>
+  <p style='margin:0 0 24px; color:{TextColor}; font-size:15px; line-height:1.6;'>
+    <strong>{ticker}</strong> {phrase}. Latest close: <strong>${latestPrice:F2}</strong>.
+  </p>
+
+  <div style='text-align:center; margin:28px 0;'>
+    <a href='https://fintrest.ai/stock/{ticker}' style='display:inline-block; background:{Brand}; color:white; padding:12px 24px; border-radius:10px; text-decoration:none; font-weight:600; font-size:14px;'>
+      Open {ticker} research →
+    </a>
+  </div>
+
+  <p style='margin:16px 0 0; color:{MutedText}; font-size:12px; line-height:1.5;'>
+    This is a one-time alert. It has been deactivated so you won't be pinged repeatedly.
+    You can re-enable it from your <a href='https://fintrest.ai/alerts' style='color:{Brand};'>Alerts page</a>.
+  </p>
+</div>");
+
+        sb.Append(Footer());
+        return sb.ToString();
+    }
+
+    // ════════════════════════════════════════════════════════════════
     // HELPERS
     // ════════════════════════════════════════════════════════════════
 
