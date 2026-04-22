@@ -165,6 +165,15 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.FundamentalSubscoreJ
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Scoring.FundamentalSubscoreJob>());
 
+// Audit-log outcome job — walks open signals forward through market data,
+// classifies target_hit / stop_hit / horizon_expired, writes rows to
+// performance_tracking. MVP Blocker 2 (docs/MVP_PUNCHLIST.md §2).
+// Fires 7:30 PM ET weekdays after EOD bars settle.
+builder.Services.AddScoped<Fintrest.Api.Services.Performance.SignalOutcomeService>();
+builder.Services.AddSingleton<Fintrest.Api.Services.Performance.SignalOutcomeJob>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<Fintrest.Api.Services.Performance.SignalOutcomeJob>());
+
 // Admin health — shared service + daily email at 7:00 AM ET.
 builder.Services.AddScoped<Fintrest.Api.Services.Health.SystemHealthService>();
 builder.Services.AddSingleton<Fintrest.Api.Services.Health.DailyHealthEmailJob>();

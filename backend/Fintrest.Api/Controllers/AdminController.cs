@@ -132,6 +132,29 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         return Ok(summary);
     }
 
+    /// <summary>
+    /// Backfill / recompute the audit-log outcome table. Walks every open
+    /// signal forward through market data and writes target_hit / stop_hit /
+    /// horizon_expired rows into performance_tracking. Idempotent — already-
+    /// closed signals are skipped. Safe to run any time for a catch-up.
+    /// </summary>
+    [HttpPost("audit-log/recompute-outcomes")]
+    public async Task<IActionResult> RecomputeSignalOutcomes(
+        [FromServices] Fintrest.Api.Services.Performance.SignalOutcomeJob job,
+        CancellationToken ct)
+    {
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            ActorUserId = AdminUserId,
+            Action = "recompute_signal_outcomes",
+            EntityType = "performance_tracking",
+        });
+        await db.SaveChangesAsync(ct);
+
+        var summary = await job.RunOnceAsync(ct);
+        return Ok(summary);
+    }
+
     [HttpPost("system-health/send-email")]
     public async Task<IActionResult> SendHealthEmail([FromServices] Fintrest.Api.Services.Health.DailyHealthEmailJob job, CancellationToken ct)
     {
