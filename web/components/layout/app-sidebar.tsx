@@ -4,46 +4,78 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Clock3,
-  LayoutGrid,
   Briefcase,
   BarChart3,
   ClipboardList,
-  Star,
+  FlaskConical,
   Bell,
-  Users,
-  Landmark,
-  Upload,
   Settings,
   LogOut,
   X,
-  ChevronDown,
+  HelpCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { LogoMark } from "@/components/layout/logo";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/auth";
 
-// v2 IA — 5 primary nav items (Ask Lens removed for MVP; chat deferred).
-// URLs point at the current route files until Phase 6 consolidation renames
-// /dashboard→/today and /performance→/audit.
-const primary = [
-  { label: "Today",     href: "/dashboard",   icon: Clock3,         matchPaths: ["/dashboard", "/today", "/picks"] },
-  { label: "Boards",    href: "/boards",      icon: LayoutGrid,     matchPaths: ["/boards"] },
-  { label: "Portfolio", href: "/portfolio",   icon: Briefcase,      matchPaths: ["/portfolio"] },
-  { label: "Markets",   href: "/markets",     icon: BarChart3,      matchPaths: ["/markets", "/heatmap"] },
-  { label: "Audit log", href: "/performance", icon: ClipboardList,  matchPaths: ["/performance", "/audit"] },
-] as const;
+// MVP-1 IA per docs/FINTREST_UX_SPEC.md §02 — four primary pillars.
+// Sub-items reveal only when the parent is active. Existing routes
+// (/dashboard, /portfolio, /watchlist, /boards, /performance) remain
+// live; sidebar uses the spec's canonical paths which will resolve via
+// route renames/redirects during the build.
+type NavItem = {
+  label: string;
+  href: string;
+  icon: typeof Briefcase;
+  matchPaths: readonly string[];
+  subItems?: readonly { label: string; href: string }[];
+};
 
-// "More" popover items — demoted from primary in v2. Congress + Insiders
-// live here *and* as tabs inside /markets; either path is valid.
-const more = [
-  { label: "Watchlist",     href: "/watchlist",          icon: Star },
-  { label: "Alerts",        href: "/alerts",             icon: Bell },
-  { label: "Insiders",      href: "/insiders",           icon: Users },
-  { label: "Congress",      href: "/congress",           icon: Landmark },
-  { label: "Notifications", href: "/notifications",      icon: Bell },
-  { label: "Upload",        href: "/portfolio/upload",   icon: Upload },
+const primary: readonly NavItem[] = [
+  {
+    label: "Markets",
+    href: "/markets",
+    icon: BarChart3,
+    matchPaths: ["/markets", "/heatmap", "/insiders", "/congress"],
+    subItems: [
+      { label: "Overview",  href: "/markets" },
+      { label: "Screeners", href: "/markets/screeners" },
+      { label: "Sectors",   href: "/markets/sectors" },
+      { label: "Regime",    href: "/markets/regime" },
+      { label: "Earnings",  href: "/markets/earnings" },
+    ],
+  },
+  {
+    label: "Research",
+    href: "/research",
+    icon: FlaskConical,
+    // /dashboard + /picks remain as legacy routes for Today's drop until
+    // the move to /research completes.
+    matchPaths: ["/research", "/dashboard", "/picks", "/swing"],
+    subItems: [
+      { label: "Today's drop",  href: "/research" },
+      { label: "Smart money",   href: "/research/smart-money" },
+      { label: "Screener",      href: "/research/screener" },
+    ],
+  },
+  {
+    label: "My stuff",
+    href: "/my/portfolio",
+    icon: Briefcase,
+    matchPaths: ["/my", "/portfolio", "/watchlist", "/boards"],
+    subItems: [
+      { label: "Portfolio", href: "/my/portfolio" },
+      { label: "Watchlist", href: "/my/watchlist" },
+      { label: "Boards",    href: "/my/boards" },
+    ],
+  },
+  {
+    label: "Audit log",
+    href: "/audit",
+    icon: ClipboardList,
+    matchPaths: ["/audit", "/performance"],
+  },
 ] as const;
 
 interface AppSidebarProps {
@@ -53,7 +85,6 @@ interface AppSidebarProps {
 
 export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
   const pathname = usePathname() ?? "";
-  const [moreOpen, setMoreOpen] = useState(false);
 
   const isActive = (paths: readonly string[]) =>
     paths.some((p) => pathname === p || pathname.startsWith(p + "/"));
@@ -62,7 +93,7 @@ export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
     <>
       {/* Logo — 56px row matches v2 top nav height */}
       <div className="h-14 flex items-center justify-between px-5 border-b border-ink-200">
-        <Link href="/dashboard" className="flex items-center gap-2" aria-label="Fintrest home">
+        <Link href="/markets" className="flex items-center gap-2" aria-label="Fintrest home">
           <LogoMark size={22} />
           <span className="font-[var(--font-heading)] text-base font-bold tracking-tight text-ink-900">
             Fintrest<span className="text-ink-500 font-normal">.ai</span>
@@ -77,81 +108,86 @@ export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
         </button>
       </div>
 
-      {/* Primary nav — v2 forest-light active, 2px forest left border */}
+      {/* Primary nav — 4 pillars per spec §02. Sub-items reveal when active. */}
       <nav className="flex-1 px-3 pt-5 pb-4 overflow-y-auto">
         <div className="space-y-0.5">
           {primary.map((item) => {
             const active = isActive(item.matchPaths);
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={cn(
-                  "relative flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
-                  "-ml-0.5 border-l-2",
-                  active
-                    ? "bg-forest-light text-forest border-forest font-semibold"
-                    : "text-ink-700 border-transparent hover:bg-ink-100 hover:text-ink-900 font-medium"
+              <div key={item.href}>
+                <Link
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    "relative flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
+                    "-ml-0.5 border-l-2",
+                    active
+                      ? "bg-forest-light text-forest border-forest font-semibold"
+                      : "text-ink-700 border-transparent hover:bg-ink-100 hover:text-ink-900 font-medium"
+                  )}
+                >
+                  <item.icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+                  {item.label}
+                </Link>
+                {active && item.subItems && (
+                  <AnimatePresence initial={false}>
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.12, ease: "easeOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="py-1 space-y-px">
+                        {item.subItems.map((sub) => {
+                          const subActive = pathname === sub.href;
+                          return (
+                            <Link
+                              key={sub.href}
+                              href={sub.href}
+                              onClick={onClose}
+                              className={cn(
+                                "block pl-10 pr-3 py-1.5 text-[13px] rounded-md transition-colors",
+                                subActive
+                                  ? "text-forest font-medium"
+                                  : "text-ink-500 hover:text-ink-800 hover:bg-ink-100",
+                              )}
+                            >
+                              {sub.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
                 )}
-              >
-                <item.icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
-                {item.label}
-              </Link>
+              </div>
             );
           })}
         </div>
-
-        {/* More — collapsible secondary */}
-        <div className="mt-6">
-          <button
-            onClick={() => setMoreOpen((v) => !v)}
-            className="w-full flex items-center justify-between px-3 mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 hover:text-ink-700 transition-colors"
-          >
-            More
-            <ChevronDown
-              className={cn("h-3 w-3 transition-transform", moreOpen && "rotate-180")}
-              strokeWidth={2}
-            />
-          </button>
-          <AnimatePresence initial={false}>
-            {moreOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.12, ease: "easeOut" }}
-                className="overflow-hidden"
-              >
-                <div className="space-y-0.5 pt-1">
-                  {more.map((item) => {
-                    const active = pathname === item.href || pathname.startsWith(item.href + "/");
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={onClose}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
-                          active
-                            ? "bg-ink-100 text-ink-900 font-medium"
-                            : "text-ink-600 hover:bg-ink-100 hover:text-ink-900"
-                        )}
-                      >
-                        <item.icon className="h-[15px] w-[15px] shrink-0" strokeWidth={1.7} />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
       </nav>
 
-      {/* Bottom — settings + logout */}
+      {/* Bottom — Support section (Methodology + Settings) per spec §02 */}
       <div className="px-3 py-3 border-t border-ink-200 space-y-0.5">
+        <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500">
+          Support
+        </div>
+        <Link
+          href="/methodology"
+          onClick={onClose}
+          className="flex items-center gap-3 px-3 py-2 text-sm rounded-md font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+        >
+          <HelpCircle className="h-[15px] w-[15px]" strokeWidth={1.7} />
+          Methodology
+        </Link>
+        <Link
+          href="/inbox"
+          onClick={onClose}
+          className="flex items-center gap-3 px-3 py-2 text-sm rounded-md font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+        >
+          <Bell className="h-[15px] w-[15px]" strokeWidth={1.7} />
+          Inbox
+        </Link>
         <Link
           href="/settings"
           onClick={onClose}
