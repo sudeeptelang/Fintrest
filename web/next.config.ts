@@ -20,9 +20,8 @@ const nextConfig: NextConfig = {
       { source: "/audit",               destination: "/performance" },
       { source: "/audit/:slug*",        destination: "/performance/:slug*" },
 
-      // Inbox consolidates /alerts + /notifications. Default lands on
-      // alerts until the unified inbox page ships.
-      { source: "/inbox",               destination: "/alerts" },
+      // /inbox is now a real page; /inbox/create aliases the existing
+      // alert creation flow until a dedicated inbox-create ships.
       { source: "/inbox/create",        destination: "/alerts/create" },
     ];
   },
