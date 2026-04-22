@@ -120,6 +120,7 @@ public class SystemHealthService(AppDbContext db, ILogger<SystemHealthService> l
             new JobSchedule("AlgorithmIcTrackingJob", "Mon–Fri 5:30 AM ET (stub)", NextWeekdayAt(etNow, 5, 30)),
             new JobSchedule("DailyHealthEmailJob",    "Mon–Fri 7:00 AM ET", NextWeekdayAt(etNow, 7, 0)),
             new JobSchedule("FirehoseIngestJob",      "Mon–Fri 6:15 AM ET", NextWeekdayAt(etNow, 6, 15)),
+            new JobSchedule("FundamentalSubscoreJob", "Mon–Fri 5:15 AM ET", NextWeekdayAt(etNow, 5, 15)),
             new JobSchedule("IntradayDriftJob",       "Every 15m when SPY>1% / VIX>15%", etNow.AddMinutes(15)),
         };
 
