@@ -233,6 +233,94 @@ function priceShort(p: number): string {
   return p.toFixed(0);
 }
 
+export type TradePlanBullet = {
+  kind: "bull" | "risk" | "neutral";
+  text: string;
+};
+
+/**
+ * Derive up to 3 supporting bullets (driver · risk · context) for the
+ * TradePlan component. Pulls from the thesis catalysts/risks first, then
+ * falls back to patterns read off the breakdown + reference levels. Always
+ * returns at least one neutral context bullet (the R:R framing) so the
+ * panel is never empty.
+ */
+export function buildTradePlanBullets({
+  signal,
+  thesis,
+}: {
+  signal: Signal;
+  thesis?: AthenaThesisResponse | null;
+}): TradePlanBullet[] {
+  const bullets: TradePlanBullet[] = [];
+
+  // 1. Bull — prefer thesis catalyst, else a momentum/trend read.
+  const bullText = thesis?.catalysts?.[0];
+  if (bullText) {
+    bullets.push({ kind: "bull", text: bullText });
+  } else if (signal.breakdown) {
+    const b = signal.breakdown;
+    if (b.momentumScore >= 70 && b.trendScore >= 70) {
+      bullets.push({
+        kind: "bull",
+        text: `Momentum ${Math.round(b.momentumScore)} and trend ${Math.round(b.trendScore)} both top-quartile — the engine sees this running.`,
+      });
+    } else if (b.fundamentalsScore >= 70) {
+      bullets.push({
+        kind: "bull",
+        text: `Fundamentals ${Math.round(b.fundamentalsScore)} — quality and profitability give the setup a floor.`,
+      });
+    } else if (b.newsScore >= 70) {
+      bullets.push({
+        kind: "bull",
+        text: `News catalyst ${Math.round(b.newsScore)} — fresh headlines backing the move.`,
+      });
+    }
+  }
+
+  // 2. Risk — prefer thesis risk, else read the weakest factor.
+  const riskText = thesis?.risks?.[0];
+  if (riskText) {
+    bullets.push({ kind: "risk", text: riskText });
+  } else if (signal.breakdown) {
+    const b = signal.breakdown;
+    if (b.riskScore < 50) {
+      bullets.push({
+        kind: "risk",
+        text: `Risk score ${Math.round(b.riskScore)} — elevated volatility; size smaller than a typical position.`,
+      });
+    } else if (b.sentimentScore < 40) {
+      bullets.push({
+        kind: "risk",
+        text: `Sentiment ${Math.round(b.sentimentScore)} — consensus is cautious; headline risk is real.`,
+      });
+    } else if (b.fundamentalsScore < 40) {
+      bullets.push({
+        kind: "risk",
+        text: `Fundamentals ${Math.round(b.fundamentalsScore)} — the balance sheet is not carrying this trade.`,
+      });
+    }
+  }
+
+  // 3. Context — R:R framing. Always present if we have levels.
+  const entry = signal.entryLow;
+  const stop = signal.stopLoss;
+  const target = signal.targetHigh ?? signal.targetLow;
+  if (entry != null && stop != null && target != null) {
+    const risk = Math.abs(entry - stop);
+    const reward = Math.abs(target - entry);
+    if (risk > 0) {
+      const rr = reward / risk;
+      bullets.push({
+        kind: "neutral",
+        text: `Reward/risk ${rr.toFixed(1)}:1 — ${rr >= 2.5 ? "well above" : rr >= 1.8 ? "above" : "near"} the universe median of ~2.1:1.`,
+      });
+    }
+  }
+
+  return bullets.slice(0, 3);
+}
+
 /**
  * Surface the trade plan narrative from the freshest available source.
  * Prefers `thesis.tradePlan.narrative` (from /thesis) and falls back to

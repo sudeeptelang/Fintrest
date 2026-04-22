@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useRef, useState } from "react";
 import Link from "next/link";
 import {
   useStock,
@@ -18,20 +18,18 @@ import {
 } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { DeepDiveAccordion, DeepDiveRow } from "@/components/ui/deep-dive-accordion";
 import { SignalDetailHero } from "@/components/signals/signal-detail-hero";
 import { LensCardGated } from "@/components/lens/lens-card";
 import { PlainEnglishTakeaways } from "@/components/signals/plain-english-takeaways";
-import { RefLevelBar } from "@/components/signals/ref-level-bar";
-import { FactorBreakdown, FactorRow } from "@/components/signals/factor-row";
+import { TradePlan } from "@/components/signals/trade-plan";
+import { FactorBreakdownPanel } from "@/components/signals/factor-breakdown-panel";
+import { SmartMoneyBreakdown, type SmartMoneySubSignal } from "@/components/signals/smart-money-breakdown";
 import { AnalystRatingCard } from "@/components/signals/analyst-rating-card";
 import { RelatedNews } from "@/components/signals/related-news";
 import { StockSnapshot as StockSnapshotSection } from "@/components/stock/stock-snapshot";
 import { PriceChart } from "@/components/charts/price-chart";
-import { FactorRadar } from "@/components/charts/factor-radar";
-import { FactorGauges } from "@/components/charts/factor-gauges";
-import { FactorBarChart } from "@/components/charts/factor-bar-chart";
 import { AthenaSnowflake } from "@/components/stock/athena-snowflake";
-import { RewardsRisks } from "@/components/stock/rewards-risks";
 import { TechnicalAnalysis } from "@/components/stock/technical-analysis";
 import { ValuationSection } from "@/components/stock/valuation-section";
 import { PerformanceChart } from "@/components/charts/performance-chart";
@@ -39,8 +37,8 @@ import { EarningsHistory } from "@/components/stock/earnings-history";
 import { EarningsChart } from "@/components/charts/earnings-chart";
 import { OwnershipStrip } from "@/components/stock/ownership-strip";
 import {
-  expandFactors,
   buildTakeaways,
+  buildTradePlanBullets,
   getTradePlanNarrative,
   formatMarketCap,
   fundamentalDecomposition,
@@ -50,32 +48,25 @@ interface StockDetailPageProps {
   params: Promise<{ ticker: string }>;
 }
 
-// Unified Ticker Detail page (v2 Forest & Rust) — ONE page, no teasers to
-// another route. Card order:
+// Unified Ticker Detail page (v2 Forest & Rust).
+// Spec: docs/DESIGN_TICKER_DEEP_DIVE.md (2026-04-22 mockups, v2 revision).
 //
-//   Breadcrumb
-//   Hero                        — ticker + price + actions + composite score ring
-//   Lens's thesis               — full prose (gated for Free)
-//   Key takeaways               — plain-English bullets
-//   Reference levels            — entry / stop / target + R:R
-//   Risk profile                — rewards-vs-risks panel
-//   ─── Technical ───           — section heading, all data below
-//     7-factor breakdown        — the engine's view
-//     Factor profile            — radar + gauges + bar chart detail views
-//     Fundamental scorecard     — 5-dimension Simply-Wall-St-style snowflake
-//     Price chart               — with range selector
-//     Snapshot grid             — valuation · margins · perf · quote · indicators
-//     Technical analysis        — RSI / MAs / ATR interpretation
-//     Performance               — multi-timeframe
-//     Valuation detail          — fair value + street consensus
-//   Earnings history            — per-quarter beats/misses + trend
-//   Ownership                   — insider + institutional strip
-//   Analyst rating              — consensus + target
-//   Related news                — headlines with sentiment
+// Above-the-fold blocks, in order:
+//   1. Hero — ticker + price + actions + 8-seg composite ring
+//   2. Lens thesis — full prose (gated for Free)
+//   3. Trade plan — stop · entry · now · target + R:R + supporting bullets
+//   4. 8-factor breakdown — radar + numbered list (Smart $ row clickable)
+//   5. Smart Money breakdown — indented drill-down of the 8th factor
+//
+// Deep Dive accordion (collapsed by default): 7 rows — Price chart · Options
+// flow detail · Fundamentals · Valuation & sensitivity · Related news ·
+// Macro & regime context · Peer comparison.
 export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { ticker: rawTicker } = use(params);
   const ticker = rawTicker.toUpperCase();
   const [chartRange, setChartRange] = useState("3m");
+  const [smartMoneyOpen, setSmartMoneyOpen] = useState(true);
+  const smartMoneyRef = useRef<HTMLDivElement | null>(null);
 
   const { data: stock } = useStock(ticker);
   const { data: signalsData } = useStockSignals(ticker);
@@ -93,7 +84,6 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
 
   const signal = signalsData?.signals?.[0];
   const breakdown = signal?.breakdown;
-  const factors = breakdown ? expandFactors(breakdown) : [];
   const fundDecomp = breakdown ? fundamentalDecomposition(breakdown) : null;
 
   const entry = signal?.entryLow ?? signal?.currentPrice ?? null;
@@ -102,7 +92,21 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const hasLevels = entry != null && stop != null && target != null;
 
   const takeaways = signal ? buildTakeaways({ signal, thesis }) : [];
+  const tradePlanBullets = signal ? buildTradePlanBullets({ signal, thesis }) : [];
   const tradePlanNote = signal ? getTradePlanNarrative(signal, thesis) : null;
+
+  // Smart Money sub-signals — §14.9. Until the phased feeds ship, scores are
+  // null and each row renders with its source/staleness in the honest
+  // "pending feed" state.
+  const smartMoneySignals: SmartMoneySubSignal[] = buildPlaceholderSmartMoney();
+  const smartMoneyComposite = computeSmartMoneyComposite(smartMoneySignals);
+
+  function scrollToSmartMoney() {
+    setSmartMoneyOpen(true);
+    requestAnimationFrame(() => {
+      smartMoneyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   const isInWatchlist = watchlists?.some((wl) =>
     wl.items.some((item) => item.ticker.toUpperCase() === ticker),
@@ -168,9 +172,9 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         }
       />
 
-      {/* 1. Lens's thesis */}
+      {/* 1. Lens thesis */}
       <LensCardGated
-        eyebrow="Lens's thesis"
+        eyebrow={lensEyebrow(signal)}
         title={thesisTitle(thesis, signal)}
         meta={signal ? `Signal #${String(signal.id).padStart(2, "0")}` : undefined}
         personalizedForElite
@@ -182,96 +186,51 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         )}
       </LensCardGated>
 
-      {/* 2. Key takeaways */}
-      {takeaways.length > 0 && <PlainEnglishTakeaways items={takeaways} />}
-
-      {/* 3. Reference levels */}
+      {/* 2. Trade plan */}
       {hasLevels && (
-        <RefLevelBar entry={entry} stop={stop} target={target} note={tradePlanNote} />
+        <TradePlan
+          entry={entry}
+          stop={stop}
+          target={target}
+          now={signal?.currentPrice ?? snapshot?.price ?? null}
+          bullets={tradePlanBullets}
+          note={tradePlanNote}
+        />
       )}
 
-      {/* 4. Risk profile */}
-      {snapshot && <RewardsRisks snapshot={snapshot} signal={signal ?? null} />}
+      {/* 3. 8-factor breakdown */}
+      {breakdown && signal && (
+        <FactorBreakdownPanel
+          breakdown={breakdown}
+          composite={signal.scoreTotal}
+          smartMoneyScore={smartMoneyComposite}
+          onSmartMoneyClick={scrollToSmartMoney}
+        />
+      )}
 
-      {/* 5. Technical section */}
-      <section className="pt-2">
-        <div className="border-t border-ink-200 pt-6 space-y-6">
-          <div className="flex items-baseline gap-3">
-            <h2 className="font-[var(--font-heading)] text-[22px] leading-[28px] font-semibold text-ink-900 tracking-[-0.01em]">
-              Technical
-            </h2>
-            <span className="font-[var(--font-mono)] text-[13px] text-ink-500">
-              What the engine saw
-            </span>
-          </div>
+      {/* 4. Smart Money breakdown — indented drill-down of the 8th factor */}
+      {smartMoneyOpen && (
+        <div ref={smartMoneyRef}>
+          <SmartMoneyBreakdown
+            composite={smartMoneyComposite}
+            subSignals={smartMoneySignals}
+            collapsible
+            onCollapse={() => setSmartMoneyOpen(false)}
+          />
+        </div>
+      )}
 
-          {/* 7-factor breakdown rows */}
-          {factors.length > 0 && (
-            <div>
-              <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.14em] text-forest-dark mb-3">
-                7-factor breakdown
-              </div>
-              <FactorBreakdown>
-                {factors.map((f) => (
-                  <FactorRow key={f.name} name={f.name} score={f.score} summary={f.summary} />
-                ))}
-              </FactorBreakdown>
-            </div>
-          )}
+      {/* 5. Key takeaways — in plain English */}
+      {takeaways.length > 0 && <PlainEnglishTakeaways items={takeaways} />}
 
-          {/* §14.1 — Fundamentals decomposition (Quality / Profitability / Growth).
-              Sits under the 7-factor breakdown when sub-scores are available. */}
-          {fundDecomp && (
-            <div>
-              <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.14em] text-forest-dark mb-3">
-                Fundamentals decomposition
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <FundamentalSubscoreCard label="Quality" score={fundDecomp.quality} hint="gross margin + leverage discipline" />
-                <FundamentalSubscoreCard label="Profitability" score={fundDecomp.profitability} hint="ROE + op margin + net margin" />
-                <FundamentalSubscoreCard label="Growth" score={fundDecomp.growth} hint="revenue + EPS year-over-year" />
-              </div>
-              <p className="mt-3 text-[11px] text-ink-500 italic">
-                Each sub-score is sector-normalized — ranked against peers in the same GICS sector.
-              </p>
-            </div>
-          )}
-
-          {/* Factor profile detail views — radar / gauges / bar chart */}
-          {breakdown && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
-                  Factor radar
-                </div>
-                <FactorRadar breakdown={breakdown} />
-              </div>
-              <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6 lg:col-span-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
-                  Factor gauges
-                </div>
-                <FactorGauges breakdown={breakdown} />
-              </div>
-              <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6 lg:col-span-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
-                  Factor scores
-                </div>
-                <FactorBarChart breakdown={breakdown} />
-              </div>
-            </div>
-          )}
-
-          {/* Fundamental scorecard (5-dim) */}
-          {snapshot && (
-            <AthenaSnowflake snapshot={snapshot} breakdown={breakdown} dividendYield={null} />
-          )}
-
-          {/* Price chart */}
-          <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-[var(--font-heading)] text-[14px] font-semibold text-ink-900">
-                Price chart
-              </h3>
+      {/* 6. Deep Dive accordion — 7 rows, collapsed by default */}
+      <DeepDiveAccordion>
+        <DeepDiveRow
+          title="Price chart"
+          summary="1D · 5D · 3M · 1Y · volume profile · Polygon real-time"
+        >
+          <div>
+            <div className="flex items-center justify-end mb-4">
               <div className="inline-flex gap-0.5 bg-ink-50 border border-ink-200 rounded-md p-0.5">
                 {["1m", "3m", "6m", "1y"].map((range) => (
                   <button
@@ -292,46 +251,100 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
             </div>
             <PriceChart data={chartData ?? []} height={320} />
           </div>
+        </DeepDiveRow>
 
-          {/* Snapshot grid — valuation, margins, performance, quote/volume, indicators */}
-          {snapshot && <StockSnapshotSection snapshot={snapshot} />}
+        <DeepDiveRow
+          title="Options flow detail"
+          summary="Chain · unusual activity · skew · IV rank · Unusual Whales"
+          emptyMessage="Unusual Whales feed not yet wired — available when the options provider is plumbed in (§14.9 phase 3)."
+        />
 
-          {/* Detailed technical analysis + multi-timeframe performance */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {snapshot && <TechnicalAnalysis snapshot={snapshot} />}
-            {snapshot && <PerformanceChart snapshot={snapshot} />}
+        <DeepDiveRow
+          title="Fundamentals"
+          summary={fundamentalsSummary(snapshot, fundDecomp)}
+        >
+          <div className="space-y-6">
+            {fundDecomp && (
+              <div>
+                <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.14em] text-forest-dark mb-3">
+                  Fundamentals decomposition
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <FundamentalSubscoreCard label="Quality" score={fundDecomp.quality} hint="gross margin + leverage discipline" />
+                  <FundamentalSubscoreCard label="Profitability" score={fundDecomp.profitability} hint="ROE + op margin + net margin" />
+                  <FundamentalSubscoreCard label="Growth" score={fundDecomp.growth} hint="revenue + EPS year-over-year" />
+                </div>
+                <p className="mt-3 text-[11px] text-ink-500 italic">
+                  Each sub-score is sector-normalized — ranked against peers in the same GICS sector.
+                </p>
+              </div>
+            )}
+            {snapshot && (
+              <AthenaSnowflake snapshot={snapshot} breakdown={breakdown} dividendYield={null} />
+            )}
+            {snapshot && <StockSnapshotSection snapshot={snapshot} />}
+            {snapshot && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <TechnicalAnalysis snapshot={snapshot} />
+                <PerformanceChart snapshot={snapshot} />
+              </div>
+            )}
+            {earnings && earnings.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <EarningsHistory earnings={earnings} />
+                <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
+                    Earnings trend
+                  </div>
+                  <EarningsChart earnings={earnings} />
+                </div>
+              </div>
+            )}
           </div>
+        </DeepDiveRow>
 
-          {/* Valuation detail — fair value + street consensus */}
+        <DeepDiveRow
+          title="Valuation & sensitivity"
+          summary="Fair value · 5-scenario multiple analysis"
+        >
           {snapshot && signal && (
             <ValuationSection ticker={ticker} signal={signal} snapshot={snapshot} earnings={earnings} />
           )}
-        </div>
-      </section>
+        </DeepDiveRow>
 
-      {/* 6. Earnings history */}
-      {earnings && earnings.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <EarningsHistory earnings={earnings} />
-          <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
-              Earnings trend
-            </div>
-            <EarningsChart earnings={earnings} />
+        <DeepDiveRow
+          title="Related news"
+          summary={relatedNewsSummary(news)}
+        >
+          <div className="space-y-6">
+            {news && news.length > 0 && <RelatedNews items={news} limit={6} />}
+            {analyst && (
+              <AnalystRatingCard data={analyst} currentPrice={signal?.currentPrice ?? snapshot?.price} />
+            )}
           </div>
-        </div>
-      )}
+        </DeepDiveRow>
 
-      {/* 7. Ownership */}
-      {ownership && <OwnershipStrip data={ownership} />}
+        <DeepDiveRow
+          title="Macro & regime context"
+          summary="Risk-on · VIX · 10Y · DXY · FRED + Cboe"
+          emptyMessage="Regime classifier not yet wired — the Macro & regime pipeline lands with §14.5."
+        />
 
-      {/* 8. Analyst rating */}
-      {analyst && (
-        <AnalystRatingCard data={analyst} currentPrice={signal?.currentPrice ?? snapshot?.price} />
-      )}
+        <DeepDiveRow
+          title="Peer comparison"
+          summary=""
+          emptyMessage="Insufficient peer data — hidden until populated."
+        />
 
-      {/* 9. Related news */}
-      {news && news.length > 0 && <RelatedNews items={news} limit={6} />}
+        {ownership && (
+          <DeepDiveRow
+            title="Ownership strip"
+            summary="Insider + institutional + transaction history"
+          >
+            <OwnershipStrip data={ownership} />
+          </DeepDiveRow>
+        )}
+      </DeepDiveAccordion>
 
       <p className="text-[11px] text-ink-500 italic pt-4">
         Educational content only — not financial advice. Past signal performance does not guarantee future results.
@@ -352,6 +365,109 @@ function thesisTitle(
   if (type === "BUY_TODAY") return "Composite setup above the 7-factor bar.";
   if (type === "AVOID") return "Factors flagging avoid — risks outweigh the setup.";
   return "Setup forming — waiting for confirmation.";
+}
+
+// Lens thesis eyebrow — picks up signal type (QA-P1-3).
+function lensEyebrow(signal: { signalType?: string } | null | undefined): string {
+  const type = signal?.signalType?.toUpperCase() ?? "";
+  if (type === "BUY_TODAY" || type === "BUY") return "Lens thesis · Event-driven setup";
+  if (type === "WATCH") return "Lens thesis · Setup forming";
+  if (type === "AVOID" || type === "HIGH_RISK") return "Lens thesis · Risks elevated";
+  return "Lens thesis";
+}
+
+// Deep Dive summaries — specific beats generic.
+function fundamentalsSummary(
+  snapshot: { price?: number | null } | null | undefined,
+  fundDecomp: { quality: number | null; profitability: number | null; growth: number | null } | null,
+): string {
+  if (!snapshot) return "Fundamentals data not yet loaded.";
+  if (!fundDecomp) return "Financial health · scorecard pending Q/P/G population";
+  const populated = [fundDecomp.quality, fundDecomp.profitability, fundDecomp.growth].filter((v) => v != null).length;
+  const prefix =
+    fundDecomp.profitability != null && fundDecomp.profitability >= 75
+      ? "Financial health strong"
+      : fundDecomp.profitability != null && fundDecomp.profitability >= 50
+      ? "Financial health solid"
+      : "Financial health mixed";
+  return `${prefix} · ${populated} of 3 sub-scores populated`;
+}
+
+function relatedNewsSummary(news: { source?: string | null }[] | null | undefined): string {
+  if (!news || news.length === 0) return "No recent articles.";
+  const sources = Array.from(
+    new Set(
+      news
+        .map((n) => n.source)
+        .filter((s): s is string => !!s)
+        .slice(0, 3),
+    ),
+  );
+  const base = `${news.length} articles`;
+  return sources.length > 0 ? `${base} · ${sources.join(" · ")}` : base;
+}
+
+// §14.9 — Smart Money placeholder. The sub-feeds ship in phases; until each
+// lands, the row renders in its honest "pending feed" state with the real
+// source + staleness line. Swap this for a real data hook in Phase 1 once
+// EDGAR Form 4 parsing + market_firehose_snapshot are wired.
+function buildPlaceholderSmartMoney(): SmartMoneySubSignal[] {
+  return [
+    {
+      key: "insider",
+      label: "Insider activity",
+      weightPct: 35,
+      score: null,
+      evidence: null,
+      source: "SEC EDGAR Form 4 · 1–2 day disclosure lag",
+      pendingMessage: "EDGAR Form 4 parser is next up (§14.9 phase 1). Cluster + officer weighting land with it.",
+    },
+    {
+      key: "institutional",
+      label: "Institutional flow",
+      weightPct: 25,
+      score: null,
+      evidence: null,
+      source: "SEC 13F via Whale Wisdom · 45-day reporting lag",
+      pendingMessage: "13F ingestion lands with §14.9 phase 2.",
+    },
+    {
+      key: "options",
+      label: "Options positioning",
+      weightPct: 15,
+      score: null,
+      evidence: null,
+      source: "Unusual Whales + Cboe · real-time",
+      pendingMessage: "Options flow is §14.9 phase 3 — the paid feed is deferred until Pro revenue justifies it.",
+    },
+    {
+      key: "congressional",
+      label: "Congressional",
+      weightPct: 15,
+      score: null,
+      evidence: null,
+      source: "Quiver Quantitative · up to 45-day STOCK Act lag",
+      pendingMessage: "Quiver integration lands with §14.9 phase 2.",
+    },
+    {
+      key: "short",
+      label: "Short dynamics",
+      weightPct: 10,
+      score: null,
+      evidence: null,
+      source: "FINRA bi-monthly + Fintel · 1–2 week lag",
+      pendingMessage: "Short-interest trend series is queued for §14.9 phase 2.",
+    },
+  ];
+}
+
+function computeSmartMoneyComposite(signals: SmartMoneySubSignal[]): number | null {
+  const populated = signals.filter((s) => s.score != null);
+  if (populated.length === 0) return null;
+  const totalWeight = populated.reduce((acc, s) => acc + s.weightPct, 0);
+  if (totalWeight === 0) return null;
+  const weighted = populated.reduce((acc, s) => acc + (s.score ?? 0) * s.weightPct, 0);
+  return weighted / totalWeight;
 }
 
 function formatVolumeShort(v: number | null | undefined): string | undefined {
