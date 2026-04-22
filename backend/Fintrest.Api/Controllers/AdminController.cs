@@ -178,6 +178,46 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         return Ok(result);
     }
 
+    /// <summary>
+    /// Manually set a user's plan. Admin support tool — the proper path
+    /// for real subscriptions is Stripe webhooks reconciling automatically.
+    /// This endpoint exists for (a) local QA testing across tiers, (b)
+    /// manual correction when a webhook fires late or a user provides
+    /// proof of purchase out-of-band. Always audited.
+    /// </summary>
+    [HttpPost("users/{email}/plan")]
+    public async Task<IActionResult> SetUserPlan(
+        string email,
+        [FromBody] SetPlanRequest request,
+        CancellationToken ct)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+        if (user is null) return NotFound(new { error = "User not found" });
+
+        if (!Enum.TryParse<PlanType>(request.Plan, true, out var plan))
+            return BadRequest(new { error = $"Plan must be one of: free, pro, elite. Got: {request.Plan}" });
+
+        var previous = user.Plan;
+        user.Plan = plan;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            ActorUserId = AdminUserId,
+            Action = "set_user_plan",
+            EntityType = "users",
+            EntityId = user.Id,
+            MetadataJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                previous = previous.ToString().ToLowerInvariant(),
+                next = plan.ToString().ToLowerInvariant(),
+            }),
+        });
+
+        await db.SaveChangesAsync(ct);
+        return Ok(new { email = user.Email, plan = plan.ToString().ToLowerInvariant(), previous = previous.ToString().ToLowerInvariant() });
+    }
+
     [HttpPost("system-health/send-email")]
     public async Task<IActionResult> SendHealthEmail([FromServices] Fintrest.Api.Services.Health.DailyHealthEmailJob job, CancellationToken ct)
     {
@@ -313,3 +353,5 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
 }
 
 public record SyncUniverseRequest(List<string> Tickers);
+
+public record SetPlanRequest(string Plan);
