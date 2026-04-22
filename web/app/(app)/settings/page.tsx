@@ -457,9 +457,9 @@ function BillingPanel() {
       {/* Actions */}
       {!isPaid ? (
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-          <p className="text-sm font-medium">Upgrade for full signals + Lens chat + portfolio research.</p>
+          <p className="text-sm font-medium">Upgrade for the full daily drop + Lens thesis on every signal + portfolio research.</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Pro is $19/mo ($199 annual) · Elite is $45/mo ($449 annual).
+            Pro is $29/mo ($299 annual) · Elite is $99/mo ($999 annual).
           </p>
           <Link href="/pricing" className="inline-block mt-3">
             <Button size="sm" className="bg-primary hover:bg-primary/90 text-white">
@@ -476,14 +476,11 @@ function BillingPanel() {
             disabled={opening || !sub?.stripeCustomerId}
           >
             {opening ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <ExternalLink className="h-3 w-3 mr-1.5" />}
-            Manage Subscription
+            Manage subscription
           </Button>
-          <Link
-            href="/pricing"
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            Change plan →
-          </Link>
+          <p className="text-[11px] text-muted-foreground">
+            Plan changes, payment method updates, and invoices all live in the Stripe portal.
+          </p>
         </div>
       )}
 

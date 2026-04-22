@@ -43,8 +43,8 @@ export const PLANS = [
   {
     name: "Elite",
     description: "Institutional-grade research. Lens tuned to your portfolio.",
-    monthly: { price: "$45", period: "/mo", slug: "elite" },
-    annual:  { price: "$449", period: "/yr", slug: "elite-annual", savings: "Save 17% ($91)" },
+    monthly: { price: "$99", period: "/mo", slug: "elite" },
+    annual:  { price: "$999", period: "/yr", slug: "elite-annual", savings: "Save 16% ($189)" },
     features: [
       "Everything in Pro",
       "Unlimited portfolios",
