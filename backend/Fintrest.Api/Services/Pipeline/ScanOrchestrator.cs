@@ -98,6 +98,53 @@ public class ScanOrchestrator(
                 }
             }
 
+            // §14.1 — Override the Fundamental factor with the sector-normalized
+            // Q/P/G blend from fundamental_subscore (populated nightly by
+            // FundamentalSubscoreJob). Falls back to the inline StockScorer output
+            // when no subscore row exists for a ticker — so the scan still works
+            // on a fresh install before the job has ever run.
+            var todayEt = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")));
+            var subScoreLookup = await db.FundamentalSubscores
+                .AsNoTracking()
+                .Where(f => f.AsOfDate == todayEt)
+                .Select(f => new
+                {
+                    f.Ticker,
+                    f.QualityScore,
+                    f.ProfitabilityScore,
+                    f.GrowthScore,
+                })
+                .ToDictionaryAsync(f => f.Ticker, ct);
+
+            if (subScoreLookup.Count > 0)
+            {
+                int blended = 0;
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    var (snap, raw) = pending[i];
+                    if (!subScoreLookup.TryGetValue(snap.Ticker, out var sub)) continue;
+
+                    var blendedFundamental = BlendQpg(
+                        sub.QualityScore, sub.ProfitabilityScore, sub.GrowthScore);
+                    if (blendedFundamental is null) continue;
+
+                    var newBreakdown = raw.Breakdown with { Fundamental = blendedFundamental.Value };
+                    var newRaw = raw with { Breakdown = newBreakdown };
+                    pending[i] = (snap, newRaw);
+                    blended++;
+                }
+                logger.LogInformation(
+                    "Blended Q/P/G subscores into Fundamental factor for {N} of {Total} pending stocks",
+                    blended, pending.Count);
+            }
+            else
+            {
+                logger.LogInformation(
+                    "No fundamental_subscore rows for {Date} — keeping inline Fundamental score",
+                    todayEt);
+            }
+
             // ─────────────────────────────────────────────────────────────
             // PASS 2 — Cross-sectional percentile ranking across universe.
             // Converts each factor score from "raw table output" to "your stock's
@@ -444,6 +491,22 @@ public class ScanOrchestrator(
     /// Apply regime tilt to each factor of a ranked breakdown, bounded by configured cap.
     /// Runs AFTER percentile ranking so the tilt is applied on universe-relative scores.
     /// </summary>
+    /// <summary>
+    /// Blend Quality / Profitability / Growth sub-scores into a single
+    /// Fundamental factor score (§14.1). Equal-weight 1/3 each when all
+    /// three are non-null; otherwise an average of what's available. Returns
+    /// null when none of the three sub-scores are available for this ticker,
+    /// which signals the caller to fall back to the inline StockScorer value.
+    /// </summary>
+    private static double? BlendQpg(double? quality, double? profitability, double? growth)
+    {
+        var parts = new List<double>();
+        if (quality is not null) parts.Add(quality.Value);
+        if (profitability is not null) parts.Add(profitability.Value);
+        if (growth is not null) parts.Add(growth.Value);
+        return parts.Count == 0 ? null : parts.Average();
+    }
+
     private ScoringEngineV2.ScoreBreakdown ApplyRegimeTilt(
         ScoringEngineV2.ScoreBreakdown ranked,
         string? sector,
