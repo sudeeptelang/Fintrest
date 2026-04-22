@@ -69,7 +69,7 @@ export function AthenaThesisCard({ ticker }: { ticker: string }) {
       {/* Thesis body — body-lg (16/28) ink-800, max 720px per Lens spec */}
       <div className="max-w-[720px] mb-6">
         {data.thesis.split(/\n\n+/).map((para, i) => (
-          <p key={i} className="text-[16px] leading-[28px] text-ink-800 mb-3 last:mb-0">
+          <p key={i} className="font-[var(--font-lens)] text-[16px] leading-[28px] text-ink-800 mb-3 last:mb-0">
             {para.trim()}
           </p>
         ))}

@@ -82,7 +82,7 @@ export function LensCard({
         </h3>
       )}
 
-      <div className="font-[var(--font-sans)] text-[16px] leading-[28px] text-ink-800 max-w-[720px] [&_strong]:font-semibold [&_strong]:text-ink-950">
+      <div className="font-[var(--font-lens)] text-[16px] leading-[28px] text-ink-800 max-w-[720px] [&_strong]:font-semibold [&_strong]:text-ink-950">
         {children}
       </div>
 

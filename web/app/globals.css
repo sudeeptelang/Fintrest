@@ -21,6 +21,12 @@
   --font-mono: var(--font-mono);
   --font-heading: var(--font-heading);
 
+  /* Lens prose — serif stack per FINTREST_UX_SPEC §03. The one place
+     serif appears in the UI; signals "research analyst voice" against
+     the system sans used everywhere else. Apply via `font-[var(--font-lens)]`
+     on any Lens thesis / retrospective / narrative body. */
+  --font-lens: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+
   /* ─── Shadcn semantic tokens (still used by most components) ─── */
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -136,16 +142,20 @@
   --ink-900: #101828;
   --ink-950: #060C1A;
 
-  /* Brand — forest */
-  --forest:       #0F4F3A;
-  --forest-light: #E8F1EC;
-  --forest-dark:  #0A3528;
+  /* Brand — forest (MVP-1 spec: #0F6E56, up-shifted from #0F4F3A for
+     better contrast against ink-50 surface per FINTREST_UX_SPEC §03).
+     Token names kept as `forest*` so every existing Tailwind class
+     (bg-forest, text-forest-dark, etc.) picks up the new color
+     without per-component edits. */
+  --forest:       #0F6E56;
+  --forest-light: #E8F2ED;
+  --forest-dark:  #0A5540;
 
   /* Lens card bg — mid-tone between forest-light and ink-100. Only used for Lens thesis cards. */
-  --lens-bg:      #DCEBE2;
+  --lens-bg:      #DBEBE3;
 
   /* Board cover palette — 8 colors, low-saturation, no primaries */
-  --cover-forest: #0F4F3A;
+  --cover-forest: #0F6E56;
   --cover-rust:   #B8502F;
   --cover-ink-700: #344054;
   --cover-ink-500: #667085;
@@ -237,32 +247,32 @@
   --card-foreground:    var(--ink-100);
   --popover:            var(--ink-900);
   --popover-foreground: var(--ink-100);
-  --primary:            #5BA889;        /* lighter forest — readable on dark */
+  --primary:            #9FE1CB;        /* spec §03 dark-mode accent */
   --primary-foreground: var(--ink-950);
   --secondary:          var(--ink-800);
   --secondary-foreground: var(--ink-100);
   --muted:              var(--ink-800);
   --muted-foreground:   var(--ink-400);
-  --accent:             #1A3D30;        /* deep forest-dark tint */
+  --accent:             #1E4D3B;        /* deep forest tint for dark */
   --accent-foreground:  var(--ink-100);
   --destructive:        #E07A6D;        /* lighter danger for dark surfaces */
   --border:             rgba(255, 255, 255, 0.08);
   --input:              rgba(255, 255, 255, 0.12);
-  --ring:               #5BA889;
+  --ring:               #9FE1CB;
 
-  --chart-1: #5BA889;
+  --chart-1: #9FE1CB;
   --chart-2: #D48365;
   --chart-3: #E39A4A;
   --chart-4: #4EA87A;
   --chart-5: #8B7763;
 
-  --emerald:       #5BA889;
-  --emerald-light: #7FC4A6;
+  --emerald:       #9FE1CB;
+  --emerald-light: #B8E9D6;
   --emerald-dark:  #2E6B52;
 
   --sidebar:                    var(--ink-900);
   --sidebar-foreground:         var(--ink-100);
-  --sidebar-primary:            #5BA889;
+  --sidebar-primary:            #9FE1CB;
   --sidebar-primary-foreground: var(--ink-950);
   --sidebar-accent:             var(--ink-800);
   --sidebar-accent-foreground:  var(--ink-100);
