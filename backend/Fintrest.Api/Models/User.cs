@@ -38,6 +38,19 @@ public class User
     public bool ReceiveSignalAlerts { get; set; } = true;
     public bool ReceiveWeeklyNewsletter { get; set; } = true;
 
+    // Onboarding state — migration 023. MVP Blocker 1.
+    public DateTime? OnboardingCompletedAt { get; set; }
+    public bool OnboardingSkipped { get; set; }
+
+    [MaxLength(20)]
+    public string? ExperienceLevel { get; set; } // beginner | intermediate | advanced
+
+    [MaxLength(20)]
+    public string? RiskAppetite { get; set; } // conservative | balanced | aggressive
+
+    [Column(TypeName = "jsonb")]
+    public string? PreferredSectors { get; set; } // JSON array of GICS sectors
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
