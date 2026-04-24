@@ -102,15 +102,17 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         var keyMetrics = keyMetricsTask.Result?.FirstOrDefault();
         var ratios = ratiosTask.Result?.FirstOrDefault();
         var target = targetTask.Result?.FirstOrDefault();
-        var nextEarnings = earningsTask.Result?
+        // FMP returns calendar-date strings like "2026-05-12" — DateTime.Parse
+        // produces Kind=Unspecified, which Npgsql rejects when writing to the
+        // timestamptz column Stock.NextEarningsDate. Anchor every parsed value
+        // to UTC midnight; the column only cares about the date component
+        // anyway. No-match case returns null rather than DateTime.MinValue.
+        var nextEarningsDate = earningsTask.Result?
             .Where(e => DateTime.TryParse(e.Date, out _))
-            .Select(e => DateTime.Parse(e.Date!))
+            .Select(e => (DateTime?)DateTime.SpecifyKind(DateTime.Parse(e.Date!), DateTimeKind.Utc))
             .Where(d => d >= today)
             .OrderBy(d => d)
             .FirstOrDefault();
-
-        // Treat the default DateTime as null
-        DateTime? nextEarningsDate = nextEarnings == default ? null : nextEarnings;
 
         if (profile is null && keyMetrics is null && ratios is null && target is null && nextEarningsDate is null)
             return null;
