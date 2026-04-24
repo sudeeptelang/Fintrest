@@ -25,6 +25,7 @@ import { LensCardGated } from "@/components/lens/lens-card";
 import { PlainEnglishTakeaways } from "@/components/signals/plain-english-takeaways";
 import { TradePlan } from "@/components/signals/trade-plan";
 import { FactorBreakdownPanel } from "@/components/signals/factor-breakdown-panel";
+import { DrivingToday } from "@/components/signals/driving-today";
 import { SmartMoneyBreakdown, type SmartMoneySubSignal } from "@/components/signals/smart-money-breakdown";
 import { AnalystRatingCard } from "@/components/signals/analyst-rating-card";
 import { RelatedNews } from "@/components/signals/related-news";
@@ -203,7 +204,12 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         />
       )}
 
-      {/* 3. 8-factor breakdown */}
+      {/* 3a. What's driving today — per-factor contribution chips vs. baseline */}
+      {breakdown && signal && (
+        <DrivingToday breakdown={breakdown} composite={signal.scoreTotal} />
+      )}
+
+      {/* 3b. 8-factor breakdown */}
       {breakdown && signal && (
         <FactorBreakdownPanel
           breakdown={breakdown}
