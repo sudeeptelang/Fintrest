@@ -521,33 +521,36 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             // Crypto
             "IBIT", "ETHA",
         };
+        // ETF-proxy labels. Prices are the ETF price, NOT the underlying
+        // index level (SPY ~$700 vs S&P 500 index ~5800+). Ticker is in
+        // the label so users don't mistake 706.93 for a broken "S&P 500".
         var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             // US
-            ["SPY"] = "S&P 500",
-            ["QQQ"] = "Nasdaq 100",
-            ["DIA"] = "Dow Jones",
-            ["IWM"] = "Russell 2000",
+            ["SPY"] = "SPY · S&P 500",
+            ["QQQ"] = "QQQ · Nasdaq 100",
+            ["DIA"] = "DIA · Dow Jones",
+            ["IWM"] = "IWM · Russell 2000",
             // International
-            ["EFA"] = "EAFE (Developed)",
-            ["VWO"] = "Emerging Mkts",
-            ["FXI"] = "China 50",
-            ["EWJ"] = "Japan (Nikkei)",
-            ["EWG"] = "Germany (DAX)",
-            ["EWU"] = "UK (FTSE)",
+            ["EFA"] = "EFA · EAFE",
+            ["VWO"] = "VWO · Emerging Mkts",
+            ["FXI"] = "FXI · China 50",
+            ["EWJ"] = "EWJ · Japan",
+            ["EWG"] = "EWG · Germany",
+            ["EWU"] = "EWU · UK",
             // Commodities
-            ["GLD"] = "Gold",
-            ["SLV"] = "Silver",
-            ["USO"] = "Crude Oil",
-            ["UNG"] = "Natural Gas",
+            ["GLD"] = "GLD · Gold",
+            ["SLV"] = "SLV · Silver",
+            ["USO"] = "USO · Crude Oil",
+            ["UNG"] = "UNG · Nat Gas",
             // Bonds
-            ["TLT"] = "20Y Treasury",
-            ["IEF"] = "10Y Treasury",
-            ["SHY"] = "1-3Y Treasury",
-            ["HYG"] = "High-Yield Bonds",
+            ["TLT"] = "TLT · 20Y Treasury",
+            ["IEF"] = "IEF · 10Y Treasury",
+            ["SHY"] = "SHY · 1-3Y Treasury",
+            ["HYG"] = "HYG · High-Yield",
             // Crypto
-            ["IBIT"] = "Bitcoin ETF",
-            ["ETHA"] = "Ethereum ETF",
+            ["IBIT"] = "IBIT · Bitcoin",
+            ["ETHA"] = "ETHA · Ethereum",
         };
 
         var stocks = await db.Stocks
