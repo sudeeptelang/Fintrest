@@ -245,8 +245,10 @@
   --emerald:       var(--forest);       /* bg-emerald now renders forest */
   --emerald-light: var(--forest-light);
   --emerald-dark:  var(--forest-dark);
-  --navy:          var(--ink-950);      /* bg-navy now renders true-black */
-  --navy-light:    var(--ink-900);
+  /* NOTE: --navy / --navy-light are now owned by the v3 content palette
+     (Technical factor family). Do NOT remap them to ink-* here — that
+     silently broke every navy-light pill in the factor breakdown and
+     driving-today chip strip. The values live near the top of :root. */
 
   /* Radius base — 8px (v2 default) */
   --radius: 0.5rem;

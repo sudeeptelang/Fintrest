@@ -76,10 +76,10 @@ export function MoversGrid({
               type="button"
               onClick={() => setTab(t.key)}
               className={cn(
-                "px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors",
+                "px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors border",
                 tab === t.key
-                  ? "bg-ink-900 text-ink-0 border border-ink-900"
-                  : "bg-ink-0 text-ink-700 border border-ink-200 hover:border-ink-400",
+                  ? "bg-forest-light text-forest-dark border-forest"
+                  : "bg-ink-0 text-ink-700 border-ink-200 hover:border-ink-400",
               )}
             >
               {t.label}

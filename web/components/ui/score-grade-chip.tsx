@@ -23,13 +23,16 @@ function bandFor(score: number): GradeBand {
   return "F";
 }
 
-// Band → tile background class. A greens with `up` (high-score = good),
-// B navy, C ink, D warm gray, F down.
+// Band → tile background class. A = up-green (high-score = good),
+// B = sky-blue (brand — good but not top), C = neutral ink, D = muted,
+// F = down. Keeps A and F the strongest signals; B / C / D read as
+// progressively quieter. No near-black tiles (the old B=bg-navy looked
+// like a black pill and clashed with the sky-brand palette).
 const BAND_STYLE: Record<GradeBand, { bg: string; text: string }> = {
   A: { bg: "bg-up", text: "text-ink-0" },
-  B: { bg: "bg-navy", text: "text-ink-0" },
-  C: { bg: "bg-ink-100", text: "text-ink-700" },
-  D: { bg: "bg-ink-400", text: "text-ink-0" },
+  B: { bg: "bg-forest", text: "text-ink-0" },
+  C: { bg: "bg-ink-200", text: "text-ink-700" },
+  D: { bg: "bg-ink-300", text: "text-ink-700" },
   F: { bg: "bg-down", text: "text-ink-0" },
 };
 
