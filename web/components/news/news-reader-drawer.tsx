@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { X, ExternalLink, Loader2, Sparkles } from "lucide-react";
-import { api, type NewsItem } from "@/lib/api";
-import { AthenaSurface } from "@/components/ui/athena-surface";
-import Link from "next/link";
+import { useEffect } from "react";
+import { X, ExternalLink } from "lucide-react";
+import { type NewsItem } from "@/lib/api";
 import { StockLogo } from "@/components/stock/stock-logo";
 
 /**
- * Side-drawer news reader. User clicks a news item → this opens → Athena generates a
- * 2-3 sentence take tied to the ticker's context (first click only; cached for future views).
- * User can then click through to the source for the full article. Source links open in a new tab.
+ * Side-drawer news reader. Phase 1: shows the headline, the source's
+ * summary paragraph if we have one (FMP / Finnhub usually ship one),
+ * and a click-through to the full article at the source. The Lens
+ * take on news was removed for phase 1 — a planned feature, not
+ * wired in for launch.
  */
 export function NewsReaderDrawer({
   item,
@@ -21,13 +20,6 @@ export function NewsReaderDrawer({
   onClose: () => void;
 }) {
   const open = item !== null;
-
-  const { data: summary, isLoading } = useQuery({
-    queryKey: ["news-athena", item?.id],
-    queryFn: () => api.newsAthenaSummary(item!.id),
-    enabled: open && !!item?.id,
-    staleTime: Infinity, // summaries never change
-  });
 
   // Lock body scroll while the drawer is open.
   useEffect(() => {
@@ -99,43 +91,17 @@ export function NewsReaderDrawer({
             {item.headline}
           </h2>
 
-          {/* Athena Take — navy card */}
-          <AthenaSurface>
-            <div className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="h-4 w-4 text-[#00b87c]" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#00b87c]">
-                  Lens&apos;s Take
-                </span>
-                {item.ticker && (
-                  <Link
-                    href={`/stock/${item.ticker}`}
-                    className="ml-auto text-[10px] text-white/60 hover:text-[#00b87c] transition-colors"
-                    onClick={onClose}
-                  >
-                    Full thesis →
-                  </Link>
-                )}
-              </div>
-              {isLoading ? (
-                <div className="flex items-center gap-2 text-white/70 text-sm">
-                  <Loader2 className="h-4 w-4 animate-spin text-[#00b87c]" />
-                  Lens is reading the headline…
-                </div>
-              ) : summary?.athenaSummary ? (
-                <p className="text-sm leading-relaxed text-white/90">
-                  {summary.athenaSummary}
-                </p>
-              ) : (
-                <p className="text-sm text-white/60">
-                  Lens summary not available for this headline yet.
-                </p>
-              )}
-              <p className="text-[10px] text-white/40 leading-relaxed pt-3 mt-3 border-t border-white/10">
-                Educational context only — not financial advice. Past performance does not guarantee future results.
+          {/* Article summary (from source feed) */}
+          {item.summary && (
+            <div className="px-4 py-4 rounded-[10px] border border-ink-200 bg-ink-50">
+              <p className="text-[14px] leading-[22px] text-ink-800">
+                {item.summary}
+              </p>
+              <p className="text-[10px] text-ink-500 pt-3 mt-3 border-t border-ink-200">
+                Summary from {item.source ?? "source"}. Click below to read the full article.
               </p>
             </div>
-          </AthenaSurface>
+          )}
 
           {/* Read full article at source */}
           {item.url && (
