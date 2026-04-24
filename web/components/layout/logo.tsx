@@ -1,13 +1,13 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The Fintrest logo — v2 Forest & Rust.
+ * The Fintrest logo — v3 Sky Blue.
  *
- * Inline SVG instead of a PNG so the color comes from the design token
- * (forest) and scales cleanly across sizes. The <Image> asset at
- * /logo-icon.png was baked with the old bright-green palette — replacing
- * the asset would require a design handoff, and inline SVG matches the
- * preview HTML exactly.
+ * Swapped from the inline "F" tile to the stylized F-with-arrow-and-nodes
+ * asset supplied 2026-04-24. The PNG lives at /public/logo.png and is
+ * rendered via <img> so we don't need Next/Image's config plumbing here.
+ * Rounded square backdrop is kept so the crop matches other square
+ * icon tiles in the UI (stock logos, etc.).
  *
  * Sizes follow v2 usage: 24 (marketing nav), 32 (app sidebar), 48 (auth).
  */
@@ -18,27 +18,28 @@ export function LogoMark({
   size?: number;
   className?: string;
 }) {
-  // Inner "F" is ~58% of the outer square. Corner radius scales at ~21%.
-  const fontSize = Math.round(size * 0.56);
   const radius = Math.max(4, Math.round(size * 0.21));
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center bg-forest text-ink-0 flex-shrink-0",
+        "inline-flex items-center justify-center flex-shrink-0 overflow-hidden bg-forest",
         className,
       )}
       style={{
         width: size,
         height: size,
         borderRadius: radius,
-        fontFamily: "var(--font-heading), 'Sora', system-ui, sans-serif",
-        fontWeight: 700,
-        fontSize,
-        lineHeight: 1,
       }}
       aria-hidden="true"
     >
-      F
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo.png"
+        alt="Fintrest"
+        width={size}
+        height={size}
+        style={{ width: size, height: size, objectFit: "cover", display: "block" }}
+      />
     </span>
   );
 }
