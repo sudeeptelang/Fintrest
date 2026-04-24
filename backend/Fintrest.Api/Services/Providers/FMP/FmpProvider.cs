@@ -485,6 +485,45 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         );
     }
 
+    public async Task<List<LiveQuoteDto>> GetQuotesAsync(IReadOnlyList<string> tickers, CancellationToken ct = default)
+    {
+        if (tickers.Count == 0) return [];
+
+        // FMP /stable/quote accepts a single symbol OR a comma-separated
+        // list on certain plans. To be safe and stay inside URL-length
+        // limits, we batch at 100 per request and stitch the results.
+        var results = new List<LiveQuoteDto>();
+        var batchSize = 100;
+        for (int i = 0; i < tickers.Count; i += batchSize)
+        {
+            var batch = tickers.Skip(i).Take(batchSize);
+            var symbols = string.Join(",", batch);
+            var url = $"{_baseUrl}/quote?symbol={symbols}&apikey={_apiKey}";
+            var rows = await TryFetch<List<FmpQuote>>(url, ct);
+            if (rows is null) continue;
+
+            foreach (var r in rows)
+            {
+                if (string.IsNullOrWhiteSpace(r.Symbol)) continue;
+                var asOf = r.Timestamp.HasValue
+                    ? DateTimeOffset.FromUnixTimeSeconds(r.Timestamp.Value).UtcDateTime
+                    : DateTime.UtcNow;
+                results.Add(new LiveQuoteDto(
+                    Ticker: r.Symbol!.ToUpperInvariant(),
+                    Price: r.Price,
+                    PreviousClose: r.PreviousClose,
+                    Change: r.Change,
+                    ChangePct: r.ChangePercentage,
+                    DayHigh: r.DayHigh,
+                    DayLow: r.DayLow,
+                    Volume: r.Volume,
+                    AsOf: asOf
+                ));
+            }
+        }
+        return results;
+    }
+
     public async Task<List<EarningsSurpriseDto>> GetEarningsSurprisesAsync(string ticker, int quarters = 12, CancellationToken ct = default)
     {
         // FMP stable: /earnings-surprises returns quarterly rows in
@@ -770,6 +809,22 @@ file record FmpPriceTargetSummary(
     [property: JsonPropertyName("lastYearAvgPriceTarget")] double? LastYearAvgPriceTarget,
     [property: JsonPropertyName("allTime")] int? AllTime,
     [property: JsonPropertyName("allTimeAvgPriceTarget")] double? AllTimeAvgPriceTarget
+);
+
+/// <summary>FMP /stable/quote row. Field names match the exact JSON
+/// the user verified in a live curl (timestamp is unix epoch seconds,
+/// changePercentage is a plain decimal like 23.21803).</summary>
+file record FmpQuote(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("price")] decimal? Price,
+    [property: JsonPropertyName("previousClose")] decimal? PreviousClose,
+    [property: JsonPropertyName("change")] decimal? Change,
+    [property: JsonPropertyName("changePercentage")] decimal? ChangePercentage,
+    [property: JsonPropertyName("volume")] long? Volume,
+    [property: JsonPropertyName("dayLow")] decimal? DayLow,
+    [property: JsonPropertyName("dayHigh")] decimal? DayHigh,
+    [property: JsonPropertyName("timestamp")] long? Timestamp
 );
 
 /// <summary>FMP /stable/earnings-surprises row. Field names follow

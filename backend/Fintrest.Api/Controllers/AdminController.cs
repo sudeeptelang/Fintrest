@@ -379,6 +379,30 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         });
     }
 
+    /// <summary>Refresh the intraday live-quotes cache for the top-N
+    /// active stocks. One FMP /quote call batched internally, ~5-15 sec
+    /// wall-clock even at count=500. Auto-runs every 15 min during
+    /// market hours; use this to force an immediate pull.</summary>
+    [HttpPost("quotes/refresh")]
+    public async Task<IActionResult> RefreshQuotes(
+        [FromServices] Fintrest.Api.Services.Ingestion.LiveQuoteService svc,
+        [FromQuery] int count = 500,
+        CancellationToken ct = default)
+    {
+        count = Math.Clamp(count, 1, 2000);
+
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            ActorUserId = AdminUserId,
+            Action = "refresh_live_quotes",
+            EntityType = "live_quotes",
+        });
+        await db.SaveChangesAsync(ct);
+
+        var summary = await svc.RefreshTopAsync(count, ct);
+        return Ok(summary);
+    }
+
     /// <summary>Fast-path bulk refresh for the top-N active stocks by
     /// market cap. Bars-only (skips fundamentals + news) so one call
     /// finishes in ~30–60s instead of the 5–10 minutes of

@@ -245,6 +245,16 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Ingestion.BarsRefreshJob>();
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Ingestion.BarsRefreshJob>());
 
+// LiveQuoteService + cron — the actual fix for "UI shows yesterday's
+// close intraday." Every 15 minutes 9:45 AM → 4:15 PM ET weekdays,
+// pulls FMP /quote in batches and upserts live_quotes. The screener
+// overlays these onto EOD bars so today's price shows in real time.
+// Admin trigger /admin/quotes/refresh still works for on-demand.
+builder.Services.AddScoped<Fintrest.Api.Services.Ingestion.LiveQuoteService>();
+builder.Services.AddSingleton<Fintrest.Api.Services.Ingestion.LiveQuoteRefreshJob>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<Fintrest.Api.Services.Ingestion.LiveQuoteRefreshJob>());
+
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>

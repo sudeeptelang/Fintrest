@@ -435,6 +435,16 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             .GroupBy(m => m.StockId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(m => m.Ts).ToList());
 
+        // Overlay intraday live quotes. The MarketData table only stores
+        // EOD bars; without this overlay, intraday users see yesterday's
+        // close until 4 PM when today's bar lands. live_quotes is
+        // refreshed every 15 min during market hours by LiveQuoteRefreshJob.
+        var tickerUpperSet = stocks.Select(s => s.Ticker).ToList();
+        var liveQuotes = await db.LiveQuotes
+            .AsNoTracking()
+            .Where(l => tickerUpperSet.Contains(l.Ticker))
+            .ToDictionaryAsync(l => l.Ticker);
+
         var rows = new List<ScreenerRowResponse>();
 
         foreach (var stock in stocks)
@@ -453,6 +463,17 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             double? changePct = latest is not null && prev is not null && prev.Close > 0
                 ? Math.Round((latest.Close - prev.Close) / prev.Close * 100, 2)
                 : null;
+
+            // Intraday overlay — if live_quotes has a fresh snapshot for
+            // this ticker, prefer its price + changePct so the screener
+            // reflects today's move rather than yesterday's close. We
+            // don't mess with the historical bars; this is a per-row
+            // surface-level swap.
+            if (liveQuotes.TryGetValue(stock.Ticker, out var lq))
+            {
+                if (lq.Price.HasValue) price = (double)lq.Price.Value;
+                if (lq.ChangePct.HasValue) changePct = Math.Round((double)lq.ChangePct.Value, 2);
+            }
 
             double? avgVol30 = bars.Count >= 30
                 ? bars.Take(30).Average(b => (double)b.Volume)

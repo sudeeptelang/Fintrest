@@ -79,7 +79,29 @@ public interface IFundamentalsProvider
     /// last Y" narrative on the ticker detail + feeds the Fundamentals
     /// factor quality check. Most-recent first, up to `quarters` rows.</summary>
     Task<List<EarningsSurpriseDto>> GetEarningsSurprisesAsync(string ticker, int quarters = 12, CancellationToken ct = default);
+
+    /// <summary>Intraday quotes for a batch of tickers. FMP's /quote
+    /// endpoint accepts a comma-separated list, returns current price
+    /// + changePct + dayHigh/Low/volume per symbol. Used to overlay
+    /// live prices onto the screener response so users see today's
+    /// move instead of yesterday's close. Empty list returns empty.</summary>
+    Task<List<LiveQuoteDto>> GetQuotesAsync(IReadOnlyList<string> tickers, CancellationToken ct = default);
 }
+
+/// <summary>Intraday quote from FMP /quote. Contains today's price,
+/// previousClose, changePercentage, dayHigh/Low, volume — everything
+/// needed to overlay onto the screener's EOD-only market_data bars.</summary>
+public record LiveQuoteDto(
+    string Ticker,
+    decimal? Price,
+    decimal? PreviousClose,
+    decimal? Change,
+    decimal? ChangePct,
+    decimal? DayHigh,
+    decimal? DayLow,
+    long? Volume,
+    DateTime? AsOf
+);
 
 /// <summary>One earnings-surprise row. Surprise % is computed as
 /// (actual - estimate) / |estimate| × 100; FMP sometimes ships it

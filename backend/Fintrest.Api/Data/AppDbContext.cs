@@ -72,6 +72,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     // sparklines + real day-over-day deltas on the UI.
     public DbSet<SignalScoreHistory> SignalScoreHistory => Set<SignalScoreHistory>();
 
+    // Intraday live-quotes cache (migration 027). Refreshed every
+    // 15 min during market hours; overlaid onto EOD bars by the
+    // screener so users see today's price instead of yesterday's
+    // close.
+    public DbSet<LiveQuote> LiveQuotes => Set<LiveQuote>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
