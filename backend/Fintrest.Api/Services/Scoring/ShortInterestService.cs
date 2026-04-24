@@ -69,15 +69,23 @@ public class ShortInterestService(
     }
 
     /// <summary>Latest snapshot for a ticker (DB only, no network). Null
-    /// when we haven't pulled one yet.</summary>
+    /// when we haven't pulled one yet, or when migration 025 hasn't
+    /// been applied (degrades to null instead of throwing).</summary>
     public async Task<ShortInterestSnapshot?> GetLatestAsync(string ticker, CancellationToken ct = default)
     {
         var normalized = ticker.Trim().ToUpperInvariant();
-        return await db.ShortInterestSnapshots
-            .AsNoTracking()
-            .Where(s => s.Ticker == normalized)
-            .OrderByDescending(s => s.SettlementDate)
-            .FirstOrDefaultAsync(ct);
+        try
+        {
+            return await db.ShortInterestSnapshots
+                .AsNoTracking()
+                .Where(s => s.Ticker == normalized)
+                .OrderByDescending(s => s.SettlementDate)
+                .FirstOrDefaultAsync(ct);
+        }
+        catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
+        {
+            return null;
+        }
     }
 
     /// <summary>Derive a 0-100 sub-score from a percent-of-float value.</summary>

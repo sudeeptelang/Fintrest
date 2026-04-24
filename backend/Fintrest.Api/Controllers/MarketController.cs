@@ -1128,10 +1128,15 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             : await db.Signals
                 .Where(s => s.ScanRunId == latestScan.Id && peerIds.Contains(s.StockId))
                 .ToDictionaryAsync(s => s.StockId, s => s.ScoreTotal, ct);
-        var peerQuotes = await db.LiveQuotes
-            .AsNoTracking()
-            .Where(l => upperPeers.Contains(l.Ticker))
-            .ToDictionaryAsync(l => l.Ticker, ct);
+        Dictionary<string, Models.LiveQuote> peerQuotes = new();
+        try
+        {
+            peerQuotes = await db.LiveQuotes
+                .AsNoTracking()
+                .Where(l => upperPeers.Contains(l.Ticker))
+                .ToDictionaryAsync(l => l.Ticker, ct);
+        }
+        catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01") { /* migration 027 pending */ }
 
         // Preserve FMP's peer ordering (they rank by relevance) but
         // render only peers we actually carry. Fill any missing with
@@ -1181,19 +1186,26 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         days = Math.Clamp(days, 5, 365);
 
         var cutoff = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(-days), DateTimeKind.Utc);
-        var rows = await db.SignalScoreHistory
-            .AsNoTracking()
-            .Where(h => h.Ticker == normalized && h.AsOfDate >= cutoff)
-            .OrderBy(h => h.AsOfDate)
-            .Select(h => new
-            {
-                date = h.AsOfDate,
-                score = (double)h.ScoreTotal,
-                signalType = h.SignalType,
-            })
-            .ToListAsync(ct);
-
-        return Ok(new { ticker = normalized, days, points = rows });
+        try
+        {
+            var rows = await db.SignalScoreHistory
+                .AsNoTracking()
+                .Where(h => h.Ticker == normalized && h.AsOfDate >= cutoff)
+                .OrderBy(h => h.AsOfDate)
+                .Select(h => new
+                {
+                    date = h.AsOfDate,
+                    score = (double)h.ScoreTotal,
+                    signalType = h.SignalType,
+                })
+                .ToListAsync(ct);
+            return Ok(new { ticker = normalized, days, points = rows });
+        }
+        catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
+        {
+            // migration 026 pending — degrade to empty history.
+            return Ok(new { ticker = normalized, days, points = Array.Empty<object>() });
+        }
     }
 
     /// <summary>Bulk score-history fetch — one call for a list of tickers.
@@ -1215,18 +1227,26 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         days = Math.Clamp(days, 5, 365);
 
         var cutoff = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(-days), DateTimeKind.Utc);
-        var rows = await db.SignalScoreHistory
-            .AsNoTracking()
-            .Where(h => list.Contains(h.Ticker) && h.AsOfDate >= cutoff)
-            .OrderBy(h => h.AsOfDate)
-            .Select(h => new { h.Ticker, date = h.AsOfDate, score = (double)h.ScoreTotal })
-            .ToListAsync(ct);
+        try
+        {
+            var rows = await db.SignalScoreHistory
+                .AsNoTracking()
+                .Where(h => list.Contains(h.Ticker) && h.AsOfDate >= cutoff)
+                .OrderBy(h => h.AsOfDate)
+                .Select(h => new { h.Ticker, date = h.AsOfDate, score = (double)h.ScoreTotal })
+                .ToListAsync(ct);
 
-        var map = rows
-            .GroupBy(r => r.Ticker)
-            .ToDictionary(g => g.Key, g => g.Select(x => new { x.date, x.score }).ToList());
+            var map = rows
+                .GroupBy(r => r.Ticker)
+                .ToDictionary(g => g.Key, g => g.Select(x => new { x.date, x.score }).ToList());
 
-        return Ok(new { days, tickers = map });
+            return Ok(new { days, tickers = map });
+        }
+        catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
+        {
+            // migration 026 pending — degrade to empty map.
+            return Ok(new { days, tickers = new Dictionary<string, object>() });
+        }
     }
 
     /// <summary>Recent analyst grade changes for a ticker (FMP /grades
@@ -1524,11 +1544,20 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         var normalized = (ticker ?? "").Trim().ToUpperInvariant();
         if (normalized.Length == 0) return BadRequest("ticker required");
 
-        var row = await db.InsiderScores
-            .AsNoTracking()
-            .Where(s => s.Ticker == normalized)
-            .OrderByDescending(s => s.AsOfDate)
-            .FirstOrDefaultAsync();
+        Models.InsiderScore? row = null;
+        try
+        {
+            row = await db.InsiderScores
+                .AsNoTracking()
+                .Where(s => s.Ticker == normalized)
+                .OrderByDescending(s => s.AsOfDate)
+                .FirstOrDefaultAsync();
+        }
+        catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
+        {
+            // migration 024 pending — degrade to 204.
+            return NoContent();
+        }
 
         if (row is null) return NoContent();
 

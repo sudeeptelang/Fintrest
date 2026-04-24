@@ -290,23 +290,33 @@ public class ScanOrchestrator(
             // real sparklines on the UI + real day-over-day deltas on
             // ScoreGradeChip. Upsert on (ticker, today): delete any
             // existing rows for these tickers today, then insert fresh.
+            // Guarded against missing migration 026 so a fresh DB doesn't
+            // fail the scan — just logs and skips.
             var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
             if (publishable.Count > 0)
             {
-                var tickerList = publishable.Select(p => p.Ticker).Distinct().ToList();
-                await db.SignalScoreHistory
-                    .Where(h => h.AsOfDate == today && tickerList.Contains(h.Ticker))
-                    .ExecuteDeleteAsync(ct);
-                foreach (var p in publishable)
+                try
                 {
-                    db.SignalScoreHistory.Add(new Models.SignalScoreHistory
+                    var tickerList = publishable.Select(p => p.Ticker).Distinct().ToList();
+                    await db.SignalScoreHistory
+                        .Where(h => h.AsOfDate == today && tickerList.Contains(h.Ticker))
+                        .ExecuteDeleteAsync(ct);
+                    foreach (var p in publishable)
                     {
-                        Ticker = p.Ticker,
-                        AsOfDate = today,
-                        ScoreTotal = (decimal)p.ScoreTotal,
-                        SignalType = p.SignalType,
-                        ScanRunId = scanRun.Id,
-                    });
+                        db.SignalScoreHistory.Add(new Models.SignalScoreHistory
+                        {
+                            Ticker = p.Ticker,
+                            AsOfDate = today,
+                            ScoreTotal = (decimal)p.ScoreTotal,
+                            SignalType = p.SignalType,
+                            ScanRunId = scanRun.Id,
+                        });
+                    }
+                }
+                catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
+                {
+                    logger.LogWarning(
+                        "Skipping signal_score_history writes — table does not exist (migration 026 pending). Scan will still complete; sparklines degrade to synthetic until migration runs.");
                 }
             }
 
