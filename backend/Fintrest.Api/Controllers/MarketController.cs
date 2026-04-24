@@ -439,33 +439,42 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
 
         foreach (var stock in stocks)
         {
-            if (!barsByStock.TryGetValue(stock.Id, out var bars) || bars.Count == 0) continue;
-
-            var latest = bars[0];
+            // Previously `continue`'d when bars were missing, which silently
+            // dropped big-caps whose market_data ingest lagged (MU / AMD /
+            // INTC symptom). Emit the row with null price/changePct instead
+            // so the ticker stays in the universe; downstream Gainers/Losers
+            // filters naturally skip null-changePct rows.
+            barsByStock.TryGetValue(stock.Id, out var bars);
+            bars ??= new();
+            var latest = bars.Count > 0 ? bars[0] : null;
             var prev = bars.Count > 1 ? bars[1] : null;
 
-            double? price = latest.Close;
-            double? changePct = prev is not null && prev.Close > 0
+            double? price = latest?.Close;
+            double? changePct = latest is not null && prev is not null && prev.Close > 0
                 ? Math.Round((latest.Close - prev.Close) / prev.Close * 100, 2)
                 : null;
 
             double? avgVol30 = bars.Count >= 30
                 ? bars.Take(30).Average(b => (double)b.Volume)
                 : null;
-            double? relVol = avgVol30 is > 0 ? Math.Round(latest.Volume / avgVol30.Value, 2) : null;
+            double? relVol = (latest is not null && avgVol30 is > 0)
+                ? Math.Round(latest.Volume / avgVol30.Value, 2) : null;
 
-            double? PerfN(int n) => bars.Count > n && bars[n].Close > 0
+            double? PerfN(int n) => (latest is not null && bars.Count > n && bars[n].Close > 0)
                 ? Math.Round((latest.Close - bars[n].Close) / bars[n].Close * 100, 2) : null;
 
-            var w52High = bars.Max(b => b.High);
-            var w52Low = bars.Min(b => b.Low);
-            double? w52RangePct = w52High > w52Low
-                ? Math.Round((latest.Close - w52Low) / (w52High - w52Low) * 100, 1) : null;
+            double? w52High = bars.Count > 0 ? bars.Max(b => b.High) : null;
+            double? w52Low = bars.Count > 0 ? bars.Min(b => b.Low) : null;
+            double? w52RangePct = (latest is not null && w52High is > 0 && w52Low is > 0 && w52High > w52Low)
+                ? Math.Round((latest.Close - w52Low.Value) / (w52High.Value - w52Low.Value) * 100, 1) : null;
 
             double? perfYtd = null;
-            var ytdAnchor = bars.LastOrDefault(b => b.Ts.Year == latest.Ts.Year);
-            if (ytdAnchor is not null && ytdAnchor.Close > 0 && ytdAnchor != latest)
-                perfYtd = Math.Round((latest.Close - ytdAnchor.Close) / ytdAnchor.Close * 100, 2);
+            if (latest is not null)
+            {
+                var ytdAnchor = bars.LastOrDefault(b => b.Ts.Year == latest.Ts.Year);
+                if (ytdAnchor is not null && ytdAnchor.Close > 0 && ytdAnchor != latest)
+                    perfYtd = Math.Round((latest.Close - ytdAnchor.Close) / ytdAnchor.Close * 100, 2);
+            }
 
             fundByStock.TryGetValue(stock.Id, out var fund);
             signalsByStock.TryGetValue(stock.Id, out var signal);
@@ -485,7 +494,7 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 Sector: stock.Sector,
                 Price: price,
                 ChangePct: changePct,
-                Volume: latest.Volume,
+                Volume: latest?.Volume,
                 RelVolume: relVol,
                 MarketCap: stock.MarketCap,
                 PeRatio: fund?.PeRatio,
@@ -503,8 +512,8 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 PerfQuarter: PerfN(66),
                 PerfYtd: perfYtd,
                 PerfYear: PerfN(252),
-                Week52High: Math.Round(w52High, 2),
-                Week52Low: Math.Round(w52Low, 2),
+                Week52High: w52High is not null ? Math.Round(w52High.Value, 2) : null,
+                Week52Low: w52Low is not null ? Math.Round(w52Low.Value, 2) : null,
                 Week52RangePct: w52RangePct,
                 Rsi: null, // RSI not stored per bar, computed at scan time
                 AnalystTargetPrice: stock.AnalystTargetPrice,

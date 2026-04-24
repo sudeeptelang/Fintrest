@@ -387,6 +387,80 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         return Ok(new { Ticker = ticker, Status = "ingested" });
     }
 
+    /// <summary>Scan the universe for missing big-caps. Pulls FMP's
+    /// large-cap screener (market cap >= minCap USD) and compares
+    /// against our Stocks table. Returns missing tickers + stale-data
+    /// stats so "why isn't MU / AMD / INTC in Top Gainers?" gets a
+    /// data-backed answer without manual ticker lists.
+    ///
+    /// `minCap` defaults to 10B (typical "large cap" floor);
+    /// 2000000000 (2B) catches the russell1k universe.</summary>
+    [HttpGet("universe/scan-gaps")]
+    public async Task<IActionResult> ScanUniverseGaps(
+        [FromServices] Fintrest.Api.Services.Providers.Contracts.IFundamentalsProvider fmp,
+        [FromQuery] long minCap = 10_000_000_000L,
+        [FromQuery] int limit = 50,
+        CancellationToken ct = default)
+    {
+        // Use the russell1k preset if minCap is >= 2B; russell2k for smaller.
+        // The preset fetcher wraps FMP company-screener with the right filters.
+        var presetKey = minCap >= 10_000_000_000L ? "sp500" : minCap >= 2_000_000_000L ? "russell1k" : "russell2k";
+        var fmpTickers = await fmp.GetIndexConstituentsAsync(presetKey, ct);
+
+        if (fmpTickers.Count == 0)
+            return Ok(new { message = $"FMP returned no tickers for preset '{presetKey}' — try a different minCap", inDb = 0, missing = Array.Empty<object>() });
+
+        // What we have in DB that intersects with the FMP list.
+        var fmpSet = fmpTickers.Select(t => t.ToUpperInvariant()).ToHashSet();
+        var haveRows = await db.Stocks
+            .Where(s => fmpSet.Contains(s.Ticker))
+            .Select(s => new { s.Id, s.Ticker, s.Name, s.MarketCap, s.Active })
+            .ToListAsync(ct);
+        var haveSet = haveRows.Select(r => r.Ticker).ToHashSet();
+
+        // Tickers present on FMP but missing from DB.
+        var missingTickers = fmpSet.Except(haveSet).ToList();
+
+        // Stale check: for tickers we DO have, what's their newest bar date?
+        var haveIds = haveRows.Select(r => r.Id).ToList();
+        var cutoff = DateTime.UtcNow.AddDays(-7);
+        var recent = await db.MarketData
+            .Where(m => haveIds.Contains(m.StockId) && m.Ts >= cutoff)
+            .Select(m => new { m.StockId, m.Ts })
+            .ToListAsync(ct);
+        var latestByStock = recent
+            .GroupBy(m => m.StockId)
+            .ToDictionary(g => g.Key, g => g.Max(x => x.Ts));
+
+        var staleTickers = haveRows
+            .Where(r => !latestByStock.TryGetValue(r.Id, out var t) || t < DateTime.UtcNow.AddDays(-3))
+            .OrderByDescending(r => r.MarketCap ?? 0)
+            .Take(limit)
+            .Select(r => new
+            {
+                r.Ticker,
+                r.Name,
+                r.MarketCap,
+                r.Active,
+                lastBarAt = latestByStock.TryGetValue(r.Id, out var ts) ? ts : (DateTime?)null,
+                note = !r.Active ? "inactive"
+                    : !latestByStock.ContainsKey(r.Id) ? "no bars in last 7 days — run /admin/ingest/{ticker}"
+                    : "last bar > 3 days old — re-ingest",
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            presetUsed = presetKey,
+            fmpCount = fmpTickers.Count,
+            inDbCount = haveRows.Count,
+            missingCount = missingTickers.Count,
+            staleCount = staleTickers.Count,
+            missing = missingTickers.Take(limit).Select(t => new { ticker = t, note = "not in Stocks table — run /seed/preset/" + presetKey }),
+            stale = staleTickers,
+        });
+    }
+
     /// <summary>Diagnose universe + data-freshness for a list of tickers.
     /// Pass ?tickers=MU,AMD,INTC to see for each: presence in the Stocks
     /// table, last-bar timestamp, latest close, and %change vs. previous
