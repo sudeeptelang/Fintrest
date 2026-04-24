@@ -17,6 +17,7 @@ import {
   useCreateWatchlist,
   useInsiderScore,
   useShortInterest,
+  useCongressSignal,
 } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -40,7 +41,7 @@ import { EarningsHistory } from "@/components/stock/earnings-history";
 import { EarningsChart } from "@/components/charts/earnings-chart";
 import { OwnershipStrip } from "@/components/stock/ownership-strip";
 import { InsiderActivityCard, CongressActivityCard } from "@/components/stock/ticker-activity-cards";
-import type { InsiderScore, ShortInterestResponse } from "@/lib/api";
+import type { InsiderScore, ShortInterestResponse, CongressSignalResponse } from "@/lib/api";
 import {
   buildTakeaways,
   buildTradePlanBullets,
@@ -84,6 +85,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { data: ownership } = useStockOwnership(ticker);
   const { data: insiderScore } = useInsiderScore(ticker);
   const { data: shortInterest } = useShortInterest(ticker);
+  const { data: congressSignal } = useCongressSignal(ticker);
   const { data: watchlists } = useWatchlists();
   const addToWatchlist = useAddWatchlistItem();
   const createWatchlist = useCreateWatchlist();
@@ -110,6 +112,8 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
       ? hydrateInsiderRow(row, insiderScore ?? null)
       : row.key === "short"
       ? hydrateShortRow(row, shortInterest ?? null)
+      : row.key === "congressional"
+      ? hydrateCongressRow(row, congressSignal ?? null)
       : row,
   );
   const smartMoneyComposite = computeSmartMoneyComposite(smartMoneySignals);
@@ -563,6 +567,23 @@ function hydrateShortRow(
     };
   }
   return { ...row, score: snap.score, evidence: snap.evidence };
+}
+
+// Swap the pending "congressional" row for a live one. Computed at
+// query-time from the firehose cache — no ingest needed beyond what
+// already runs for the Markets page.
+function hydrateCongressRow(
+  row: SmartMoneySubSignal,
+  sig: CongressSignalResponse | null,
+): SmartMoneySubSignal {
+  if (!sig) {
+    return {
+      ...row,
+      evidence: null,
+      pendingMessage: "No Congressional disclosures on record for this ticker in the last 90 days.",
+    };
+  }
+  return { ...row, score: sig.score, evidence: sig.evidence };
 }
 
 function formatDollarsShort(v: number | null | undefined): string | null {

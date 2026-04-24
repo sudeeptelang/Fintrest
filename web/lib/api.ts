@@ -336,6 +336,19 @@ export interface IpoCalendarItem {
   marketCap: number | null;
 }
 
+// Smart Money (phase 2) congressional sub-signal derived from the last
+// 90 days of firehose disclosures. Shape matches
+// MarketController.GetCongressSignal.
+export interface CongressSignalResponse {
+  ticker: string;
+  score: number;
+  buyCount90d: number;
+  sellCount90d: number;
+  bipartisan: boolean;
+  evidence: string | null;
+  latestDisclosure: string | null;
+}
+
 // Smart Money (phase 2) short-interest snapshot. Mirrors the anonymous
 // response shape of MarketController.GetShortInterest.
 export interface ShortInterestResponse {
@@ -602,6 +615,12 @@ export const api = {
     authFetchApi<InsiderActivity[]>(`/market/insiders/${ticker}?limit=${limit}`),
   marketCongressByTicker: (ticker: string, limit = 10) =>
     authFetchApi<CongressTradeRow[]>(`/market/congress/${ticker}?limit=${limit}`),
+  marketCongressSignal: async (ticker: string): Promise<CongressSignalResponse | null> => {
+    const res = await fetch(`${API_BASE}/market/congress-signal/${ticker}`);
+    if (res.status === 204) return null;
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    return res.json();
+  },
   marketShortInterest: async (ticker: string): Promise<ShortInterestResponse | null> => {
     // GET /market/short-interest/{ticker} returns 204 when we haven't
     // pulled a snapshot for this ticker yet. Treat that as null.

@@ -232,6 +232,11 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.ShortInterestJob>();
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Scoring.ShortInterestJob>());
 
+// Smart Money Phase 2 — Congressional disclosures sub-signal. Derived
+// at query-time from the existing market_firehose_snapshots cache —
+// no new ingest, no cron. Scoped because it reads DbContext.
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.CongressSignalService>();
+
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>

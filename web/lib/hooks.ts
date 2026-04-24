@@ -194,6 +194,15 @@ export function useShortInterest(ticker: string) {
   });
 }
 
+export function useCongressSignal(ticker: string) {
+  return useQuery({
+    queryKey: ["market-congress-signal", ticker.toUpperCase()],
+    queryFn: () => api.marketCongressSignal(ticker.toUpperCase()),
+    enabled: !!ticker,
+    staleTime: 1000 * 60 * 60,
+  });
+}
+
 export function useCongressLatest(limit = 100) {
   return useQuery({ queryKey: ["market-congress", limit], queryFn: () => api.marketCongressLatest(limit) });
 }

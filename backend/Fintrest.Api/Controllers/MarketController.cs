@@ -1049,6 +1049,34 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
+    /// <summary>Per-ticker Congressional sub-signal — Smart Money Phase 2.
+    /// Derived at query-time from the last 90 days of firehose
+    /// snapshots. Returns 204 when there are no disclosures on file for
+    /// this ticker.</summary>
+    [HttpGet("market/congress-signal/{ticker}")]
+    public async Task<IActionResult> GetCongressSignal(
+        string ticker,
+        [FromServices] Fintrest.Api.Services.Scoring.CongressSignalService congressSvc,
+        CancellationToken ct)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+
+        var result = await congressSvc.ComputeAsync(normalized, ct);
+        if (result is null) return NoContent();
+
+        return Ok(new
+        {
+            ticker = normalized,
+            score = result.Score,
+            buyCount90d = result.BuyCount90d,
+            sellCount90d = result.SellCount90d,
+            bipartisan = result.Bipartisan,
+            evidence = result.Evidence,
+            latestDisclosure = result.LatestDisclosure,
+        });
+    }
+
     /// <summary>Per-ticker short-interest snapshot — the Smart Money
     /// Phase 2 "Short dynamics" sub-signal. Reads the latest snapshot from
     /// short_interest_snapshots (populated by
