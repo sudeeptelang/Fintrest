@@ -12,7 +12,6 @@ import {
   Settings,
   LogOut,
   X,
-  HelpCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { LogoMark } from "@/components/layout/logo";
@@ -161,19 +160,14 @@ export function AppSidebar({ mobileOpen, onClose }: AppSidebarProps) {
         </div>
       </nav>
 
-      {/* Bottom — Support section (Methodology + Settings) per spec §02 */}
+      {/* Bottom — Support section. Methodology link removed for phase 1
+          (per 2026-04-24 — we don't reveal scoring internals pre-launch).
+          Route file is kept alive at /methodology but not linked; can be
+          re-surfaced when we're ready to publish the scoring doc. */}
       <div className="px-3 py-3 border-t border-ink-200 space-y-0.5">
         <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500">
           Support
         </div>
-        <Link
-          href="/methodology"
-          onClick={onClose}
-          className="flex items-center gap-3 px-3 py-2 text-sm rounded-md font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
-        >
-          <HelpCircle className="h-[15px] w-[15px]" strokeWidth={1.7} />
-          Methodology
-        </Link>
         <Link
           href="/inbox"
           onClick={onClose}

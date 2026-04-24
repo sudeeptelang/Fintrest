@@ -57,23 +57,15 @@ export function SocialProof() {
           </div>
           <div className="border-t border-ink-100 pt-5 flex items-center justify-between gap-4 flex-wrap">
             <p className="text-sm text-ink-600">
-              Read the methodology, then open the audit log. Decide for yourself.
+              Every signal tracked. Open the audit log and decide for yourself.
             </p>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/methodology"
-                className="text-sm font-semibold text-ink-700 hover:text-ink-950"
-              >
-                Methodology
-              </Link>
-              <Link
-                href="/audit"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-forest hover:text-forest-dark"
-              >
-                See the audit log
-                <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
-              </Link>
-            </div>
+            <Link
+              href="/audit"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-forest hover:text-forest-dark"
+            >
+              See the audit log
+              <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
+            </Link>
           </div>
         </motion.div>
       </div>
