@@ -79,6 +79,16 @@
   --color-danger: var(--danger);
   --color-danger-light: var(--danger-light);
 
+  /* ─── v3 content palette — 4 factor families ─── */
+  --color-navy: var(--navy);
+  --color-navy-light: var(--navy-light);
+  --color-amber: var(--amber);
+  --color-amber-light: var(--amber-light);
+  --color-plum: var(--plum);
+  --color-plum-light: var(--plum-light);
+  --color-teal: var(--teal);
+  --color-teal-light: var(--teal-light);
+
   --color-ink-0: var(--ink-0);
   --color-ink-50: var(--ink-50);
   --color-ink-100: var(--ink-100);
@@ -155,6 +165,16 @@
   --forest:       #1E63B8;
   --forest-light: #E7EFF9;
   --forest-dark:  #154785;
+
+  /* Content palette — 4 factor families (v3 expansion).
+     Brand forest/sky stays for chrome only. Content surfaces use these
+     muted tones so the 8-factor breakdown, deep-dive rows, and section
+     washes get visual hierarchy back. Pairs cleanly with the sky brand;
+     up/down performance tokens unchanged. */
+  --navy:       #1E3A5F;  --navy-light:  #E7ECF3;  /* Technical: Momentum · Trend · Rel Volume */
+  --amber:      #B8862F;  --amber-light: #F9F1DE;  /* Fundamentals: Fundamentals · Valuation */
+  --plum:       #6B3B5E;  --plum-light:  #F1E7EC;  /* Sentiment: Sentiment · News */
+  --teal:       #2F7A7A;  --teal-light:  #E1EFEF;  /* Smart Money: Smart Money · Risk */
 
   /* Lens card bg — mid-tone between sky-light and ink-100. */
   --lens-bg:      #D8E5F2;
