@@ -73,7 +73,25 @@ public interface IFundamentalsProvider
     /// with the stock's current price so we can show implied upside /
     /// downside. Null if FMP has no DCF model on file for the ticker.</summary>
     Task<DcfValuationDto?> GetDcfAsync(string ticker, CancellationToken ct = default);
+
+    /// <summary>Recent earnings-surprise history — one row per quarter
+    /// with estimate, actual, and surprise %. Powers the "beats X of
+    /// last Y" narrative on the ticker detail + feeds the Fundamentals
+    /// factor quality check. Most-recent first, up to `quarters` rows.</summary>
+    Task<List<EarningsSurpriseDto>> GetEarningsSurprisesAsync(string ticker, int quarters = 12, CancellationToken ct = default);
 }
+
+/// <summary>One earnings-surprise row. Surprise % is computed as
+/// (actual - estimate) / |estimate| × 100; FMP sometimes ships it
+/// pre-computed, sometimes we derive.</summary>
+public record EarningsSurpriseDto(
+    string Ticker,
+    DateTime ReportDate,
+    decimal? EstimatedEps,
+    decimal? ActualEps,
+    decimal? SurprisePct,
+    bool Beat
+);
 
 /// <summary>FMP /stable/discounted-cash-flow output. DCF is a fair-value
 /// estimate; we pair with StockPrice to compute implied upside or

@@ -336,6 +336,28 @@ export interface IpoCalendarItem {
   marketCap: number | null;
 }
 
+// Earnings surprises feed for the ticker detail + Lens thesis copy.
+// Includes per-quarter rows and an aggregate beat-rate + streak so the
+// UI can render "beats 7 of last 10 · 3-quarter streak" in one line.
+export interface EarningsSurprisesResponse {
+  ticker: string;
+  quartersReviewed: number;
+  beats: number;
+  misses: number;
+  beatRatePct: number;
+  avgSurprisePct: number;
+  streak: number; // + = consecutive beats, - = consecutive misses
+  quarters: EarningsSurpriseRow[];
+}
+
+export interface EarningsSurpriseRow {
+  reportDate: string;
+  estimatedEps: number | null;
+  actualEps: number | null;
+  surprisePct: number | null;
+  beat: boolean;
+}
+
 // FMP DCF fair-value + implied upside vs current price. Band ships
 // pre-computed server-side so the frontend doesn't own the thresholds.
 export interface DcfResponse {
@@ -643,6 +665,12 @@ export const api = {
     authFetchApi<InsiderActivity[]>(`/market/insiders/${ticker}?limit=${limit}`),
   marketCongressByTicker: (ticker: string, limit = 10) =>
     authFetchApi<CongressTradeRow[]>(`/market/congress/${ticker}?limit=${limit}`),
+  marketEarningsSurprises: async (ticker: string, quarters = 10): Promise<EarningsSurprisesResponse | null> => {
+    const res = await fetch(`${API_BASE}/market/earnings-surprises/${ticker}?quarters=${quarters}`);
+    if (res.status === 204) return null;
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    return res.json();
+  },
   marketDcf: async (ticker: string): Promise<DcfResponse | null> => {
     const res = await fetch(`${API_BASE}/market/dcf/${ticker}`);
     if (res.status === 204) return null;

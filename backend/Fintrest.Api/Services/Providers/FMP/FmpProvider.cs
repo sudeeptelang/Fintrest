@@ -485,6 +485,39 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         );
     }
 
+    public async Task<List<EarningsSurpriseDto>> GetEarningsSurprisesAsync(string ticker, int quarters = 12, CancellationToken ct = default)
+    {
+        // FMP stable: /earnings-surprises returns quarterly rows in
+        // reverse chronological order. We clamp to the requested window
+        // and compute surprise % when FMP didn't ship one.
+        var url = $"{_baseUrl}/earnings-surprises?symbol={ticker}&apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpEarningsSurprise>>(url, ct);
+        if (rows is null || rows.Count == 0) return [];
+
+        return rows
+            .Where(r => DateTime.TryParse(r.Date, out _))
+            .OrderByDescending(r => DateTime.Parse(r.Date!))
+            .Take(quarters)
+            .Select(r =>
+            {
+                var est = r.EstimatedEarning;
+                var act = r.ActualEarningResult;
+                decimal? surprise = r.SurprisePercentage;
+                if (surprise is null && est is not null && act is not null && est != 0m)
+                    surprise = Math.Round((act.Value - est.Value) / Math.Abs(est.Value) * 100m, 2);
+                var beat = act is not null && est is not null && act > est;
+                return new EarningsSurpriseDto(
+                    Ticker: ticker.ToUpperInvariant(),
+                    ReportDate: DateTime.SpecifyKind(DateTime.Parse(r.Date!), DateTimeKind.Utc),
+                    EstimatedEps: est,
+                    ActualEps: act,
+                    SurprisePct: surprise,
+                    Beat: beat
+                );
+            })
+            .ToList();
+    }
+
     public async Task<DcfValuationDto?> GetDcfAsync(string ticker, CancellationToken ct = default)
     {
         // FMP stable: /discounted-cash-flow returns the current DCF
@@ -737,6 +770,19 @@ file record FmpPriceTargetSummary(
     [property: JsonPropertyName("lastYearAvgPriceTarget")] double? LastYearAvgPriceTarget,
     [property: JsonPropertyName("allTime")] int? AllTime,
     [property: JsonPropertyName("allTimeAvgPriceTarget")] double? AllTimeAvgPriceTarget
+);
+
+/// <summary>FMP /stable/earnings-surprises row. Field names follow
+/// FMP's actual API shape — `estimatedEarning` and
+/// `actualEarningResult` (singular), not `estimate` / `actual`. The
+/// `surprisePercentage` field is populated for most rows but not all;
+/// we derive client-side when absent.</summary>
+file record FmpEarningsSurprise(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("date")] string? Date,
+    [property: JsonPropertyName("estimatedEarning")] decimal? EstimatedEarning,
+    [property: JsonPropertyName("actualEarningResult")] decimal? ActualEarningResult,
+    [property: JsonPropertyName("surprisePercentage")] decimal? SurprisePercentage
 );
 
 /// <summary>FMP /stable/discounted-cash-flow row. Two fields that

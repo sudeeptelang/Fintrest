@@ -225,6 +225,16 @@ export function useDcf(ticker: string) {
   });
 }
 
+export function useEarningsSurprises(ticker: string, quarters = 10) {
+  return useQuery({
+    queryKey: ["market-earnings-surprises", ticker.toUpperCase(), quarters],
+    queryFn: () => api.marketEarningsSurprises(ticker.toUpperCase(), quarters),
+    enabled: !!ticker,
+    // Surprises are quarterly events; cache aggressively.
+    staleTime: 1000 * 60 * 60 * 6, // 6 hours
+  });
+}
+
 export function useCongressLatest(limit = 100) {
   return useQuery({ queryKey: ["market-congress", limit], queryFn: () => api.marketCongressLatest(limit) });
 }

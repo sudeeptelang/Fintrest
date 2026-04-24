@@ -43,6 +43,7 @@ import { OwnershipStrip } from "@/components/stock/ownership-strip";
 import { InsiderActivityCard, CongressActivityCard } from "@/components/stock/ticker-activity-cards";
 import { FinancialScoresCard } from "@/components/stock/financial-scores-card";
 import { DcfCard } from "@/components/stock/dcf-card";
+import { EarningsSurprisesCard } from "@/components/stock/earnings-surprises-card";
 import type { InsiderScore, ShortInterestResponse, CongressSignalResponse } from "@/lib/api";
 import {
   buildTakeaways,
@@ -310,6 +311,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
               <FinancialScoresCard ticker={ticker} />
               <DcfCard ticker={ticker} />
             </div>
+            <EarningsSurprisesCard ticker={ticker} />
             {snapshot && (
               <AthenaSnowflake snapshot={snapshot} breakdown={breakdown} dividendYield={null} />
             )}

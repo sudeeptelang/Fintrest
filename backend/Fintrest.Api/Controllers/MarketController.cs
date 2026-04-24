@@ -1049,6 +1049,74 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
+    /// <summary>Earnings surprise history for a ticker. Returns the last
+    /// N quarters plus a "beats X of Y" aggregate so the Lens thesis
+    /// generator can quote the track record in a single sentence.</summary>
+    [HttpGet("market/earnings-surprises/{ticker}")]
+    public async Task<IActionResult> GetEarningsSurprises(
+        string ticker,
+        [FromServices] Fintrest.Api.Services.Providers.Contracts.IFundamentalsProvider fmp,
+        [FromQuery] int quarters = 10,
+        CancellationToken ct = default)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+        quarters = Math.Clamp(quarters, 4, 20);
+
+        var rows = await fmp.GetEarningsSurprisesAsync(normalized, quarters, ct);
+        if (rows.Count == 0) return NoContent();
+
+        var beats = rows.Count(r => r.Beat);
+        var avgSurprise = rows
+            .Where(r => r.SurprisePct is not null)
+            .Select(r => r.SurprisePct!.Value)
+            .DefaultIfEmpty(0m)
+            .Average();
+
+        return Ok(new
+        {
+            ticker = normalized,
+            quartersReviewed = rows.Count,
+            beats,
+            misses = rows.Count - beats,
+            beatRatePct = Math.Round((decimal)beats / rows.Count * 100m, 1),
+            avgSurprisePct = Math.Round(avgSurprise, 2),
+            streak = ComputeBeatStreak(rows),
+            quarters = rows.Select(r => new
+            {
+                reportDate = r.ReportDate,
+                estimatedEps = r.EstimatedEps,
+                actualEps = r.ActualEps,
+                surprisePct = r.SurprisePct,
+                beat = r.Beat,
+            }),
+        });
+    }
+
+    private static int ComputeBeatStreak(List<Fintrest.Api.Services.Providers.Contracts.EarningsSurpriseDto> rows)
+    {
+        // Rows arrive most-recent first. Count consecutive beats from
+        // the top; break at the first miss. Negative means consecutive
+        // misses (caller can render "missed last 3" differently).
+        var streak = 0;
+        foreach (var r in rows)
+        {
+            if (streak == 0)
+            {
+                streak = r.Beat ? 1 : -1;
+            }
+            else if ((streak > 0 && r.Beat) || (streak < 0 && !r.Beat))
+            {
+                streak += streak > 0 ? 1 : -1;
+            }
+            else
+            {
+                break;
+            }
+        }
+        return streak;
+    }
+
     /// <summary>FMP-computed DCF fair-value + implied upside/downside
     /// vs the stock's current price. Surfaces on the Fundamentals
     /// deep-dive as a Valuation anchor. Returns 204 if FMP has no DCF
