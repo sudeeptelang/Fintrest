@@ -177,7 +177,7 @@ function MorningTake({ signals }: { signals: Signal[] }) {
   if (signals.length === 0) {
     return (
       <p>
-        No signals cleared the 7-factor bar this morning. The tape is sitting in a neutral regime — the next scan publishes tomorrow before the open.
+        No signals cleared the 8-factor bar this morning. The tape is sitting in a neutral regime — the next scan publishes tomorrow before the open.
       </p>
     );
   }
@@ -186,7 +186,7 @@ function MorningTake({ signals }: { signals: Signal[] }) {
   const buys = signals.filter((s) => s.signalType.toUpperCase() === "BUY_TODAY").length;
   return (
     <p>
-      Today&apos;s scan surfaced <strong>{signals.length} signals</strong> above the 7-factor bar,
+      Today&apos;s scan surfaced <strong>{signals.length} signals</strong> above the 8-factor bar,
       {" "}with <strong>{buys} classified BUY TODAY</strong>. The top of the board is carried by{" "}
       <strong>{names}</strong> — momentum and relative-volume factors are doing most of the work.
       The broader tape is sitting in a neutral regime, so risk appetite is moderate; tight stops

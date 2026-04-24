@@ -106,9 +106,9 @@ export const STEPS = [
   },
   {
     step: "02",
-    title: "The 7-factor bar",
+    title: "The 8-factor bar",
     description:
-      "The 7-factor rule engine scores each candidate 0–100 across momentum, volume, catalysts, earnings, sentiment, trend, and risk. No AI guesswork — a structured, weighted, regime-gated test. Only setups above the bar pass to the research set.",
+      "The 8-factor rule engine scores each candidate 0–100 across momentum, volume, catalysts, earnings, sentiment, trend, risk, and smart money. No AI guesswork — a structured, weighted, regime-gated test. Only setups above the bar pass to the research set.",
   },
   {
     step: "03",

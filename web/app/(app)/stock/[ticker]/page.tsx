@@ -362,7 +362,7 @@ function thesisTitle(
 ): string {
   if (thesis?.verdict) return thesis.verdict;
   const type = signal?.signalType?.toUpperCase() ?? "";
-  if (type === "BUY_TODAY") return "Composite setup above the 7-factor bar.";
+  if (type === "BUY_TODAY") return "Composite setup above the 8-factor bar.";
   if (type === "AVOID") return "Factors flagging avoid — risks outweigh the setup.";
   return "Setup forming — waiting for confirmation.";
 }
@@ -519,7 +519,7 @@ function ThesisFallback({
         )}
       </p>
       <p className="mt-3">
-        The 7-factor breakdown below shows what drove the score. Reference levels give
+        The 8-factor breakdown below shows what drove the score. Reference levels give
         a structural view of where the setup activates, invalidates, and targets — the
         decision to act is yours.
       </p>

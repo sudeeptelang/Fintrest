@@ -158,7 +158,7 @@ export function LensCardGated({
         <div className="mt-5 pt-5 border-t border-[rgba(15,79,58,0.2)] flex items-center gap-4">
           <div className="flex-1 text-[13px] leading-[20px] text-ink-700">
             <strong className="font-semibold text-ink-950">Continue reading on Pro.</strong>{" "}
-            Full Lens thesis, reference levels, and 7-factor breakdown on every signal.
+            Full Lens thesis, reference levels, and 8-factor breakdown on every signal.
           </div>
           <Link
             href={ctaHref}
