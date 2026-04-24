@@ -161,6 +161,29 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     }
 
     /// <summary>
+    /// Recompute insider scores across every ticker with activity in the
+    /// last 30 days. Idempotent — rows for today's as_of_date are
+    /// replaced. Run after an /admin/edgar/ingest to see fresh scores
+    /// flow through the Smart Money sub-card.
+    /// </summary>
+    [HttpPost("insiders/score/recompute")]
+    public async Task<IActionResult> RecomputeInsiderScores(
+        [FromServices] Fintrest.Api.Services.Scoring.InsiderScoreJob job,
+        CancellationToken ct)
+    {
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            ActorUserId = AdminUserId,
+            Action = "recompute_insider_scores",
+            EntityType = "insider_scores",
+        });
+        await db.SaveChangesAsync(ct);
+
+        var summary = await job.RunOnceAsync(ct);
+        return Ok(summary);
+    }
+
+    /// <summary>
     /// Backfill / recompute the audit-log outcome table. Walks every open
     /// signal forward through market data and writes target_hit / stop_hit /
     /// horizon_expired rows into performance_tracking. Idempotent — already-

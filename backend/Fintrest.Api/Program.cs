@@ -214,6 +214,15 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Providers.Edgar.EdgarIngestJ
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Providers.Edgar.EdgarIngestJob>());
 
+// Insider scoring — 30-day window over the ingested transactions.
+// Fires 8:45 PM ET (45 min after the ingest job) so latest raw rows
+// are persisted before we score. Admin endpoint
+// /admin/insiders/score/recompute triggers a manual run.
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.InsiderScoreService>();
+builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.InsiderScoreJob>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<Fintrest.Api.Services.Scoring.InsiderScoreJob>());
+
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
