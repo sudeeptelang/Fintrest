@@ -8,6 +8,21 @@ This doc captures (a) every rearrangement idea raised in the session,
 (b) the ranked execution order, and (c) the tradeoffs. It's the sister
 doc to `FMP_ROADMAP.md` — data and UI move together.
 
+## Guiding principle — MOBILE-FIRST, always
+
+Every layout, every density decision, every new component gets designed at
+**390 px (iPhone 15 Pro)** *before* the 1120 px desktop version. If it works
+at 390, it trivially scales up; the reverse almost never works. This isn't
+a reminder — it's a veto rule. Any PR that lands a desktop layout without a
+proven 390 layout first gets reverted.
+
+Specific implications for items in this doc:
+- **Data-dense signal rows** (Tier 1 #4) — at 390 px, rows must still fit: logo + ticker + score + delta on one line; R:R / levels / distance on a second line. No horizontal scroll, no truncated ticker symbols.
+- **Markets strip + Latest News column** (Tier 1 #7) — the reference PDF shows a three-column desktop layout; on mobile this stacks vertically (indices row → chart → news list).
+- **Movers grid** (Tier 2 #15) — tabs become a horizontal-scroll chip row on mobile; "Run Lens" + "+ Watchlist" actions move into a right-swipe action sheet, not inline icons.
+- **Palette expansion** (Part 3.5) — the 4-family tinting needs to stay readable on mobile where each factor bar is ~48 px wide. Test contrast before rollout.
+- **"What's driving today" strip** (Tier 3 #16) — on mobile this is a horizontally scrollable chip list ("momentum +8 · news +12 · risk −5 ·…"), not a multi-column desktop layout.
+
 ---
 
 ## Part 1 — What's wrong today

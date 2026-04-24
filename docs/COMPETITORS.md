@@ -142,6 +142,49 @@ Better launch target than long-term wealth management users because the need for
 > The clearest path is to ship the smallest product that wins the decision moment:
 > "What stock should I look at now, why, how risky is it, and what should I do next?"
 
+## Score-first peer deep-dive (2026-04-24 update)
+
+Live fetches on the direct peers — products where a composite score/rating *is* the
+product (as opposed to portfolio trackers, content hubs, or trading platforms).
+This is the list we need to out-execute at launch.
+
+### Head-to-head table
+
+| Product | Score name | Range / shape | Factors | Explainable? | Authored voice? | Public track record? | Tagline / positioning |
+|---|---|---|---|---|---|---|---|
+| **Fintrest** (us) | Composite | 0–100 numeric | 8 factors + regime weighting | ✅ per-factor breakdown + Lens thesis | ✅ Lens persona | ✅ Audit log public | "Explainable US stock signals — every number has a reason" |
+| **Danelfin** | AI Score | 1–10 | 600 technical + 150 fundamental + 150 sentiment | ✅ "no black boxes," factor transparency | ❌ generic AI summaries | ⚠️ backtested 376% vs S&P since 2017, no live audit | "Invest with the odds in your favor" |
+| **TipRanks** | Smart Score | 1–10 | 8 datasets (analyst, blogger, hedge fund, news sent, insider, fund, technical, fundamental) | ✅ 8-dataset breakdown | ❌ none | ⚠️ aggregates analyst track records, not their own signals | Crowd-sourced Wall Street wisdom |
+| **Simply Wall St** | Snowflake | 5-axis radar (Value/Future/Past/Health/Dividend) | Per-axis fundamental decomposition | ✅ iconic radar + intrinsic value model | ❌ templated analyst notes | ❌ portfolio-shaped, not signal-shaped | "Stop reacting, start growing — data the pros use" |
+| **WallStreetZen** | Zen Ratings | A–F letter | 115 factors + AI pattern detection | ⚠️ limited — no granular factor view on landing | ❌ none | ⚠️ "A-rated +32.52% annualized" as marketing claim, no per-signal ledger | "Stock analysis for the serious part-time investor" |
+| **Kavout** | K Score / Smart Signals | Not surfaced on landing | AI-driven (undisclosed) | ❌ black-box on landing | ❌ none | ❌ no visible ledger | "AI Financial Research Agents & Investing Tools for Smarter Decisions" |
+| **Zacks** | Zacks Rank | 1–5 | Earnings estimate revisions (narrow) | ✅ revision-centric methodology | ❌ none | ✅ 30+ year public record — the gold standard | Institutional rigor, dated UX |
+| **Stockinvest.us** | Overall signal | Buy/Hold/Sell + score | Technical-heavy | ⚠️ moderate | ❌ none | ❌ | Technical-trader UX |
+
+### Where Fintrest wins (defensible wedges)
+
+1. **Lens as an authored voice.** None of the peers have a persona. They have "AI summaries" — templated, voiceless, interchangeable. Lens is a brand moat that compounds as we publish; it's harder to copy than a model.
+2. **Public audit log from day one.** Zacks has 30 years of public record; WallStreetZen quotes a single annualized number with no per-signal ledger; Danelfin shows backtest returns but not live outcomes. Publishing every signal's entry/target/stop/result as a live page is a trust wedge none of them seem to want to replicate.
+3. **Trade plan integrity.** Entry + target + stop shown as a unit, with an R:R ≥ 2.0 gate before a BUY publishes. Danelfin/Kavout/TipRanks publish scores without actionable levels; Simply Wall St doesn't publish signals at all. This is the differentiator for retail swing-trade users.
+4. **Smart Money composite.** Most peers have insider data OR options flow OR institutional — few combine them. Our five-sub-signal Smart Money sub-card (insider + institutional + options + congress + short) is materially more complete once Phase 2-3 ship.
+5. **Compliance posture.** "Educational content, not financial advice" footer on every signal. Kavout/TipRanks/Danelfin lean on implied promises ("invest with the odds in your favor," "+32% annualized"). Our conservative stance is a moat with regulators and with sophisticated users who've been burned by guarantee-style pitches.
+
+### Where Fintrest is behind (execution gaps to close)
+
+1. **Simply Wall St's radar is iconic.** Our 8-factor breakdown reads as bars; theirs reads as a shape. Consider a radar view as the default with bars as drill-down — ties into `UX_AUDIT.md` Tier 3.
+2. **Danelfin has 9 years of backtested bragging rights.** We can't manufacture history, but we can start the live ledger *now* and own 3-year credibility by 2029. Audit log strip on Today (UX_AUDIT Tier 1) is the foundation for this.
+3. **TipRanks integrates crowd-sourced analyst tracking.** Hedge-fund-manager and blogger sentiment layers. We likely won't match this — focus instead on Smart Money + Lens depth.
+4. **WallStreetZen compresses the value prop into a letter grade.** "A-rated" is more scannable than "76/100." Worth debating whether our BUY/WATCH/AVOID + score dual-display should collapse into a letter grade for the glance.
+5. **Kavout + TipRanks span more asset classes (crypto, forex).** We deliberately don't — stay focused on US equities.
+
+### Marketing wedge for launch
+
+> **"Every other AI stock app gives you a score. We give you the reason."**
+
+That's the one line that sets us apart from Kavout/Danelfin/WallStreetZen. Everything we ship — Lens, audit log, 8-factor breakdown, trade plan, Smart Money sub-card — reinforces it.
+
+---
+
 ## Checklist: Fintrest.ai vs. Research Recommendations
 
 | Recommendation | Status in Fintrest.ai |
