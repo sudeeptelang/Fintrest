@@ -235,6 +235,26 @@ export function useEarningsSurprises(ticker: string, quarters = 10) {
   });
 }
 
+export function useScoreHistory(ticker: string, days = 30) {
+  return useQuery({
+    queryKey: ["stock-score-history", ticker.toUpperCase(), days],
+    queryFn: () => api.stockScoreHistory(ticker.toUpperCase(), days),
+    enabled: !!ticker,
+    // Written at scan time (once daily); cache aggressively.
+    staleTime: 1000 * 60 * 60 * 6, // 6 hours
+  });
+}
+
+export function useScoreHistoryBulk(tickers: string[], days = 30) {
+  const key = tickers.map((t) => t.toUpperCase()).sort().join(",");
+  return useQuery({
+    queryKey: ["stock-score-history-bulk", key, days],
+    queryFn: () => api.stockScoreHistoryBulk(tickers, days),
+    enabled: tickers.length > 0,
+    staleTime: 1000 * 60 * 60 * 6,
+  });
+}
+
 export function useAnalystRevisions(ticker: string, days = 30) {
   return useQuery({
     queryKey: ["market-analyst-revisions", ticker.toUpperCase(), days],

@@ -286,6 +286,30 @@ public class ScanOrchestrator(
                 });
             }
 
+            // 5b. Persist one score-history row per published signal. Feeds
+            // real sparklines on the UI + real day-over-day deltas on
+            // ScoreGradeChip. Upsert on (ticker, today): delete any
+            // existing rows for these tickers today, then insert fresh.
+            var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+            if (publishable.Count > 0)
+            {
+                var tickerList = publishable.Select(p => p.Ticker).Distinct().ToList();
+                await db.SignalScoreHistory
+                    .Where(h => h.AsOfDate == today && tickerList.Contains(h.Ticker))
+                    .ExecuteDeleteAsync(ct);
+                foreach (var p in publishable)
+                {
+                    db.SignalScoreHistory.Add(new Models.SignalScoreHistory
+                    {
+                        Ticker = p.Ticker,
+                        AsOfDate = today,
+                        ScoreTotal = (decimal)p.ScoreTotal,
+                        SignalType = p.SignalType,
+                        ScanRunId = scanRun.Id,
+                    });
+                }
+            }
+
             // 6. Finalize scan run
             sw.Stop();
             scanRun.Status = "COMPLETED";

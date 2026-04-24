@@ -67,6 +67,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     // Feeds the "Short dynamics" sub-signal on the Smart Money card.
     public DbSet<ShortInterestSnapshot> ShortInterestSnapshots => Set<ShortInterestSnapshot>();
 
+    // Per-ticker daily composite-score snapshots (migration 026).
+    // Written at scan time by ScanOrchestrator; read to power real
+    // sparklines + real day-over-day deltas on the UI.
+    public DbSet<SignalScoreHistory> SignalScoreHistory => Set<SignalScoreHistory>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

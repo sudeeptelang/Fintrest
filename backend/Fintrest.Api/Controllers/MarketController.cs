@@ -1058,6 +1058,70 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
+    /// <summary>Per-ticker daily composite-score history. Written at
+    /// scan time by ScanOrchestrator. Powers real sparklines on the
+    /// Today grid + ticker hero and the real "delta vs yesterday"
+    /// on ScoreGradeChip. Returns an ordered list of { date, score,
+    /// signalType } up to `days` back.</summary>
+    [HttpGet("stocks/{ticker}/score-history")]
+    public async Task<IActionResult> GetScoreHistory(
+        string ticker,
+        [FromQuery] int days = 30,
+        CancellationToken ct = default)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+        days = Math.Clamp(days, 5, 365);
+
+        var cutoff = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(-days), DateTimeKind.Utc);
+        var rows = await db.SignalScoreHistory
+            .AsNoTracking()
+            .Where(h => h.Ticker == normalized && h.AsOfDate >= cutoff)
+            .OrderBy(h => h.AsOfDate)
+            .Select(h => new
+            {
+                date = h.AsOfDate,
+                score = (double)h.ScoreTotal,
+                signalType = h.SignalType,
+            })
+            .ToListAsync(ct);
+
+        return Ok(new { ticker = normalized, days, points = rows });
+    }
+
+    /// <summary>Bulk score-history fetch — one call for a list of tickers.
+    /// Used by the Today grid so each signal row gets a real sparkline
+    /// without an N+1 request fan-out. Returns a map { ticker: [points] }.</summary>
+    [HttpGet("stocks/score-history/bulk")]
+    public async Task<IActionResult> GetScoreHistoryBulk(
+        [FromQuery] string tickers,
+        [FromQuery] int days = 30,
+        CancellationToken ct = default)
+    {
+        var list = (tickers ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(t => t.ToUpperInvariant())
+            .Distinct()
+            .Take(200)
+            .ToList();
+        if (list.Count == 0) return BadRequest("pass ?tickers=T1,T2,…");
+        days = Math.Clamp(days, 5, 365);
+
+        var cutoff = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(-days), DateTimeKind.Utc);
+        var rows = await db.SignalScoreHistory
+            .AsNoTracking()
+            .Where(h => list.Contains(h.Ticker) && h.AsOfDate >= cutoff)
+            .OrderBy(h => h.AsOfDate)
+            .Select(h => new { h.Ticker, date = h.AsOfDate, score = (double)h.ScoreTotal })
+            .ToListAsync(ct);
+
+        var map = rows
+            .GroupBy(r => r.Ticker)
+            .ToDictionary(g => g.Key, g => g.Select(x => new { x.date, x.score }).ToList());
+
+        return Ok(new { days, tickers = map });
+    }
+
     /// <summary>Recent analyst grade changes for a ticker (FMP /grades
     /// firehose, filtered to the last N days). Returns per-event rows
     /// plus an aggregate: upgrades / downgrades / reiterations /

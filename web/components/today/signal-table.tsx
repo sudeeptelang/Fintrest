@@ -1,8 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { Signal } from "@/lib/api";
+import { useScoreHistoryBulk } from "@/lib/hooks";
 import { UpgradeGateRow } from "@/components/ui/upgrade-gate";
 import { StockLogo } from "@/components/ui/stock-logo";
 import { ScoreGradeChip } from "@/components/ui/score-grade-chip";
@@ -38,6 +40,13 @@ export function SignalTable({
   const visible = freeTier ? signals.slice(0, 7) : signals;
   const hiddenCount = freeTier ? Math.max(0, signals.length - visible.length) : 0;
 
+  // Bulk score-history fetch — one call, all visible tickers.
+  // The hook is enabled only when we have tickers; each row reads
+  // its own ticker's points from the result map.
+  const tickers = useMemo(() => visible.map((s) => s.ticker), [visible]);
+  const { data: historyBulk } = useScoreHistoryBulk(tickers, 30);
+  const historyMap = historyBulk?.tickers ?? {};
+
   return (
     <div className={cn("rounded-[10px] border border-ink-200 bg-ink-0 overflow-hidden", className)}>
       {visible.map((s, i) => (
@@ -48,6 +57,7 @@ export function SignalTable({
           sector={getSector?.(s) ?? ""}
           thesis={getThesis(s)}
           thesisLocked={freeTier && i >= thesisVisibleForRanks}
+          realHistory={historyMap[s.ticker.toUpperCase()]}
         />
       ))}
       {freeTier && hiddenCount > 0 && (
@@ -66,16 +76,23 @@ function Row({
   sector,
   thesis,
   thesisLocked,
+  realHistory,
 }: {
   rank: number;
   signal: Signal;
   sector: string;
   thesis: string;
   thesisLocked: boolean;
+  realHistory?: Array<{ date: string; score: number }>;
 }) {
   const up = (signal.changePct ?? 0) >= 0;
   const rr = computeRiskReward(signal);
-  const spark = synthSparkline(signal);
+  // Prefer real score-history when available (≥ 2 points); fall back to
+  // the deterministic synthetic curve so brand-new tickers still render
+  // a sparkline on day 1.
+  const spark = realHistory && realHistory.length >= 2
+    ? realHistory.map((p) => p.score)
+    : synthSparkline(signal);
 
   return (
     <Link

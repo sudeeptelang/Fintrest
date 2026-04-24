@@ -2,8 +2,10 @@
 
 import { cn } from "@/lib/utils";
 import type { Signal, StockInfo } from "@/lib/api";
+import { useScoreHistory } from "@/lib/hooks";
 import { StockLogo } from "@/components/ui/stock-logo";
 import { ScoreGradeChip } from "@/components/ui/score-grade-chip";
+import { SparklineMini } from "@/components/ui/sparkline-mini";
 
 // Signal horizon is a single int on the wire today; the UI presents it as a
 // range because the scoring engine writes the center of a window. Soft range
@@ -52,6 +54,14 @@ export function SignalDetailHero({
     horizonLabel,
   ].filter((v): v is string => !!v);
 
+  // Real 30-day score history for the hero sparkline + day-over-day delta.
+  const { data: history } = useScoreHistory(ticker);
+  const points = history?.points ?? [];
+  const realSpark = points.length >= 2 ? points.map((p) => p.score) : null;
+  const scoreDelta = signal && points.length >= 2
+    ? Math.round(signal.scoreTotal - points[points.length - 2].score)
+    : null;
+
   return (
     <section
       className={cn(
@@ -82,13 +92,22 @@ export function SignalDetailHero({
       {/* Score panel — wash background so it reads as a distinct focal block */}
       {signal && (
         <div className="mt-5 rounded-[10px] bg-ink-50 p-4 md:p-5 grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4 md:gap-6 items-center">
-          <ScoreGradeChip
-            score={signal.scoreTotal}
-            delta={null /* TODO: wire to yesterday's score once history table ships */}
-            size="lg"
-            showNum={true}
-            showDelta={false}
-          />
+          <div className="flex items-center gap-3">
+            <ScoreGradeChip
+              score={signal.scoreTotal}
+              delta={scoreDelta}
+              size="lg"
+              showNum={true}
+              showDelta={scoreDelta != null}
+            />
+            {realSpark && (
+              <SparklineMini
+                data={realSpark}
+                size="lg"
+                tone={scoreDelta != null && scoreDelta < 0 ? "down" : scoreDelta != null && scoreDelta > 0 ? "up" : undefined}
+              />
+            )}
+          </div>
           <div className="min-w-0 flex flex-col gap-1.5">
             {signal.currentPrice != null && (
               <div className="flex flex-wrap items-baseline gap-3">

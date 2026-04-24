@@ -336,6 +336,25 @@ export interface IpoCalendarItem {
   marketCap: number | null;
 }
 
+// Real score-history points for sparklines + day-over-day delta.
+// Populated at scan time by the backend; each data point is one day.
+export interface ScoreHistoryPoint {
+  date: string;
+  score: number;
+  signalType?: string | null;
+}
+
+export interface ScoreHistoryResponse {
+  ticker: string;
+  days: number;
+  points: ScoreHistoryPoint[];
+}
+
+export interface BulkScoreHistoryResponse {
+  days: number;
+  tickers: Record<string, Array<{ date: string; score: number }>>;
+}
+
 // Analyst revisions window feed for the News / Catalyst deep-dive
 // on ticker detail. Band comes server-side so the UI doesn't own
 // thresholds.
@@ -690,6 +709,10 @@ export const api = {
     authFetchApi<InsiderActivity[]>(`/market/insiders/${ticker}?limit=${limit}`),
   marketCongressByTicker: (ticker: string, limit = 10) =>
     authFetchApi<CongressTradeRow[]>(`/market/congress/${ticker}?limit=${limit}`),
+  stockScoreHistory: (ticker: string, days = 30) =>
+    fetchApi<ScoreHistoryResponse>(`/stocks/${ticker}/score-history?days=${days}`),
+  stockScoreHistoryBulk: (tickers: string[], days = 30) =>
+    fetchApi<BulkScoreHistoryResponse>(`/stocks/score-history/bulk?tickers=${tickers.join(",")}&days=${days}`),
   marketAnalystRevisions: async (ticker: string, days = 30): Promise<AnalystRevisionsResponse | null> => {
     const res = await fetch(`${API_BASE}/market/analyst-revisions/${ticker}?days=${days}`);
     if (res.status === 204) return null;
