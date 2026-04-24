@@ -336,6 +336,31 @@ export interface IpoCalendarItem {
   marketCap: number | null;
 }
 
+// Analyst revisions window feed for the News / Catalyst deep-dive
+// on ticker detail. Band comes server-side so the UI doesn't own
+// thresholds.
+export interface AnalystRevisionsResponse {
+  ticker: string;
+  windowDays: number;
+  totalEvents: number;
+  upgrades: number;
+  downgrades: number;
+  reiterations: number;
+  initializations: number;
+  targets: number;
+  netRevisions: number;
+  band: "strongly-positive" | "positive" | "mixed" | "negative" | "strongly-negative";
+  events: AnalystRevisionEvent[];
+}
+
+export interface AnalystRevisionEvent {
+  date: string;
+  action: string | null; // "up" | "down" | "reiterate" | "initialize" | "target"
+  newGrade: string | null;
+  previousGrade: string | null;
+  gradingCompany: string | null;
+}
+
 // Earnings surprises feed for the ticker detail + Lens thesis copy.
 // Includes per-quarter rows and an aggregate beat-rate + streak so the
 // UI can render "beats 7 of last 10 · 3-quarter streak" in one line.
@@ -665,6 +690,12 @@ export const api = {
     authFetchApi<InsiderActivity[]>(`/market/insiders/${ticker}?limit=${limit}`),
   marketCongressByTicker: (ticker: string, limit = 10) =>
     authFetchApi<CongressTradeRow[]>(`/market/congress/${ticker}?limit=${limit}`),
+  marketAnalystRevisions: async (ticker: string, days = 30): Promise<AnalystRevisionsResponse | null> => {
+    const res = await fetch(`${API_BASE}/market/analyst-revisions/${ticker}?days=${days}`);
+    if (res.status === 204) return null;
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    return res.json();
+  },
   marketEarningsSurprises: async (ticker: string, quarters = 10): Promise<EarningsSurprisesResponse | null> => {
     const res = await fetch(`${API_BASE}/market/earnings-surprises/${ticker}?quarters=${quarters}`);
     if (res.status === 204) return null;

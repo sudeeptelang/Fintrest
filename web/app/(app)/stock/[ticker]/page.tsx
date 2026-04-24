@@ -44,6 +44,7 @@ import { InsiderActivityCard, CongressActivityCard } from "@/components/stock/ti
 import { FinancialScoresCard } from "@/components/stock/financial-scores-card";
 import { DcfCard } from "@/components/stock/dcf-card";
 import { EarningsSurprisesCard } from "@/components/stock/earnings-surprises-card";
+import { AnalystRevisionsCard } from "@/components/stock/analyst-revisions-card";
 import type { InsiderScore, ShortInterestResponse, CongressSignalResponse } from "@/lib/api";
 import {
   buildTakeaways,
@@ -353,6 +354,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         >
           <div className="space-y-6">
             {news && news.length > 0 && <RelatedNews items={news} limit={6} />}
+            <AnalystRevisionsCard ticker={ticker} />
             {analyst && (
               <AnalystRatingCard data={analyst} currentPrice={signal?.currentPrice ?? snapshot?.price} />
             )}

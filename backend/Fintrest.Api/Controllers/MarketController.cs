@@ -1049,6 +1049,71 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
+    /// <summary>Recent analyst grade changes for a ticker (FMP /grades
+    /// firehose, filtered to the last N days). Returns per-event rows
+    /// plus an aggregate: upgrades / downgrades / reiterations /
+    /// initializations over the window, and a "net revisions" integer
+    /// that the News / Catalyst factor can ingest. Returns 204 when
+    /// there's been no activity in the window.</summary>
+    [HttpGet("market/analyst-revisions/{ticker}")]
+    public async Task<IActionResult> GetAnalystRevisions(
+        string ticker,
+        [FromServices] Fintrest.Api.Services.Providers.Contracts.IFundamentalsProvider fmp,
+        [FromQuery] int days = 30,
+        CancellationToken ct = default)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+        days = Math.Clamp(days, 7, 365);
+
+        var since = DateTime.UtcNow.AddDays(-days);
+        var events = await fmp.GetAnalystGradeEventsAsync(normalized, since, ct);
+        if (events.Count == 0) return NoContent();
+
+        int upgrades = 0, downgrades = 0, reiterations = 0, initializations = 0, targets = 0;
+        foreach (var e in events)
+        {
+            switch (e.Action)
+            {
+                case "up":          upgrades++; break;
+                case "down":        downgrades++; break;
+                case "reiterate":   reiterations++; break;
+                case "initialize":  initializations++; break;
+                case "target":      targets++; break;
+            }
+        }
+
+        var net = upgrades - downgrades;
+        string band;
+        if (net >= 3) band = "strongly-positive";
+        else if (net >= 1) band = "positive";
+        else if (net == 0) band = "mixed";
+        else if (net >= -2) band = "negative";
+        else band = "strongly-negative";
+
+        return Ok(new
+        {
+            ticker = normalized,
+            windowDays = days,
+            totalEvents = events.Count,
+            upgrades,
+            downgrades,
+            reiterations,
+            initializations,
+            targets,
+            netRevisions = net,
+            band,
+            events = events.Take(15).Select(e => new
+            {
+                date = e.Date,
+                action = e.Action,
+                newGrade = e.NewGrade,
+                previousGrade = e.PreviousGrade,
+                gradingCompany = e.GradingCompany,
+            }),
+        });
+    }
+
     /// <summary>Earnings surprise history for a ticker. Returns the last
     /// N quarters plus a "beats X of Y" aggregate so the Lens thesis
     /// generator can quote the track record in a single sentence.</summary>

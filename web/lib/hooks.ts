@@ -235,6 +235,17 @@ export function useEarningsSurprises(ticker: string, quarters = 10) {
   });
 }
 
+export function useAnalystRevisions(ticker: string, days = 30) {
+  return useQuery({
+    queryKey: ["market-analyst-revisions", ticker.toUpperCase(), days],
+    queryFn: () => api.marketAnalystRevisions(ticker.toUpperCase(), days),
+    enabled: !!ticker,
+    // Grade changes fire unpredictably but settle in hours. 30-min
+    // cache keeps us fresh without hammering FMP.
+    staleTime: 1000 * 60 * 30,
+  });
+}
+
 export function useCongressLatest(limit = 100) {
   return useQuery({ queryKey: ["market-congress", limit], queryFn: () => api.marketCongressLatest(limit) });
 }
