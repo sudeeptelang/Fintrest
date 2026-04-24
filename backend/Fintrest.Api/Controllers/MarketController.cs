@@ -157,6 +157,22 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 .OrderBy(x => x.Date)
                 .Take(30)
                 .ToList();
+
+            // Self-heal: persist the earnings dates back to the stocks
+            // table so the fallback path below has data next time the
+            // FMP feed hiccups. Also populates the column for all
+            // clients that read stock.NextEarningsDate directly (ticker
+            // detail page, Risk factor, etc.) — the column was zero-
+            // populated before this endpoint ran.
+            var idToDate = matched.ToDictionary(m => m.StockId, m => m.Date);
+            var stocksToUpdate = await db.Stocks
+                .Where(s => idToDate.Keys.Contains(s.Id))
+                .ToListAsync();
+            foreach (var s in stocksToUpdate)
+            {
+                if (idToDate.TryGetValue(s.Id, out var d)) s.NextEarningsDate = d;
+            }
+            if (stocksToUpdate.Count > 0) await db.SaveChangesAsync();
         }
         else
         {
