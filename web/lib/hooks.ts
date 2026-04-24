@@ -187,6 +187,16 @@ export function useCongressLatest(limit = 100) {
   return useQuery({ queryKey: ["market-congress", limit], queryFn: () => api.marketCongressLatest(limit) });
 }
 
+export function useOvernightChanges() {
+  return useQuery({
+    queryKey: ["signals-overnight-changes"],
+    queryFn: api.overnightChanges,
+    // Scan completes ~6:00 AM ET. Keep fresh for an hour; overnight diff
+    // doesn't change intraday.
+    staleTime: 1000 * 60 * 60,
+  });
+}
+
 export function usePerformanceOverview() {
   return useQuery({ queryKey: ["performance"], queryFn: api.performanceOverview });
 }

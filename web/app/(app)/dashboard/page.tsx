@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTopPicks, usePlan, planMeets } from "@/lib/hooks";
 import { RegimeStrip } from "@/components/today/regime-strip";
 import { AuditStrip } from "@/components/today/audit-strip";
+import { OvernightChanges } from "@/components/today/overnight-changes";
 import { FeaturedSignalCard } from "@/components/today/featured-signal-card";
 import { SignalTable } from "@/components/today/signal-table";
 import { LensCardGated } from "@/components/lens/lens-card";
@@ -58,6 +59,8 @@ export default function TodayPage() {
       </header>
 
       <AuditStrip />
+
+      <OvernightChanges />
 
       <RegimeStrip />
 

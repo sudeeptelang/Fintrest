@@ -238,6 +238,101 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     }
 
     /// <summary>Latest market-moving news across all stocks — "Trending News" widget.</summary>
+    /// <summary>Signals diff between the last two completed scans — the
+    /// "what changed overnight" panel on Today. Returns added (in latest,
+    /// not in previous), fellOff (in previous, not in latest), biggest
+    /// score jumps and biggest drops (in both). Each list capped at 5.</summary>
+    [HttpGet("signals/overnight-changes")]
+    public async Task<IActionResult> OvernightChanges()
+    {
+        var scans = await db.ScanRuns
+            .Where(s => s.Status == "COMPLETED")
+            .OrderByDescending(s => s.CompletedAt)
+            .Take(2)
+            .ToListAsync();
+
+        if (scans.Count < 2)
+        {
+            return Ok(new
+            {
+                hasComparison = false,
+                message = "Need two completed scans to compute overnight changes.",
+                added = Array.Empty<object>(),
+                fellOff = Array.Empty<object>(),
+                jumps = Array.Empty<object>(),
+                drops = Array.Empty<object>(),
+            });
+        }
+
+        var latestId = scans[0].Id;
+        var prevId = scans[1].Id;
+
+        // Join Signals to Stocks so we can emit tickers. One query fetches
+        // both scans; we partition in-memory.
+        var rows = await db.Signals
+            .Where(s => s.ScanRunId == latestId || s.ScanRunId == prevId)
+            .Include(s => s.Stock)
+            .Select(s => new
+            {
+                s.ScanRunId,
+                s.StockId,
+                Ticker = s.Stock.Ticker,
+                StockName = s.Stock.Name,
+                s.ScoreTotal,
+                s.SignalType,
+            })
+            .ToListAsync();
+
+        var latestByTicker = rows.Where(r => r.ScanRunId == latestId).ToDictionary(r => r.Ticker);
+        var prevByTicker   = rows.Where(r => r.ScanRunId == prevId).ToDictionary(r => r.Ticker);
+
+        var addedTickers = latestByTicker.Keys.Except(prevByTicker.Keys).ToList();
+        var fellTickers  = prevByTicker.Keys.Except(latestByTicker.Keys).ToList();
+        var bothTickers  = latestByTicker.Keys.Intersect(prevByTicker.Keys).ToList();
+
+        var added = addedTickers
+            .Select(t => latestByTicker[t])
+            .OrderByDescending(r => r.ScoreTotal)
+            .Take(5)
+            .Select(r => new { ticker = r.Ticker, name = r.StockName, score = Math.Round(r.ScoreTotal), signalType = r.SignalType })
+            .ToList();
+
+        var fellOff = fellTickers
+            .Select(t => prevByTicker[t])
+            .OrderByDescending(r => r.ScoreTotal)
+            .Take(5)
+            .Select(r => new { ticker = r.Ticker, name = r.StockName, score = Math.Round(r.ScoreTotal), signalType = r.SignalType })
+            .ToList();
+
+        var deltas = bothTickers
+            .Select(t => new
+            {
+                ticker = t,
+                name = latestByTicker[t].StockName,
+                currentScore = Math.Round(latestByTicker[t].ScoreTotal),
+                previousScore = Math.Round(prevByTicker[t].ScoreTotal),
+                delta = Math.Round(latestByTicker[t].ScoreTotal - prevByTicker[t].ScoreTotal, 1),
+                signalType = latestByTicker[t].SignalType,
+            })
+            .ToList();
+
+        var jumps = deltas.OrderByDescending(d => d.delta).Where(d => d.delta > 0).Take(5).ToList();
+        var drops = deltas.OrderBy(d => d.delta).Where(d => d.delta < 0).Take(5).ToList();
+
+        return Ok(new
+        {
+            hasComparison = true,
+            latestScanAt = scans[0].CompletedAt,
+            previousScanAt = scans[1].CompletedAt,
+            addedCount = addedTickers.Count,
+            fellOffCount = fellTickers.Count,
+            added,
+            fellOff,
+            jumps,
+            drops,
+        });
+    }
+
     [HttpGet("market/news")]
     public async Task<ActionResult<List<NewsResponse>>> TrendingNews([FromQuery] int limit = 10)
     {

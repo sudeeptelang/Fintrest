@@ -295,6 +295,36 @@ export interface EarningsCalendarItem {
   signalScore: number | null;
 }
 
+// Today page "what changed overnight" — diff between the last 2 completed scans.
+export interface OvernightChanges {
+  hasComparison: boolean;
+  message?: string;
+  latestScanAt?: string;
+  previousScanAt?: string;
+  addedCount: number;
+  fellOffCount: number;
+  added: OvernightMover[];
+  fellOff: OvernightMover[];
+  jumps: OvernightDelta[];
+  drops: OvernightDelta[];
+}
+
+export interface OvernightMover {
+  ticker: string;
+  name: string;
+  score: number;
+  signalType: string | null;
+}
+
+export interface OvernightDelta {
+  ticker: string;
+  name: string;
+  currentScore: number;
+  previousScore: number;
+  delta: number;
+  signalType: string | null;
+}
+
 export interface IpoCalendarItem {
   ticker: string;
   company: string;
@@ -569,6 +599,7 @@ export const api = {
   },
   marketCongressLatest: (limit = 50) => authFetchApi<CongressTradeRow[]>(`/market/congress/latest?limit=${limit}`),
   topPicks: (limit = 12) => fetchApi<SignalListResponse>(`/picks/top-today?limit=${limit}`),
+  overnightChanges: () => fetchApi<OvernightChanges>("/signals/overnight-changes"),
   swingWeek: () => fetchApi<SignalListResponse>("/picks/swing-week"),
 
   // Stocks (public)
