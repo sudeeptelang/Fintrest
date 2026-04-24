@@ -239,6 +239,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         <DeepDiveRow
           title="Price chart"
           summary="1D · 5D · 3M · 1Y · volume profile · Polygon real-time"
+          family="technical"
         >
           <div>
             <div className="flex items-center justify-end mb-4">
@@ -266,13 +267,15 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
 
         <DeepDiveRow
           title="Options flow detail"
-          summary="Chain · unusual activity · skew · IV rank · Unusual Whales"
-          emptyMessage="Unusual Whales feed not yet wired — available when the options provider is plumbed in (§14.9 phase 3)."
+          summary="Chain · unusual activity · skew · IV rank"
+          emptyMessage="Options flow feed ships with Smart Money phase 3 — targeted for Q3 2026."
+          family="smart"
         />
 
         <DeepDiveRow
           title="Fundamentals"
           summary={fundamentalsSummary(snapshot, fundDecomp)}
+          family="fundamentals"
         >
           <div className="space-y-6">
             {fundDecomp && (
@@ -317,6 +320,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         <DeepDiveRow
           title="Valuation & sensitivity"
           summary="Fair value · 5-scenario multiple analysis"
+          family="fundamentals"
         >
           {snapshot && signal && (
             <ValuationSection ticker={ticker} signal={signal} snapshot={snapshot} earnings={earnings} />
@@ -326,6 +330,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         <DeepDiveRow
           title="Related news"
           summary={relatedNewsSummary(news)}
+          family="sentiment"
         >
           <div className="space-y-6">
             {news && news.length > 0 && <RelatedNews items={news} limit={6} />}
@@ -338,19 +343,22 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         <DeepDiveRow
           title="Macro & regime context"
           summary="Risk-on · VIX · 10Y · DXY · FRED + Cboe"
-          emptyMessage="Regime classifier not yet wired — the Macro & regime pipeline lands with §14.5."
+          emptyMessage="Macro regime classifier coming with the FMP economic-calendar wire-up — targeted for next sprint."
+          family="technical"
         />
 
         <DeepDiveRow
           title="Peer comparison"
           summary=""
-          emptyMessage="Insufficient peer data — hidden until populated."
+          emptyMessage="Peer list ships with FMP /stock-peers integration — on the Week 3 roadmap."
+          family="fundamentals"
         />
 
         {ownership && (
           <DeepDiveRow
             title="Ownership strip"
             summary="Insider + institutional + transaction history"
+            family="smart"
           >
             <OwnershipStrip data={ownership} />
           </DeepDiveRow>
@@ -434,10 +442,11 @@ function relatedNewsSummary(
   return parts.join(" · ");
 }
 
-// §14.9 — Smart Money placeholder. The sub-feeds ship in phases; until each
-// lands, the row renders in its honest "pending feed" state with the real
-// source + staleness line. Swap this for a real data hook in Phase 1 once
-// EDGAR Form 4 parsing + market_firehose_snapshot are wired.
+// Smart Money sub-signals. Phase 1 (insider) is live — the row hydrates
+// from GET /market/insider-score/{ticker} in hydrateInsiderRow below.
+// Phases 2 (short, institutional, congressional) and Phase 3 (options)
+// ship in the FMP_ROADMAP Week 2–3 sequence. Until each lands, the row
+// renders a clean empty state with source + ETA — no jargon.
 function buildPlaceholderSmartMoney(): SmartMoneySubSignal[] {
   return [
     {
@@ -447,7 +456,16 @@ function buildPlaceholderSmartMoney(): SmartMoneySubSignal[] {
       score: null,
       evidence: null,
       source: "SEC EDGAR Form 4 · 1–2 day disclosure lag",
-      pendingMessage: "EDGAR Form 4 parser is next up (§14.9 phase 1). Cluster + officer weighting land with it.",
+      pendingMessage: "No qualifying insider buys in the last 30 days.",
+    },
+    {
+      key: "short",
+      label: "Short dynamics",
+      weightPct: 10,
+      score: null,
+      evidence: null,
+      source: "FMP short-interest feed · weekly refresh",
+      pendingMessage: "Short interest feed shipping in the next sprint — highest-leverage FMP tier-1 wire-up.",
     },
     {
       key: "institutional",
@@ -456,7 +474,16 @@ function buildPlaceholderSmartMoney(): SmartMoneySubSignal[] {
       score: null,
       evidence: null,
       source: "SEC 13F via Whale Wisdom · 45-day reporting lag",
-      pendingMessage: "13F ingestion lands with §14.9 phase 2.",
+      pendingMessage: "13F institutional holdings ingest targeted for Q3 2026 once the audit-log depth matures.",
+    },
+    {
+      key: "congressional",
+      label: "Congressional",
+      weightPct: 15,
+      score: null,
+      evidence: null,
+      source: "FMP /senate-latest + /house-latest · STOCK Act disclosures",
+      pendingMessage: "Per-ticker congress activity card ships with the Smart Money phase 2 rollout.",
     },
     {
       key: "options",
@@ -465,25 +492,7 @@ function buildPlaceholderSmartMoney(): SmartMoneySubSignal[] {
       score: null,
       evidence: null,
       source: "Unusual Whales + Cboe · real-time",
-      pendingMessage: "Options flow is §14.9 phase 3 — the paid feed is deferred until Pro revenue justifies it.",
-    },
-    {
-      key: "congressional",
-      label: "Congressional",
-      weightPct: 15,
-      score: null,
-      evidence: null,
-      source: "Quiver Quantitative · up to 45-day STOCK Act lag",
-      pendingMessage: "Quiver integration lands with §14.9 phase 2.",
-    },
-    {
-      key: "short",
-      label: "Short dynamics",
-      weightPct: 10,
-      score: null,
-      evidence: null,
-      source: "FINRA bi-monthly + Fintel · 1–2 week lag",
-      pendingMessage: "Short-interest trend series is queued for §14.9 phase 2.",
+      pendingMessage: "Options flow targeted for Q3 2026 — the paid feed is gated by Pro-tier revenue.",
     },
   ];
 }
