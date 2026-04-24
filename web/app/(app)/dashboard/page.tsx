@@ -71,21 +71,7 @@ export default function TodayPage() {
         <MorningTake signals={signals} />
       </LensCardGated>
 
-      {/* Filter chips */}
-      <div className="flex gap-2 flex-wrap">
-        {FILTERS.map((f) => (
-          <FilterChip
-            key={f.key}
-            active={filter === f.key}
-            count={filterCount(signals, f.key)}
-            onClick={() => setFilter(f.key)}
-          >
-            {f.label}
-          </FilterChip>
-        ))}
-      </div>
-
-      {/* Featured 3 */}
+      {/* Featured 3 — always the top score-totals regardless of active filter */}
       {featured.length > 0 && (
         <section>
           <div className="flex items-baseline gap-3 mb-5">
@@ -109,16 +95,28 @@ export default function TodayPage() {
         </section>
       )}
 
-      {/* Full table */}
+      {/* Full table — filter chips above the table since they filter what's in it */}
       {tableSignals.length > 0 && (
         <section>
-          <div className="flex items-baseline gap-3 mb-5">
+          <div className="flex items-baseline gap-3 mb-4">
             <h2 className="font-[var(--font-heading)] text-[20px] leading-[28px] font-semibold text-ink-900 tracking-[-0.005em]">
               All signals
             </h2>
             <span className="font-[var(--font-mono)] text-[13px] text-ink-500">
               {tableSignals.length} more passed the bar today
             </span>
+          </div>
+          <div className="flex gap-2 flex-wrap mb-4">
+            {FILTERS.map((f) => (
+              <FilterChip
+                key={f.key}
+                active={filter === f.key}
+                count={filterCount(signals, f.key)}
+                onClick={() => setFilter(f.key)}
+              >
+                {f.label}
+              </FilterChip>
+            ))}
           </div>
           <SignalTable
             signals={tableSignals}
