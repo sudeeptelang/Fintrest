@@ -92,7 +92,9 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         var ratiosTask = TryFetch<List<FmpRatiosFull>>($"{_baseUrl}/ratios-ttm?symbol={ticker}&apikey={_apiKey}", ct);
         var targetTask = TryFetch<List<FmpPriceTargetConsensus>>($"{_baseUrl}/price-target-consensus?symbol={ticker}&apikey={_apiKey}", ct);
         var today = DateTime.UtcNow.Date;
-        var earningsTask = TryFetch<List<FmpEarningCalendar>>($"{_baseUrl}/earning-calendar?symbol={ticker}&from={today:yyyy-MM-dd}&to={today.AddDays(120):yyyy-MM-dd}&apikey={_apiKey}", ct);
+        // Note: endpoint is `earnings-calendar` (plural) — the singular
+        // `earning-calendar` form exists but returns empty on FMP Ultimate.
+        var earningsTask = TryFetch<List<FmpEarningCalendar>>($"{_baseUrl}/earnings-calendar?symbol={ticker}&from={today:yyyy-MM-dd}&to={today.AddDays(120):yyyy-MM-dd}&apikey={_apiKey}", ct);
 
         await Task.WhenAll(profileTask, keyMetricsTask, ratiosTask, targetTask, earningsTask);
 
@@ -390,8 +392,10 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
 
     public async Task<List<EarningCalendarEntry>> GetEarningCalendarAsync(DateTime from, DateTime to, CancellationToken ct = default)
     {
-        // FMP stable: /earning-calendar with date range returns all companies reporting.
-        var url = $"{_baseUrl}/earning-calendar?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&apikey={_apiKey}";
+        // FMP stable: /earnings-calendar (plural!) with date range returns all
+        // companies reporting. The singular /earning-calendar form is a FMP
+        // doc-page typo that returns empty — confirmed via API test.
+        var url = $"{_baseUrl}/earnings-calendar?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&apikey={_apiKey}";
         var rows = await TryFetch<List<FmpEarningCalendar>>(url, ct);
         if (rows is null) return [];
 

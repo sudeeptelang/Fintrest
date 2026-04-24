@@ -170,7 +170,11 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 .ToListAsync();
             foreach (var s in stocksToUpdate)
             {
-                if (idToDate.TryGetValue(s.Id, out var d)) s.NextEarningsDate = d;
+                // PostgreSQL timestamptz requires Kind=Utc. FMP hands back
+                // dates parsed from "2026-04-30" strings with Kind=Unspecified,
+                // which Npgsql refuses. Force UTC-kinded at midnight UTC.
+                if (idToDate.TryGetValue(s.Id, out var d))
+                    s.NextEarningsDate = DateTime.SpecifyKind(d.Date, DateTimeKind.Utc);
             }
             if (stocksToUpdate.Count > 0) await db.SaveChangesAsync();
         }
