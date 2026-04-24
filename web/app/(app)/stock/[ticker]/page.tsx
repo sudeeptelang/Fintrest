@@ -18,6 +18,7 @@ import {
   useInsiderScore,
   useShortInterest,
   useCongressSignal,
+  useInstitutionalSignal,
 } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -46,7 +47,7 @@ import { DcfCard } from "@/components/stock/dcf-card";
 import { EarningsSurprisesCard } from "@/components/stock/earnings-surprises-card";
 import { AnalystRevisionsCard } from "@/components/stock/analyst-revisions-card";
 import { PeersCard } from "@/components/stock/peers-card";
-import type { InsiderScore, ShortInterestResponse, CongressSignalResponse } from "@/lib/api";
+import type { InsiderScore, ShortInterestResponse, CongressSignalResponse, InstitutionalSignalResponse } from "@/lib/api";
 import {
   buildTakeaways,
   buildTradePlanBullets,
@@ -91,6 +92,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { data: insiderScore } = useInsiderScore(ticker);
   const { data: shortInterest } = useShortInterest(ticker);
   const { data: congressSignal } = useCongressSignal(ticker);
+  const { data: institutionalSignal } = useInstitutionalSignal(ticker);
   const { data: watchlists } = useWatchlists();
   const addToWatchlist = useAddWatchlistItem();
   const createWatchlist = useCreateWatchlist();
@@ -119,6 +121,8 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
       ? hydrateShortRow(row, shortInterest ?? null)
       : row.key === "congressional"
       ? hydrateCongressRow(row, congressSignal ?? null)
+      : row.key === "institutional"
+      ? hydrateInstitutionalRow(row, institutionalSignal ?? null)
       : row,
   );
   const smartMoneyComposite = computeSmartMoneyComposite(smartMoneySignals);
@@ -593,6 +597,22 @@ function hydrateCongressRow(
       ...row,
       evidence: null,
       pendingMessage: "No Congressional disclosures on record for this ticker in the last 90 days.",
+    };
+  }
+  return { ...row, score: sig.score, evidence: sig.evidence };
+}
+
+// Swap the pending "institutional" row for a live one from FMP's
+// 13F-rolled-up ownership feed. Score + evidence composed server-side.
+function hydrateInstitutionalRow(
+  row: SmartMoneySubSignal,
+  sig: InstitutionalSignalResponse | null,
+): SmartMoneySubSignal {
+  if (!sig) {
+    return {
+      ...row,
+      evidence: null,
+      pendingMessage: "No institutional 13F data on file for this ticker yet.",
     };
   }
   return { ...row, score: sig.score, evidence: sig.evidence };

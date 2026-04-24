@@ -1469,6 +1469,63 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         return "weak";
     }
 
+    /// <summary>Per-ticker Institutional flow signal — Smart Money
+    /// Phase 2 row #4. Derives a 0-100 score from FMP's institutional
+    /// ownership feed (13F-rolled-up). Score rewards rising ownership %
+    /// and rising investor count; heavy already-owned names without
+    /// recent change settle near neutral. Returns 204 when FMP has no
+    /// ownership data for the ticker.</summary>
+    [HttpGet("market/institutional-signal/{ticker}")]
+    public async Task<IActionResult> GetInstitutionalSignal(
+        string ticker,
+        [FromServices] Fintrest.Api.Services.Providers.Contracts.IFundamentalsProvider fmp,
+        CancellationToken ct)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+
+        var snap = await fmp.GetOwnershipAsync(normalized, ct);
+        if (snap is null) return NoContent();
+
+        // Score model (MVP):
+        //   Base 50. Ownership-% change dominates (±30 pts for ±10%).
+        //   Investor-count change adds ±20 pts for a ±10-investor swing.
+        //   Clamp 0-100.
+        var score = 50.0;
+        var ownPctChange = snap.OwnershipPercentChange ?? 0;
+        score += ownPctChange * 3.0;
+        var investorChange = snap.InvestorsHoldingChange ?? 0;
+        score += investorChange * 2.0;
+        score = Math.Clamp(score, 0, 100);
+
+        // Evidence line — the one-sentence Lens-style summary rendered
+        // on the Smart Money sub-card.
+        string evidence;
+        if (snap.OwnershipPercentChange is > 0.5)
+            evidence = $"Institutions +{snap.OwnershipPercentChange.Value:0.#}% of shares · "
+                + $"{snap.InvestorsHolding ?? 0} holders"
+                + (snap.InvestorsHoldingChange is > 0 ? $" (+{snap.InvestorsHoldingChange})" : "");
+        else if (snap.OwnershipPercentChange is < -0.5)
+            evidence = $"Institutions {snap.OwnershipPercentChange.Value:0.#}% of shares · "
+                + $"{snap.InvestorsHolding ?? 0} holders"
+                + (snap.InvestorsHoldingChange is < 0 ? $" ({snap.InvestorsHoldingChange})" : "");
+        else
+            evidence = $"{snap.InstitutionalPercent?.ToString("0.#%") ?? "—"} institutional · "
+                + $"{snap.InvestorsHolding ?? 0} holders · flat";
+
+        return Ok(new
+        {
+            ticker = normalized,
+            score = (int)Math.Round(score),
+            institutionalPercent = snap.InstitutionalPercent,
+            investorsHolding = snap.InvestorsHolding,
+            investorsHoldingChange = snap.InvestorsHoldingChange,
+            ownershipPercentChange = snap.OwnershipPercentChange,
+            totalInvested = snap.TotalInvested,
+            evidence,
+        });
+    }
+
     /// <summary>Per-ticker Congressional sub-signal — Smart Money Phase 2.
     /// Derived at query-time from the last 90 days of firehose
     /// snapshots. Returns 204 when there are no disclosures on file for

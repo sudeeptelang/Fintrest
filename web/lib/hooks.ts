@@ -203,6 +203,16 @@ export function useCongressSignal(ticker: string) {
   });
 }
 
+export function useInstitutionalSignal(ticker: string) {
+  return useQuery({
+    queryKey: ["market-institutional-signal", ticker.toUpperCase()],
+    queryFn: () => api.marketInstitutionalSignal(ticker.toUpperCase()),
+    enabled: !!ticker,
+    // 13F data lags 45 days by SEC rule; cache aggressively.
+    staleTime: 1000 * 60 * 60 * 6, // 6 hours
+  });
+}
+
 export function useFinancialScores(ticker: string) {
   return useQuery({
     queryKey: ["market-financial-scores", ticker.toUpperCase()],

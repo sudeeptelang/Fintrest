@@ -118,7 +118,13 @@ public class FundamentalSubscoreService(AppDbContext db, ILogger<FundamentalSubs
             {
                 Ticker = r.Ticker,
                 AsOfDate = asOf,
-                Sector = r.Sector,
+                // Defensive truncation: fundamental_subscore.sector is
+                // VARCHAR(128) after migration 028, but guard even that
+                // ceiling in case a provider returns an absurdly long
+                // industry slug. Truncation is safe — sector is a label,
+                // not a key, so we never compare by this field across
+                // truncated + untruncated variants.
+                Sector = r.Sector is { Length: > 128 } ? r.Sector[..128] : r.Sector,
                 QualityRaw = r.Quality,
                 ProfitabilityRaw = r.Profitability,
                 GrowthRaw = r.Growth,

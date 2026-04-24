@@ -449,6 +449,20 @@ export interface FinancialScoresResponse {
   revenue: number | null;
 }
 
+// Smart Money (phase 2) institutional-flow sub-signal derived from
+// FMP's 13F-rolled-up ownership feed. Score combines ownership %
+// change + investor count change.
+export interface InstitutionalSignalResponse {
+  ticker: string;
+  score: number;
+  institutionalPercent: number | null;
+  investorsHolding: number | null;
+  investorsHoldingChange: number | null;
+  ownershipPercentChange: number | null;
+  totalInvested: number | null;
+  evidence: string | null;
+}
+
 // Smart Money (phase 2) congressional sub-signal derived from the last
 // 90 days of firehose disclosures. Shape matches
 // MarketController.GetCongressSignal.
@@ -758,6 +772,12 @@ export const api = {
   },
   marketFinancialScores: async (ticker: string): Promise<FinancialScoresResponse | null> => {
     const res = await fetch(`${API_BASE}/market/financial-scores/${ticker}`);
+    if (res.status === 204) return null;
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    return res.json();
+  },
+  marketInstitutionalSignal: async (ticker: string): Promise<InstitutionalSignalResponse | null> => {
+    const res = await fetch(`${API_BASE}/market/institutional-signal/${ticker}`);
     if (res.status === 204) return null;
     if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
     return res.json();
