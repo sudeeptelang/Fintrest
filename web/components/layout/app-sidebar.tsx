@@ -37,7 +37,7 @@ const primary: readonly NavItem[] = [
     label: "Markets",
     href: "/markets",
     icon: BarChart3,
-    matchPaths: ["/markets", "/heatmap", "/insiders", "/congress"],
+    matchPaths: ["/markets", "/heatmap"],
     subItems: [
       { label: "Overview",  href: "/markets" },
       { label: "Screeners", href: "/markets/screeners" },
