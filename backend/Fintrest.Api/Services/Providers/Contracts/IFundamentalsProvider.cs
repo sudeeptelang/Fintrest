@@ -68,7 +68,22 @@ public interface IFundamentalsProvider
     /// working-capital score. Returns null if FMP has no record. Adds
     /// institutional-grade rigor to the Fundamentals factor.</summary>
     Task<FinancialScoresDto?> GetFinancialScoresAsync(string ticker, CancellationToken ct = default);
+
+    /// <summary>FMP-computed discounted cash flow fair value, paired
+    /// with the stock's current price so we can show implied upside /
+    /// downside. Null if FMP has no DCF model on file for the ticker.</summary>
+    Task<DcfValuationDto?> GetDcfAsync(string ticker, CancellationToken ct = default);
 }
+
+/// <summary>FMP /stable/discounted-cash-flow output. DCF is a fair-value
+/// estimate; we pair with StockPrice to compute implied upside or
+/// downside in a single backend response.</summary>
+public record DcfValuationDto(
+    string Ticker,
+    decimal? DcfFairValue,
+    decimal? StockPrice,
+    DateTime? AsOf
+);
 
 /// <summary>FMP /stable/financial-scores output. All three scores are
 /// well-known quant measures:

@@ -1049,6 +1049,45 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
+    /// <summary>FMP-computed DCF fair-value + implied upside/downside
+    /// vs the stock's current price. Surfaces on the Fundamentals
+    /// deep-dive as a Valuation anchor. Returns 204 if FMP has no DCF
+    /// for this ticker.</summary>
+    [HttpGet("market/dcf/{ticker}")]
+    public async Task<IActionResult> GetDcf(
+        string ticker,
+        [FromServices] Fintrest.Api.Services.Providers.Contracts.IFundamentalsProvider fmp,
+        CancellationToken ct)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+
+        var dcf = await fmp.GetDcfAsync(normalized, ct);
+        if (dcf is null || dcf.DcfFairValue is null or 0m) return NoContent();
+
+        decimal? impliedPct = null;
+        if (dcf.StockPrice is > 0 && dcf.DcfFairValue.HasValue)
+            impliedPct = Math.Round((dcf.DcfFairValue.Value - dcf.StockPrice.Value) / dcf.StockPrice.Value * 100m, 2);
+
+        return Ok(new
+        {
+            ticker = dcf.Ticker,
+            dcfFairValue = dcf.DcfFairValue,
+            stockPrice = dcf.StockPrice,
+            impliedUpsidePct = impliedPct,
+            band = DcfBand(impliedPct),
+            asOf = dcf.AsOf,
+        });
+    }
+
+    private static string DcfBand(decimal? upsidePct)
+    {
+        if (upsidePct is null) return "unknown";
+        if (upsidePct >= 20m) return "undervalued";
+        if (upsidePct >= -10m) return "fair";
+        return "overvalued";
+    }
+
     /// <summary>FMP-computed financial health scores: Altman Z +
     /// Piotroski F + working capital. Surfaces on the Fundamentals
     /// deep-dive as institutional-grade rigor markers. Returns 204

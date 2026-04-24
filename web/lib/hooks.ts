@@ -214,6 +214,17 @@ export function useFinancialScores(ticker: string) {
   });
 }
 
+export function useDcf(ticker: string) {
+  return useQuery({
+    queryKey: ["market-dcf", ticker.toUpperCase()],
+    queryFn: () => api.marketDcf(ticker.toUpperCase()),
+    enabled: !!ticker,
+    // DCF fair value is re-computed on-demand by FMP; price changes
+    // intraday. Keep fresh-ish but not thrashing.
+    staleTime: 1000 * 60 * 30, // 30 min
+  });
+}
+
 export function useCongressLatest(limit = 100) {
   return useQuery({ queryKey: ["market-congress", limit], queryFn: () => api.marketCongressLatest(limit) });
 }

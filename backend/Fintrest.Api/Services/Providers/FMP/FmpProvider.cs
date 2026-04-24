@@ -485,6 +485,23 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         );
     }
 
+    public async Task<DcfValuationDto?> GetDcfAsync(string ticker, CancellationToken ct = default)
+    {
+        // FMP stable: /discounted-cash-flow returns the current DCF
+        // fair-value estimate alongside the stock's latest close.
+        // One row per symbol; we take the first.
+        var url = $"{_baseUrl}/discounted-cash-flow?symbol={ticker}&apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpDcf>>(url, ct);
+        if (rows is null || rows.Count == 0) return null;
+        var r = rows[0];
+        return new DcfValuationDto(
+            Ticker: ticker.ToUpperInvariant(),
+            DcfFairValue: r.Dcf,
+            StockPrice: r.StockPrice,
+            AsOf: DateTime.TryParse(r.Date, out var d) ? DateTime.SpecifyKind(d, DateTimeKind.Utc) : null
+        );
+    }
+
     public async Task<FinancialScoresDto?> GetFinancialScoresAsync(string ticker, CancellationToken ct = default)
     {
         // FMP stable: /financial-scores returns Altman Z + Piotroski F +
@@ -720,6 +737,17 @@ file record FmpPriceTargetSummary(
     [property: JsonPropertyName("lastYearAvgPriceTarget")] double? LastYearAvgPriceTarget,
     [property: JsonPropertyName("allTime")] int? AllTime,
     [property: JsonPropertyName("allTimeAvgPriceTarget")] double? AllTimeAvgPriceTarget
+);
+
+/// <summary>FMP /stable/discounted-cash-flow row. Two fields that
+/// matter: the model's fair-value estimate (dcf) and the stock's
+/// current price, so we can render implied upside/downside in one
+/// backend response without a separate snapshot call.</summary>
+file record FmpDcf(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("date")] string? Date,
+    [property: JsonPropertyName("dcf")] decimal? Dcf,
+    [property: JsonPropertyName("stockPrice")] decimal? StockPrice
 );
 
 /// <summary>FMP /stable/financial-scores row. Altman Z + Piotroski F

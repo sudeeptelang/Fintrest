@@ -336,6 +336,17 @@ export interface IpoCalendarItem {
   marketCap: number | null;
 }
 
+// FMP DCF fair-value + implied upside vs current price. Band ships
+// pre-computed server-side so the frontend doesn't own the thresholds.
+export interface DcfResponse {
+  ticker: string;
+  dcfFairValue: number;
+  stockPrice: number | null;
+  impliedUpsidePct: number | null;
+  band: "undervalued" | "fair" | "overvalued" | "unknown";
+  asOf: string | null;
+}
+
 // Institutional-grade financial health scores from FMP — Altman Z +
 // Piotroski F. Surfaces in the Fundamentals deep-dive on ticker
 // detail. Bands come pre-computed from the backend so the UI never
@@ -632,6 +643,12 @@ export const api = {
     authFetchApi<InsiderActivity[]>(`/market/insiders/${ticker}?limit=${limit}`),
   marketCongressByTicker: (ticker: string, limit = 10) =>
     authFetchApi<CongressTradeRow[]>(`/market/congress/${ticker}?limit=${limit}`),
+  marketDcf: async (ticker: string): Promise<DcfResponse | null> => {
+    const res = await fetch(`${API_BASE}/market/dcf/${ticker}`);
+    if (res.status === 204) return null;
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    return res.json();
+  },
   marketFinancialScores: async (ticker: string): Promise<FinancialScoresResponse | null> => {
     const res = await fetch(`${API_BASE}/market/financial-scores/${ticker}`);
     if (res.status === 204) return null;
