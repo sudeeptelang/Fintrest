@@ -22,19 +22,29 @@ import { ScoreGradeChip } from "@/components/ui/score-grade-chip";
  * 390 px.
  */
 
-type TabKey = "gainers" | "losers" | "high52" | "low52" | "unusual";
+type TabKey = "gainers" | "losers" | "high52" | "low52" | "unusual" | "active";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "gainers", label: "Top Gainers" },
   { key: "losers", label: "Top Losers" },
+  { key: "active", label: "Most Active" },
+  { key: "unusual", label: "Unusual Vol" },
   { key: "high52", label: "52wk High" },
   { key: "low52", label: "52wk Low" },
-  { key: "unusual", label: "Unusual Vol" },
 ];
 
-export function MoversGrid() {
+export function MoversGrid({
+  initialTab = "gainers",
+  maxRows = 12,
+  showFullScreenerLink = true,
+}: {
+  initialTab?: TabKey;
+  maxRows?: number;
+  /** Hide the "Full screener →" link when already on the full page */
+  showFullScreenerLink?: boolean;
+} = {}) {
   const { data: screener, isLoading } = useMarketScreener(500);
-  const [tab, setTab] = useState<TabKey>("gainers");
+  const [tab, setTab] = useState<TabKey>(initialTab);
   const [sector, setSector] = useState<string>("all");
   const [capBand, setCapBand] = useState<string>("all");
 
@@ -54,9 +64,11 @@ export function MoversGrid() {
           <h2 className="font-[var(--font-heading)] text-[18px] font-semibold text-ink-900">
             Market movers
           </h2>
-          <Link href="/research/screener" className="font-[var(--font-sans)] text-[12px] font-medium text-forest hover:underline whitespace-nowrap">
-            Full screener →
-          </Link>
+          {showFullScreenerLink && (
+            <Link href="/research/screener" className="font-[var(--font-sans)] text-[12px] font-medium text-forest hover:underline whitespace-nowrap">
+              Full screener →
+            </Link>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -125,7 +137,7 @@ export function MoversGrid() {
             <div className="text-center">Actions</div>
           </div>
 
-          {rows.slice(0, 12).map((r) => (
+          {rows.slice(0, maxRows).map((r) => (
             <GridRow key={r.ticker} row={r} />
           ))}
         </>
@@ -258,6 +270,10 @@ function applyFilters(
       return filtered
         .filter((r) => r.relVolume != null && r.relVolume > 1.2)
         .sort((a, b) => (b.relVolume ?? 0) - (a.relVolume ?? 0));
+    case "active":
+      return filtered
+        .filter((r) => r.volume != null)
+        .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0));
   }
 }
 

@@ -1,35 +1,132 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { useMarketScreener } from "@/lib/hooks";
 import type { ScreenerRow } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { StockLogo } from "@/components/ui/stock-logo";
+import { ScoreGradeChip } from "@/components/ui/score-grade-chip";
 
-// Full 6-card screener grid per FINTREST_UX_SPEC §05. The Markets default
-// shows a trimmed 3-column summary (TopMovers); this page is the
-// power-user detour with all six buckets. Same data, wider net.
+/**
+ * Curated screener presets — the v3 replacement for the old 6-card
+ * price-action grid (which is now the MoversGrid on /markets). These
+ * presets use the FMP fundamentals + our composite score in ways
+ * MoversGrid doesn't — quality / value / growth / dividend / oversold /
+ * breakout lenses, not just today's gainers.
+ *
+ * Each card shows the top 5 matches with a family-tinted accent and
+ * a Lens-style "read" one-liner. "View all" deep-links into the Research
+ * screener with the preset applied (pending Research-merge ships).
+ */
+
+type Family = "technical" | "fundamentals" | "sentiment" | "smart";
+
+type Preset = {
+  slug: string;
+  name: string;
+  description: string;
+  family: Family;
+  read: string;
+  filter: (rows: ScreenerRow[]) => ScreenerRow[];
+};
+
+const FAMILY_STYLE: Record<Family, { accent: string; bg: string; pill: string; pillText: string; dot: string }> = {
+  technical:    { accent: "border-l-navy",  bg: "bg-navy-light/30",  pill: "bg-navy-light",  pillText: "text-navy",  dot: "bg-navy" },
+  fundamentals: { accent: "border-l-amber", bg: "bg-amber-light/30", pill: "bg-amber-light", pillText: "text-amber", dot: "bg-amber" },
+  sentiment:    { accent: "border-l-plum",  bg: "bg-plum-light/30",  pill: "bg-plum-light",  pillText: "text-plum",  dot: "bg-plum" },
+  smart:        { accent: "border-l-teal",  bg: "bg-teal-light/30",  pill: "bg-teal-light",  pillText: "text-teal",  dot: "bg-teal" },
+};
+
+const PRESETS: Preset[] = [
+  {
+    slug: "high-conviction",
+    name: "High Conviction",
+    description: "A-grade composite · rising trend",
+    family: "smart",
+    read: "What we'd buy if the compliance rules let us — score ≥ 85 and a healthy trend.",
+    filter: (rows) => rows
+      .filter((r) => (r.signalScore ?? 0) >= 85 && (r.changePct ?? 0) >= -2)
+      .sort((a, b) => (b.signalScore ?? 0) - (a.signalScore ?? 0)),
+  },
+  {
+    slug: "quality-growth",
+    name: "Quality Growth",
+    description: "Revenue growth ≥ 20% · ROE ≥ 15%",
+    family: "fundamentals",
+    read: "Secular compounders — top-line scaling plus capital efficiency.",
+    filter: (rows) => rows
+      .filter((r) => (r.revenueGrowth ?? 0) >= 0.2 && (r.returnOnEquity ?? 0) >= 0.15)
+      .sort((a, b) => (b.revenueGrowth ?? 0) - (a.revenueGrowth ?? 0)),
+  },
+  {
+    slug: "value-setups",
+    name: "Value Setups",
+    description: "Forward P/E < 15 · PEG < 1.2",
+    family: "fundamentals",
+    read: "Multiple compression plays — priced for no growth that isn't coming.",
+    filter: (rows) => rows
+      .filter((r) => (r.forwardPe ?? 999) < 15 && (r.forwardPe ?? 0) > 0 && (r.pegRatio ?? 999) < 1.2 && (r.pegRatio ?? 0) > 0)
+      .sort((a, b) => (a.forwardPe ?? 999) - (b.forwardPe ?? 999)),
+  },
+  {
+    slug: "oversold-reversal",
+    name: "Oversold Reversal",
+    description: "RSI < 30 · Score ≥ 60",
+    family: "technical",
+    read: "Capitulation + a composite that hasn't broken — the bounce setups we look for.",
+    filter: (rows) => rows
+      .filter((r) => (r.rsi ?? 100) < 30 && (r.signalScore ?? 0) >= 60)
+      .sort((a, b) => (a.rsi ?? 100) - (b.rsi ?? 100)),
+  },
+  {
+    slug: "dividend-aristocrats",
+    name: "Income",
+    description: "Yield ≥ 3% · Fwd P/E < 20",
+    family: "fundamentals",
+    read: "Income streams at a reasonable multiple — defensive ballast in a wobble.",
+    filter: (rows) => rows
+      .filter((r) => (r.dividendYield ?? 0) >= 0.03 && (r.forwardPe ?? 999) < 20 && (r.forwardPe ?? 0) > 0)
+      .sort((a, b) => (b.dividendYield ?? 0) - (a.dividendYield ?? 0)),
+  },
+  {
+    slug: "breakout-candidates",
+    name: "Breakout Candidates",
+    description: "Within 5% of 52w high · Rel Vol ≥ 1.3",
+    family: "technical",
+    read: "Price pressing the ceiling with volume confirming — classic continuation.",
+    filter: (rows) => rows
+      .filter((r) => (r.week52RangePct ?? 0) >= 0.95 && (r.relVolume ?? 0) >= 1.3)
+      .sort((a, b) => (b.week52RangePct ?? 0) - (a.week52RangePct ?? 0)),
+  },
+];
 
 export default function MarketsScreenersPage() {
   const { data: screener } = useMarketScreener(500);
   const rows = screener ?? [];
 
-  const buckets = useMemo(() => buildBuckets(rows), [rows]);
+  const computed = useMemo(
+    () => PRESETS.map((p) => ({ preset: p, matches: p.filter(rows) })),
+    [rows],
+  );
 
   return (
     <div className="max-w-[1120px] mx-auto">
-      <Breadcrumb
-        items={[{ label: "Markets", href: "/markets" }, { label: "Screeners" }]}
-      />
+      <Breadcrumb items={[{ label: "Markets", href: "/markets" }, { label: "Screeners" }]} />
 
       <header className="mb-6">
-        <h1 className="font-[var(--font-heading)] text-[22px] leading-[28px] font-semibold text-ink-900">
-          Screeners
+        <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.14em] text-forest-dark mb-2">
+          Research · Curated screens
+        </div>
+        <h1 className="font-[var(--font-heading)] text-[26px] leading-[34px] font-semibold text-ink-900">
+          Six lenses on the market
         </h1>
-        <p className="mt-1 text-[13px] text-ink-600">
-          Six buckets off the 500-ticker research universe. Tap any ticker
-          to open the ticker detail with Lens commentary on the move.
+        <p className="mt-2 text-[13px] text-ink-600 max-w-[640px] leading-[20px]">
+          Each preset applies a different factor-family lens to the 500-ticker research
+          universe. Price-action screens live on <Link href="/markets" className="text-forest hover:underline">Markets</Link> —
+          these are the fundamentals-first and setup-driven ones.
         </p>
       </header>
 
@@ -38,140 +135,133 @@ export default function MarketsScreenersPage() {
           No screener data yet. Check back after the next market-data ingest.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          <BucketCard title="Top gainers" subtitle="Today" rows={buckets.gainers} valueKind="changePct" />
-          <BucketCard title="Top losers" subtitle="Today" rows={buckets.losers} valueKind="changePct" />
-          <BucketCard title="Most active" subtitle="By volume" rows={buckets.active} valueKind="volume" />
-          <BucketCard title="Unusual volume" subtitle="≥ 1.5× 30d avg" rows={buckets.unusual} valueKind="relVolume" />
-          <BucketCard title="52-week highs" subtitle="Near or at" rows={buckets.weekHighs} valueKind="changePct" />
-          <BucketCard title="52-week lows" subtitle="Near or at" rows={buckets.weekLows} valueKind="changePct" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {computed.map(({ preset, matches }) => (
+            <PresetCard key={preset.slug} preset={preset} matches={matches} />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-type Bucket = ScreenerRow[];
+function PresetCard({ preset, matches }: { preset: Preset; matches: ScreenerRow[] }) {
+  const fs = FAMILY_STYLE[preset.family];
+  const topMatches = matches.slice(0, 5);
 
-type Buckets = {
-  gainers: Bucket;
-  losers: Bucket;
-  active: Bucket;
-  unusual: Bucket;
-  weekHighs: Bucket;
-  weekLows: Bucket;
-};
-
-function buildBuckets(rows: ScreenerRow[]): Buckets {
-  const withMove = rows.filter((r) => r.changePct != null && r.price != null);
-
-  const gainers = [...withMove].sort((a, b) => (b.changePct ?? 0) - (a.changePct ?? 0)).slice(0, 10);
-  const losers = [...withMove].sort((a, b) => (a.changePct ?? 0) - (b.changePct ?? 0)).slice(0, 10);
-
-  const active = [...rows]
-    .filter((r) => r.volume != null)
-    .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
-    .slice(0, 10);
-
-  const unusual = [...rows]
-    .filter((r) => r.relVolume != null && r.relVolume >= 1.5)
-    .sort((a, b) => (b.relVolume ?? 0) - (a.relVolume ?? 0))
-    .slice(0, 10);
-
-  // 52w highs: price within 2% of week52High (if available on the row).
-  // The ScreenerRow type may not expose week52High directly; we fall
-  // back to "top gainers with % change ≥ 3%" as a reasonable proxy
-  // when the richer field isn't present.
-  const weekHighs = withMove.filter((r) => (r.changePct ?? 0) >= 3).slice(0, 10);
-  const weekLows = withMove.filter((r) => (r.changePct ?? 0) <= -3).slice(0, 10);
-
-  return { gainers, losers, active, unusual, weekHighs, weekLows };
-}
-
-function BucketCard({
-  title,
-  subtitle,
-  rows,
-  valueKind,
-}: {
-  title: string;
-  subtitle: string;
-  rows: Bucket;
-  valueKind: "changePct" | "relVolume" | "volume";
-}) {
   return (
-    <section className="rounded-[10px] border border-ink-200 bg-ink-0 overflow-hidden">
-      <header className="px-5 py-3 border-b border-ink-100">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-500">
-          {subtitle}
+    <section
+      className={cn(
+        "rounded-[12px] border border-ink-200 bg-ink-0 overflow-hidden border-l-[3px]",
+        fs.accent,
+      )}
+    >
+      <header className={cn("px-5 py-4", fs.bg)}>
+        <div className="flex items-center justify-between mb-1">
+          <div className={cn("inline-flex items-center gap-2 rounded-full px-2 py-0.5", fs.pill)}>
+            <span className={cn("inline-block w-1.5 h-1.5 rounded-full", fs.dot)} />
+            <span className={cn("font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.08em]", fs.pillText)}>
+              {preset.family === "technical" ? "Technical" : preset.family === "fundamentals" ? "Fundamentals" : preset.family === "sentiment" ? "Sentiment" : "Smart Money"}
+            </span>
+          </div>
+          <span className="font-mono text-[11px] text-ink-600">
+            {matches.length} {matches.length === 1 ? "match" : "matches"}
+          </span>
         </div>
-        <h3 className="font-[var(--font-heading)] text-[14px] font-semibold text-ink-900 mt-0.5">
-          {title}
-        </h3>
+        <h2 className="font-[var(--font-heading)] text-[17px] font-semibold text-ink-900 leading-tight">
+          {preset.name}
+        </h2>
+        <p className="mt-0.5 font-mono text-[11px] text-ink-600">{preset.description}</p>
+        <p className="mt-2 font-[var(--font-sans)] text-[12px] text-ink-700 leading-[18px]">
+          {preset.read}
+        </p>
       </header>
-      {rows.length === 0 ? (
-        <div className="px-5 py-6 text-[12px] text-ink-400 italic">No matches.</div>
+
+      {topMatches.length === 0 ? (
+        <div className="px-5 py-6 text-[12px] text-ink-400 italic">
+          No tickers match these filters today.
+        </div>
       ) : (
         <ul className="divide-y divide-ink-100">
-          {rows.map((r) => (
-            <BucketRow key={r.ticker} row={r} valueKind={valueKind} />
+          {topMatches.map((r) => (
+            <li key={r.ticker}>
+              <Link
+                href={`/stock/${r.ticker}`}
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-ink-50 transition-colors"
+              >
+                <StockLogo ticker={r.ticker} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-[var(--font-heading)] text-[13px] font-bold text-ink-900 leading-tight">
+                    {r.ticker}
+                  </div>
+                  <div className="text-[10px] text-ink-500 truncate leading-tight mt-0.5">
+                    {r.name}
+                  </div>
+                </div>
+                <ScoreGradeChip score={r.signalScore ?? null} size="sm" showNum={false} showDelta={false} />
+                <PresetMetric row={r} family={preset.family} />
+              </Link>
+            </li>
           ))}
         </ul>
+      )}
+
+      {matches.length > topMatches.length && (
+        <footer className="px-5 py-3 bg-ink-50 border-t border-ink-100">
+          <Link
+            href={`/research/screener?preset=${preset.slug}`}
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-forest hover:text-forest-dark"
+          >
+            View all {matches.length} matches <ArrowUpRight className="h-3 w-3" strokeWidth={2.2} />
+          </Link>
+        </footer>
       )}
     </section>
   );
 }
 
-function BucketRow({ row, valueKind }: { row: ScreenerRow; valueKind: "changePct" | "relVolume" | "volume" }) {
-  const value =
-    valueKind === "changePct"
-      ? formatPct(row.changePct)
-      : valueKind === "relVolume"
-      ? row.relVolume != null
-        ? `${row.relVolume.toFixed(1)}×`
-        : "—"
-      : formatVolume(row.volume);
+function PresetMetric({ row, family }: { row: ScreenerRow; family: Family }) {
+  // Family-specific signature metric shown on the right of each row.
+  let label = "";
+  let value = "";
 
-  const tone =
-    valueKind === "changePct"
-      ? (row.changePct ?? 0) >= 0
-        ? "text-up"
-        : "text-down"
-      : "text-forest";
+  if (family === "fundamentals") {
+    if (row.dividendYield != null && row.dividendYield > 0.01) {
+      label = "Yld";
+      value = `${(row.dividendYield * 100).toFixed(1)}%`;
+    } else if (row.forwardPe != null && row.forwardPe > 0) {
+      label = "P/E";
+      value = row.forwardPe.toFixed(1);
+    } else if (row.revenueGrowth != null) {
+      label = "Rev";
+      value = `+${(row.revenueGrowth * 100).toFixed(0)}%`;
+    }
+  } else if (family === "technical") {
+    if (row.rsi != null) {
+      label = "RSI";
+      value = row.rsi.toFixed(0);
+    } else if (row.week52RangePct != null) {
+      label = "52w";
+      value = `${(row.week52RangePct * 100).toFixed(0)}%`;
+    }
+  }
+
+  if (!value) {
+    // Fallback: show %change
+    if (row.changePct != null) {
+      return (
+        <span className={cn("font-mono text-[11px] font-medium", row.changePct >= 0 ? "text-up" : "text-down")}>
+          {row.changePct >= 0 ? "+" : ""}{row.changePct.toFixed(1)}%
+        </span>
+      );
+    }
+    return null;
+  }
 
   return (
-    <li>
-      <Link
-        href={`/stock/${row.ticker}`}
-        className="flex items-center gap-3 px-5 py-2.5 hover:bg-ink-50 transition-colors"
-      >
-        <div className="flex-1 min-w-0">
-          <div className="font-[var(--font-mono)] text-[13px] font-semibold text-ink-900">
-            {row.ticker}
-          </div>
-          <div className="text-[10px] text-ink-500 truncate">
-            {row.price != null ? `$${row.price.toFixed(2)}` : "—"}
-            {row.sector ? ` · ${row.sector}` : ""}
-          </div>
-        </div>
-        <div className={cn("font-[var(--font-mono)] text-[12px] font-semibold shrink-0", tone)}>
-          {value}
-        </div>
-      </Link>
-    </li>
+    <div className="text-right leading-tight">
+      <div className="font-mono text-[11px] font-medium text-ink-900">{value}</div>
+      <div className="font-mono text-[9px] text-ink-500 uppercase tracking-wide">{label}</div>
+    </div>
   );
-}
-
-function formatPct(p: number | null): string {
-  if (p == null) return "—";
-  const sign = p >= 0 ? "+" : "";
-  return `${sign}${p.toFixed(2)}%`;
-}
-
-function formatVolume(v: number | null): string {
-  if (v == null) return "—";
-  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
-  if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
-  if (v >= 1e3) return `${(v / 1e3).toFixed(0)}K`;
-  return `${v}`;
 }
