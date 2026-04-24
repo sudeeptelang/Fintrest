@@ -18,6 +18,7 @@ import { NewsReaderDrawer } from "@/components/news/news-reader-drawer";
 import { PaywallGate } from "@/components/billing/paywall-gate";
 import { RegimeStrip } from "@/components/markets/regime-strip";
 import { MoversGrid } from "@/components/markets/movers-grid";
+import { MarketOverviewStrip } from "@/components/markets/market-overview-strip";
 import { IpoCalendarCard } from "@/components/markets/ipo-calendar-card";
 import { Newspaper, Sparkles } from "lucide-react";
 
@@ -55,7 +56,7 @@ export default function MarketsPage() {
     return stocks
       .filter((s) => s.marketCap && s.marketCap > 0 && s.changePct !== null)
       .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
-      .slice(0, 40)
+      .slice(0, 100)
       .map((s) => ({
         name: s.ticker,
         size: s.marketCap ?? 0,
@@ -98,18 +99,14 @@ export default function MarketsPage() {
           Silently hides when the macro classifier endpoint hasn't shipped. */}
       <RegimeStrip />
 
+      {/* Market overview — unified breadth + indices + treasury strip.
+          Replaces the old MarketPulse + GlobalIndicesGrid two-card layout. */}
+      <MarketOverviewStrip />
+
       {/* Market movers — consolidated "one grid" per UX_AUDIT. Tabs for
           gainers/losers/52w/unusual, sector + cap filters, inline
           Run Lens + Watchlist. Full screener at /research/screener. */}
       <MoversGrid />
-
-      {/* Market Pulse + Global Indices grid */}
-      <div className="grid lg:grid-cols-4 gap-5">
-        <MarketPulse pulse={pulseData} />
-        <div className="lg:col-span-3">
-          <GlobalIndicesGrid indices={indexList} />
-        </div>
-      </div>
 
       {/* Popular Stocks Heatmap — Pro only. Finviz-style: box size = market cap, color = today's % change. */}
       <PaywallGate tier="pro" compact>
@@ -120,7 +117,7 @@ export default function MarketsPage() {
               Popular Stocks Heatmap
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Top 40 by market cap · box size = market cap · color = today&apos;s % change · click to open
+              Top 100 by market cap · box size = market cap · color = today&apos;s % change · click to open
             </p>
           </div>
         </div>
