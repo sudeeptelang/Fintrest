@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fintrest.ai — v3 Score-First Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Ink stack — unchanged from v2 */
+  --ink-0:#FFFFFF; --ink-50:#FAFBFC; --ink-100:#F2F4F7; --ink-200:#E4E7EC;
+  --ink-300:#D0D5DD; --ink-400:#98A2B3; --ink-500:#667085; --ink-600:#475467;
+  --ink-700:#344054; --ink-800:#1D2939; --ink-900:#101828; --ink-950:#060C1A;
+
+  /* Brand (forest) — unchanged, NARROWED to chrome use only */
+  --forest:#0F4F3A; --forest-lt:#E8F1EC; --forest-dk:#0A3528;
+
+  /* NEW — Brand alt (light-blue), mocked for comparison */
+  --sky:#1E63B8; --sky-lt:#E7EFF9; --sky-dk:#154785;
+
+  /* Editorial accent — unchanged */
+  --rust:#B8502F; --rust-lt:#FBF0EA; --rust-dk:#8A3B1F;
+
+  /* Semantic performance — unchanged */
+  --up:#0A7F4F; --down:#6B5443;
+  --warn:#B25E09; --warn-lt:#FEF6E7; --danger:#912018;
+
+  /* NEW — content palette, 4 factor families */
+  --navy:#1E3A5F;   --navy-lt:#E7ECF3;    /* Technical: Momentum / Trend / Rel Volume */
+  --amber:#B8862F;  --amber-lt:#F9F1DE;   /* Fundamentals: Fundamentals / Valuation */
+  --plum:#6B3B5E;   --plum-lt:#F1E7EC;    /* Sentiment: Sentiment / News */
+  --teal:#2F7A7A;   --teal-lt:#E1EFEF;    /* Smart Money: Smart Money / Risk */
+
+  --e1:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  --e2:0 4px 8px rgba(16,24,40,.08),0 12px 24px rgba(16,24,40,.10);
+  --t:120ms ease-out;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',system-ui,sans-serif;font-size:14px;line-height:22px;color:var(--ink-900);background:var(--ink-100);-webkit-font-smoothing:antialiased}
+.mono{font-family:'DM Mono',monospace}
+.display{font-family:'Sora',sans-serif}
+
+/* ─── Top nav ─── */
+.navbar{position:sticky;top:0;z-index:100;background:var(--ink-950);color:var(--ink-0);padding:12px 24px;display:flex;align-items:center;gap:16px;box-shadow:var(--e1)}
+.navbar .brand{font-family:'Sora';font-weight:700;font-size:16px;letter-spacing:-.01em}
+.navbar .tabs{display:flex;gap:4px;margin-left:24px;flex-wrap:wrap}
+.navbar .tab{background:transparent;color:var(--ink-300);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:6px 14px;font-family:'DM Sans';font-weight:500;font-size:12px;cursor:pointer;transition:var(--t)}
+.navbar .tab:hover{background:rgba(255,255,255,.08);color:var(--ink-0)}
+.navbar .tab.active{background:var(--ink-0);color:var(--ink-900);border-color:var(--ink-0)}
+.navbar .ctx{margin-left:auto;font-size:11px;color:var(--ink-400);font-family:'DM Mono'}
+
+/* ─── Section shell ─── */
+section.scene{display:none;padding:48px 24px;max-width:1280px;margin:0 auto}
+section.scene.active{display:block}
+.scene > h1{font-family:'Sora';font-weight:700;font-size:28px;margin-bottom:8px;color:var(--ink-900)}
+.scene > .sub{font-size:14px;color:var(--ink-600);margin-bottom:40px;max-width:720px}
+.scene h2{font-family:'Sora';font-weight:600;font-size:20px;margin:40px 0 16px;color:var(--ink-900)}
+.scene h3{font-family:'Sora';font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-600);margin-bottom:12px}
+
+/* ─── Palette section ─── */
+.pal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+.swatch{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:8px;padding:16px;box-shadow:var(--e1)}
+.swatch .chip{height:80px;border-radius:6px;margin-bottom:12px}
+.swatch .name{font-weight:600;font-size:13px;color:var(--ink-900)}
+.swatch .hex{font-family:'DM Mono';font-size:11px;color:var(--ink-500);margin-top:2px}
+.swatch .role{font-size:11px;color:var(--ink-600);margin-top:8px;line-height:16px}
+
+.fam-legend{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:24px 0}
+.fam{padding:16px;border-radius:8px;border-left:3px solid}
+.fam.navy{background:var(--navy-lt);border-color:var(--navy)}
+.fam.amber{background:var(--amber-lt);border-color:var(--amber)}
+.fam.plum{background:var(--plum-lt);border-color:var(--plum)}
+.fam.teal{background:var(--teal-lt);border-color:var(--teal)}
+.fam .label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.fam.navy .label{color:var(--navy)}
+.fam.amber .label{color:var(--amber)}
+.fam.plum .label{color:var(--plum)}
+.fam.teal .label{color:var(--teal)}
+.fam .members{font-size:12px;color:var(--ink-700);line-height:18px}
+
+/* ─── Letter vs. numeric debate ─── */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:24px 0}
+.cmp{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:8px;padding:24px;text-align:center;box-shadow:var(--e1)}
+.cmp .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-500);margin-bottom:12px}
+.cmp .grade-a{display:inline-block;background:var(--up);color:var(--ink-0);font-family:'Sora';font-weight:700;font-size:56px;line-height:1;width:96px;height:96px;border-radius:16px;padding:20px 0}
+.cmp .score-num{font-family:'DM Mono';font-weight:500;font-size:56px;line-height:1;color:var(--ink-900)}
+.cmp .score-num .unit{color:var(--ink-500);font-size:24px;font-weight:400}
+.cmp .annot{font-size:12px;color:var(--ink-600);margin-top:16px;line-height:18px}
+
+/* ─── Phone frames ─── */
+.phones{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+.phone{width:390px;background:var(--ink-0);border:1px solid var(--ink-200);border-radius:24px;overflow:hidden;box-shadow:var(--e2)}
+.phone-chrome{background:var(--ink-0);padding:12px 16px;border-bottom:1px solid var(--ink-100);display:flex;align-items:center;gap:12px}
+.phone-chrome .logo{font-family:'Sora';font-weight:700;font-size:15px;color:var(--ink-900)}
+.phone-chrome .search{flex:1;background:var(--ink-100);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--ink-500)}
+.phone-chrome .avatar{width:28px;height:28px;border-radius:999px;background:var(--forest);color:var(--ink-0);display:grid;place-items:center;font-size:11px;font-weight:600}
+.phone-body{padding:16px}
+
+/* ─── Audit strip (NEW) ─── */
+.audit-strip{background:var(--ink-950);color:var(--ink-0);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.audit-strip .ptxt{font-size:12px;color:var(--ink-300);margin-bottom:2px}
+.audit-strip .pval{font-family:'DM Mono';font-weight:500;font-size:16px}
+.audit-strip .pval .win{color:var(--up)}
+.audit-strip .pval .lose{color:var(--ink-400)}
+.audit-strip .viewall{font-size:11px;color:var(--ink-300);text-decoration:underline;text-underline-offset:3px}
+
+/* ─── Overnight delta (NEW) ─── */
+.overnight{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:10px;padding:14px;margin-bottom:16px}
+.overnight h4{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-600);margin-bottom:10px}
+.overnight .deltas{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.overnight .delta{flex-shrink:0;background:var(--ink-50);border:1px solid var(--ink-200);border-radius:8px;padding:8px 12px;min-width:120px}
+.overnight .delta .k{font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em}
+.overnight .delta .v{font-family:'DM Mono';font-weight:500;font-size:14px;color:var(--ink-900);margin-top:2px}
+.overnight .delta.up .v{color:var(--up)}
+.overnight .delta.down .v{color:var(--down)}
+
+/* ─── Signal row (NEW — data-dense, score-first) ─── */
+.sig-list{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:10px;overflow:hidden}
+.sig-row{padding:14px 16px;border-bottom:1px solid var(--ink-100);display:block}
+.sig-row:last-child{border-bottom:none}
+.sig-row .top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.sig-row .logo{width:32px;height:32px;border-radius:6px;display:grid;place-items:center;font-weight:600;font-size:12px;color:var(--ink-0);flex-shrink:0}
+.sig-row .tk{font-family:'Sora';font-weight:700;font-size:15px;color:var(--ink-900);letter-spacing:-.01em}
+.sig-row .co{font-size:11px;color:var(--ink-500);margin-top:-2px}
+.sig-row .grade{margin-left:auto;display:flex;align-items:baseline;gap:6px}
+.sig-row .grade .letter{font-family:'Sora';font-weight:700;font-size:20px;color:var(--up);background:var(--ink-50);width:30px;height:30px;border-radius:6px;display:grid;place-items:center;line-height:1}
+.sig-row .grade .letter.b{color:var(--navy);background:var(--navy-lt)}
+.sig-row .grade .letter.c{color:var(--ink-600);background:var(--ink-100)}
+.sig-row .grade .num{font-family:'DM Mono';font-weight:500;font-size:13px;color:var(--ink-700)}
+.sig-row .grade .delta{font-family:'DM Mono';font-size:11px;color:var(--up)}
+.sig-row .grade .delta.neg{color:var(--down)}
+.sig-row .mid{display:flex;gap:12px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.sig-row .lvl{display:flex;gap:6px;align-items:center;font-family:'DM Mono';font-size:11px}
+.sig-row .lvl .lbl{color:var(--ink-500)}
+.sig-row .lvl .entry{color:var(--up)}
+.sig-row .lvl .target{color:var(--up)}
+.sig-row .lvl .stop{color:var(--down)}
+.sig-row .rr{background:var(--forest-lt);color:var(--forest-dk);font-weight:600;font-size:11px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'}
+.sig-row .bot{display:flex;justify-content:space-between;align-items:center}
+.sig-row .spark{height:20px;width:80px}
+.sig-row .runlens{background:var(--forest);color:var(--ink-0);font-size:11px;font-weight:600;padding:5px 10px;border-radius:6px;border:none;cursor:pointer}
+.sig-row .runlens:hover{background:var(--forest-dk)}
+
+/* Logos */
+.lg-ally{background:#6B2C91}
+.lg-plnr{background:#1B2B4A}
+.lg-meta{background:#1877F2}
+.lg-nvda{background:#76B900}
+.lg-aapl{background:#000000}
+.lg-ally2{background:#A0287C}
+
+/* ─── Ticker hero (NEW) ─── */
+.hero{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:12px;padding:18px;margin-bottom:16px}
+.hero .h-top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.hero .h-logo{width:48px;height:48px;border-radius:10px;display:grid;place-items:center;color:var(--ink-0);font-weight:700;font-size:16px}
+.hero .h-title .tk{font-family:'Sora';font-weight:700;font-size:22px;color:var(--ink-900)}
+.hero .h-title .co{font-size:12px;color:var(--ink-500)}
+.hero .h-actions{margin-left:auto;display:flex;gap:6px}
+.hero .h-actions button{background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);font-size:11px;font-weight:600;padding:6px 10px;border-radius:6px;cursor:pointer}
+.hero .h-actions .prim{background:var(--forest);color:var(--ink-0);border-color:var(--forest)}
+.hero .h-score{display:flex;gap:16px;align-items:center;padding:12px;background:var(--ink-50);border-radius:10px}
+.hero .h-letter{font-family:'Sora';font-weight:700;font-size:40px;background:var(--up);color:var(--ink-0);width:64px;height:64px;border-radius:12px;display:grid;place-items:center;line-height:1}
+.hero .h-meta .n{font-family:'DM Mono';font-weight:500;font-size:24px;color:var(--ink-900);line-height:1}
+.hero .h-meta .d{font-family:'DM Mono';font-size:12px;color:var(--up);margin-top:2px}
+.hero .h-meta .px{font-family:'DM Mono';font-size:13px;color:var(--ink-700);margin-top:8px}
+.hero .h-meta .px .ch{color:var(--up)}
+
+/* ─── Factor radar (NEW — family-tinted) ─── */
+.radar-card{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:12px;padding:18px;margin-bottom:16px}
+.radar-card h3{margin-bottom:12px}
+.radar-wrap{display:flex;gap:16px;align-items:center}
+.radar-svg{width:180px;height:180px;flex-shrink:0}
+.radar-legend{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:11px}
+.radar-legend .it{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.radar-legend .it .nm{color:var(--ink-700);font-weight:500}
+.radar-legend .it .vl{font-family:'DM Mono';font-weight:500;color:var(--ink-900)}
+.radar-legend .it::before{content:'';width:6px;height:6px;border-radius:999px;margin-right:4px;align-self:center}
+.radar-legend .it.navy::before{background:var(--navy)}
+.radar-legend .it.amber::before{background:var(--amber)}
+.radar-legend .it.plum::before{background:var(--plum)}
+.radar-legend .it.teal::before{background:var(--teal)}
+
+/* ─── What's driving today (NEW) ─── */
+.driving{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:10px;padding:14px;margin-bottom:16px}
+.driving h4{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-600);margin-bottom:10px}
+.driving .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.driving .chip{flex-shrink:0;border-radius:999px;padding:5px 10px;font-family:'DM Mono';font-size:11px;font-weight:500;border:1px solid;white-space:nowrap}
+.driving .chip.pos{background:var(--navy-lt);color:var(--navy);border-color:var(--navy)}
+.driving .chip.pos-amber{background:var(--amber-lt);color:var(--amber);border-color:var(--amber)}
+.driving .chip.pos-plum{background:var(--plum-lt);color:var(--plum);border-color:var(--plum)}
+.driving .chip.neg{background:var(--ink-50);color:var(--down);border-color:var(--ink-300)}
+
+/* ─── Lens thesis ─── */
+.lens{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:10px;padding:18px;margin-bottom:16px;border-left:2px solid var(--forest);padding-left:18px}
+.lens .eyb{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--forest-dk);font-weight:700;margin-bottom:8px}
+.lens .body{font-size:14px;line-height:22px;color:var(--ink-800)}
+.lens .foot{font-size:10px;color:var(--ink-500);font-style:italic;margin-top:12px}
+
+/* ─── Trade plan ─── */
+.trade{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:10px;padding:14px;margin-bottom:16px}
+.trade .row{display:flex;justify-content:space-between;gap:8px}
+.trade .col{flex:1;text-align:center;padding:8px 4px;border-radius:6px}
+.trade .col.entry{background:var(--forest-lt)}
+.trade .col.target{background:var(--forest-lt)}
+.trade .col.stop{background:var(--ink-50)}
+.trade .col .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-600);margin-bottom:4px}
+.trade .col.entry .lbl,.trade .col.target .lbl{color:var(--forest-dk)}
+.trade .col.stop .lbl{color:var(--down)}
+.trade .col .val{font-family:'DM Mono';font-weight:500;font-size:14px;color:var(--ink-900)}
+
+/* ─── Smart Money card ─── */
+.smoney{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:10px;padding:16px;margin-bottom:16px;border-left:3px solid var(--teal)}
+.smoney h3{display:flex;justify-content:space-between;align-items:center}
+.smoney h3 .sc{font-family:'DM Mono';color:var(--teal);font-weight:500;font-size:12px}
+.smoney .sub{padding:10px 0;border-bottom:1px solid var(--ink-100)}
+.smoney .sub:last-child{border-bottom:none}
+.smoney .sub .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.smoney .sub .nm{font-size:12px;font-weight:600;color:var(--ink-900)}
+.smoney .sub .vl{font-family:'DM Mono';font-size:13px;font-weight:500;color:var(--teal)}
+.smoney .sub .vl.empty{color:var(--ink-400)}
+.smoney .sub .ev{font-size:11px;color:var(--ink-700);line-height:16px}
+.smoney .sub .ev.pending{color:var(--ink-400);font-style:italic}
+.smoney .sub .bar{height:4px;background:var(--ink-100);border-radius:999px;margin:6px 0;overflow:hidden}
+.smoney .sub .bar .fill{height:100%;background:var(--teal);border-radius:999px}
+
+/* ─── Activity cards (congress + insider) ─── */
+.act{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:10px;padding:14px;margin-bottom:12px}
+.act h4{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--plum);margin-bottom:8px;font-weight:700}
+.act .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--ink-100);font-size:12px}
+.act .row:last-child{border-bottom:none}
+.act .row .who{color:var(--ink-800);font-weight:500}
+.act .row .wh{color:var(--ink-500);font-size:11px}
+.act .row .amt{font-family:'DM Mono';color:var(--up);font-weight:500}
+.act .row .amt.neg{color:var(--down)}
+
+/* ─── Research (desktop) ─── */
+.desktop{background:var(--ink-0);border:1px solid var(--ink-200);border-radius:12px;box-shadow:var(--e1);overflow:hidden}
+.desktop-chrome{background:var(--ink-950);color:var(--ink-0);padding:8px 20px;display:flex;align-items:center;gap:16px;font-size:12px}
+.desktop-chrome .pill{background:rgba(255,255,255,.08);padding:4px 10px;border-radius:6px;color:var(--ink-300)}
+.desktop-chrome .pill.active{background:var(--ink-0);color:var(--ink-900)}
+.mkstrip{display:grid;grid-template-columns:280px 1fr 280px;gap:0;padding:0;background:var(--ink-50);border-bottom:1px solid var(--ink-200)}
+.mkstrip .col{padding:16px 20px;border-right:1px solid var(--ink-200)}
+.mkstrip .col:last-child{border-right:none}
+.mkstrip h4{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-600);font-weight:700;margin-bottom:10px}
+.mkstrip .idx{display:flex;justify-content:space-between;padding:4px 0;font-size:12px}
+.mkstrip .idx .nm{color:var(--ink-700);font-weight:500}
+.mkstrip .idx .val{font-family:'DM Mono';color:var(--ink-900)}
+.mkstrip .idx .ch{font-family:'DM Mono';font-size:11px}
+.mkstrip .idx .ch.up{color:var(--up)}
+.mkstrip .idx .ch.dn{color:var(--down)}
+.mkstrip .chart{height:120px;position:relative;padding-top:24px}
+.mkstrip .chart-tabs{position:absolute;top:0;left:0;display:flex;gap:4px}
+.mkstrip .chart-tabs .t{font-size:10px;padding:2px 6px;color:var(--ink-500);cursor:pointer;border-radius:3px;font-family:'DM Mono';font-weight:500}
+.mkstrip .chart-tabs .t.active{background:var(--ink-900);color:var(--ink-0)}
+.mkstrip .news .item{padding:6px 0;border-bottom:1px solid var(--ink-200);font-size:11px;display:flex;gap:8px}
+.mkstrip .news .item:last-child{border-bottom:none}
+.mkstrip .news .item .ago{color:var(--ink-500);font-family:'DM Mono';flex-shrink:0;width:32px}
+.mkstrip .news .item .hl{color:var(--ink-800);line-height:15px}
+
+.movers{padding:20px}
+.movers-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.movers-head h3{font-size:13px;margin:0}
+.movers-tabs{display:flex;gap:6px}
+.movers-tabs .t{font-size:11px;padding:5px 10px;border:1px solid var(--ink-200);border-radius:999px;cursor:pointer;color:var(--ink-700);font-weight:500}
+.movers-tabs .t.active{background:var(--ink-900);color:var(--ink-0);border-color:var(--ink-900)}
+.mov-table{width:100%;border-collapse:collapse;font-size:12px}
+.mov-table th{text-align:left;padding:8px 12px;border-bottom:1px solid var(--ink-200);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-500);font-weight:600}
+.mov-table th.num{text-align:right}
+.mov-table td{padding:10px 12px;border-bottom:1px solid var(--ink-100);font-size:12px;vertical-align:middle}
+.mov-table td.num{text-align:right;font-family:'DM Mono'}
+.mov-table td .tksym{font-family:'Sora';font-weight:700;color:var(--ink-900);font-size:13px}
+.mov-table td .coname{font-size:11px;color:var(--ink-500)}
+.mov-table td .lgo{width:22px;height:22px;border-radius:4px;display:inline-grid;place-items:center;color:var(--ink-0);font-weight:600;font-size:10px;vertical-align:middle;margin-right:8px}
+.mov-table td.grade-cell{text-align:center}
+.mov-table td .g-letter{font-family:'Sora';font-weight:700;font-size:14px;background:var(--up);color:var(--ink-0);width:24px;height:24px;border-radius:4px;display:inline-grid;place-items:center;line-height:1}
+.mov-table td .g-letter.b{background:var(--navy)}
+.mov-table td .g-letter.c{background:var(--ink-500)}
+.mov-table td .act-btn{background:var(--forest);color:var(--ink-0);border:none;font-size:10px;padding:4px 8px;border-radius:4px;font-weight:600;cursor:pointer;margin-right:4px}
+.mov-table td .act-btn.secondary{background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800)}
+.mov-table td .ch.up{color:var(--up)}
+.mov-table td .ch.dn{color:var(--down)}
+
+/* ─── Callouts ─── */
+.note{background:var(--forest-lt);border-left:2px solid var(--forest);padding:12px 16px;border-radius:6px;font-size:13px;color:var(--forest-dk);margin:16px 0}
+.note strong{color:var(--forest-dk)}
+.qa{background:var(--ink-50);border:1px solid var(--ink-200);padding:16px;border-radius:8px;margin:16px 0;font-size:13px}
+.qa h4{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--rust-dk);margin-bottom:8px;font-weight:700}
+
+/* footer */
+.foot{text-align:center;padding:40px 20px 60px;color:var(--ink-500);font-size:12px}
+
+@media (max-width:820px){
+  .phones{flex-direction:column}
+  .compare-grid{grid-template-columns:1fr}
+  .fam-legend{grid-template-columns:repeat(2,1fr)}
+  .mkstrip{grid-template-columns:1fr}
+  .mkstrip .col{border-right:none;border-bottom:1px solid var(--ink-200)}
+}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <span class="brand">Fintrest.ai · v3 preview</span>
+  <div class="tabs">
+    <button class="tab active" data-s="palette">Palette</button>
+    <button class="tab" data-s="brand">Brand A/B</button>
+    <button class="tab" data-s="today">Today (mobile)</button>
+    <button class="tab" data-s="ticker">Ticker (mobile)</button>
+    <button class="tab" data-s="research">Research (desktop)</button>
+    <button class="tab" data-s="portfolio">Portfolio (mobile)</button>
+  </div>
+  <span class="ctx">score-first · mobile-first · 2026-04-24</span>
+</nav>
+
+<!-- ═════════════════════════════════════════════════════════════════
+     PALETTE
+     ═════════════════════════════════════════════════════════════════ -->
+<section class="scene active" id="palette">
+  <h1>Palette — two-layer system</h1>
+  <p class="sub">Brand forest stays for chrome (nav, logo, primary CTA, Lens gutter).
+  Content uses a new 4-family muted palette so the 8-factor breakdown, deep-dive rows,
+  and section washes get visual hierarchy back. Performance tokens (up/down) are unchanged.</p>
+
+  <h3>Brand — identity only</h3>
+  <div class="pal-grid">
+    <div class="swatch"><div class="chip" style="background:var(--forest)"></div><div class="name">forest</div><div class="hex">#0F4F3A</div><div class="role">Nav active · logo · primary CTA · Lens gutter</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--forest-dk)"></div><div class="name">forest-dark</div><div class="hex">#0A3528</div><div class="role">Hover / pressed state</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--forest-lt);border:1px solid var(--ink-200)"></div><div class="name">forest-light</div><div class="hex">#E8F1EC</div><div class="role">Entry/Target wash · subtle brand bg</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--rust)"></div><div class="name">rust</div><div class="hex">#B8502F</div><div class="role">Editorial accent (Lens editorial chip, board-of-day)</div></div>
+  </div>
+
+  <h3>Content — 4 factor families (NEW)</h3>
+  <div class="pal-grid">
+    <div class="swatch"><div class="chip" style="background:var(--navy)"></div><div class="name">navy</div><div class="hex">#1E3A5F</div><div class="role">Technical family: Momentum · Trend · Rel Volume</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--amber)"></div><div class="name">amber</div><div class="hex">#B8862F</div><div class="role">Fundamentals family: Fundamentals · Valuation</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--plum)"></div><div class="name">plum</div><div class="hex">#6B3B5E</div><div class="role">Sentiment family: Sentiment · News</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--teal)"></div><div class="name">teal</div><div class="hex">#2F7A7A</div><div class="role">Smart Money family: Smart Money · Risk</div></div>
+  </div>
+
+  <h3>Performance — semantic (unchanged)</h3>
+  <div class="pal-grid">
+    <div class="swatch"><div class="chip" style="background:var(--up)"></div><div class="name">up</div><div class="hex">#0A7F4F</div><div class="role">Stock went up · high score · bullish regime</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--down)"></div><div class="name">down</div><div class="hex">#6B5443</div><div class="role">Stock went down · warm gray-brown, never red</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--warn)"></div><div class="name">warn</div><div class="hex">#B25E09</div><div class="role">Low-confidence thesis · cautionary</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--danger)"></div><div class="name">danger</div><div class="hex">#912018</div><div class="role">Destructive actions ONLY — never performance</div></div>
+  </div>
+
+  <h2>Factor-family mapping in context</h2>
+  <p class="sub">Each bar in the 8-factor breakdown is tinted by its family — eight identical green bars become four two-factor groups the eye can scan.</p>
+  <div class="fam-legend">
+    <div class="fam navy"><div class="label">Technical</div><div class="members">Momentum · Trend · Rel Volume</div></div>
+    <div class="fam amber"><div class="label">Fundamentals</div><div class="members">Fundamentals · Valuation</div></div>
+    <div class="fam plum"><div class="label">Sentiment</div><div class="members">Sentiment · News / Catalyst</div></div>
+    <div class="fam teal"><div class="label">Smart Money</div><div class="members">Smart Money · Risk</div></div>
+  </div>
+
+  <h2>Open question — letter grade vs. 0–100?</h2>
+  <p class="sub">WallStreetZen collapses to A–F. Danelfin uses 1–10. We use 0–100. Letter is scannable; number is granular. Side-by-side below; our recommendation is <strong>dual display</strong> (letter for the glance, number for the drill-down).</p>
+  <div class="compare-grid">
+    <div class="cmp">
+      <div class="eyebrow">Letter grade (WallStreetZen style)</div>
+      <div class="grade-a">A</div>
+      <div class="annot">Instant, scannable. "ALLY is an A." Doesn't survive the first tap — if A covers 85-100, all A's look the same.</div>
+    </div>
+    <div class="cmp">
+      <div class="eyebrow">0–100 (current Fintrest)</div>
+      <div class="score-num">87<span class="unit">/100</span></div>
+      <div class="annot">Granular. Lets a score of 87 feel different from 72 or 91. Harder to glance.</div>
+    </div>
+  </div>
+  <div class="note"><strong>Proposed resolution:</strong> show both. Letter on list rows + heatmap (glance context). Number on ticker detail + signal cards (analysis context). Letter band = A (85+) · B (70–84) · C (55–69) · D (40–54) · F (&lt;40).</div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════
+     BRAND A/B — forest vs. light blue
+     ═════════════════════════════════════════════════════════════════ -->
+<section class="scene" id="brand">
+  <h1>Brand A/B — Forest vs. Light Blue</h1>
+  <p class="sub">The "too green" concern deserves a live test, not a vibe check.
+  Same hero, two brands. Forest = editorial/warm/differentiated.
+  Sky blue = finance-default/trust/conventional. Look at both, then decide.</p>
+
+  <div class="phones">
+    <!-- FOREST (current) -->
+    <div class="phone">
+      <div class="phone-chrome" style="background:var(--ink-0);border-bottom:2px solid var(--forest)">
+        <span class="logo" style="color:var(--forest)">Fintrest</span>
+        <div class="search">/ search</div>
+        <div class="avatar" style="background:var(--forest)">ST</div>
+      </div>
+      <div class="phone-body">
+        <div style="text-align:center;padding:8px 0 16px">
+          <span style="background:var(--forest-lt);color:var(--forest-dk);font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:.08em">Variant A · Forest (current)</span>
+        </div>
+        <div class="hero" style="border-color:var(--forest-lt)">
+          <div class="h-top">
+            <div class="h-logo lg-ally">A</div>
+            <div class="h-title"><div class="tk">ALLY</div><div class="co">Ally Financial Inc.</div></div>
+            <div class="h-actions">
+              <button class="prim" style="background:var(--forest);border-color:var(--forest)">＋ Pin</button>
+            </div>
+          </div>
+          <div class="h-score" style="background:var(--forest-lt)">
+            <div class="h-letter" style="background:var(--up)">A</div>
+            <div class="h-meta">
+              <div class="n">87<span style="color:var(--ink-500);font-size:14px">/100</span></div>
+              <div class="d">+4 vs. yesterday</div>
+              <div class="px">$34.82 <span class="ch">+0.62 (+1.81%)</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="lens" style="border-left-color:var(--forest)">
+          <div class="eyb" style="color:var(--forest-dk)">Lens · thesis</div>
+          <div class="body">News +12 on the Q1 EPS beat. Momentum cleared the 50-day.
+          CFO bought $2.4M — largest disclosed purchase since 2023.</div>
+          <div class="foot">Research only — your decision.</div>
+        </div>
+        <button style="width:100%;background:var(--forest);color:var(--ink-0);border:none;padding:14px;border-radius:8px;font-weight:600;font-size:13px;margin-top:8px">View full analysis</button>
+        <div style="font-size:11px;color:var(--ink-600);text-align:center;margin-top:12px;padding:12px;background:var(--forest-lt);border-radius:6px;line-height:16px">
+          <strong style="color:var(--forest-dk)">Read:</strong> warm, editorial, "not another trading app."
+          Moleskine-adjacent. Differentiated but unfamiliar in the finance category.
+        </div>
+      </div>
+    </div>
+
+    <!-- SKY BLUE (alternate) -->
+    <div class="phone">
+      <div class="phone-chrome" style="background:var(--ink-0);border-bottom:2px solid var(--sky)">
+        <span class="logo" style="color:var(--sky)">Fintrest</span>
+        <div class="search">/ search</div>
+        <div class="avatar" style="background:var(--sky)">ST</div>
+      </div>
+      <div class="phone-body">
+        <div style="text-align:center;padding:8px 0 16px">
+          <span style="background:var(--sky-lt);color:var(--sky-dk);font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:.08em">Variant B · Sky Blue (alt)</span>
+        </div>
+        <div class="hero" style="border-color:var(--sky-lt)">
+          <div class="h-top">
+            <div class="h-logo lg-ally">A</div>
+            <div class="h-title"><div class="tk">ALLY</div><div class="co">Ally Financial Inc.</div></div>
+            <div class="h-actions">
+              <button class="prim" style="background:var(--sky);border-color:var(--sky)">＋ Pin</button>
+            </div>
+          </div>
+          <div class="h-score" style="background:var(--sky-lt)">
+            <div class="h-letter" style="background:var(--up)">A</div>
+            <div class="h-meta">
+              <div class="n">87<span style="color:var(--ink-500);font-size:14px">/100</span></div>
+              <div class="d">+4 vs. yesterday</div>
+              <div class="px">$34.82 <span class="ch">+0.62 (+1.81%)</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="lens" style="border-left-color:var(--sky)">
+          <div class="eyb" style="color:var(--sky-dk)">Lens · thesis</div>
+          <div class="body">News +12 on the Q1 EPS beat. Momentum cleared the 50-day.
+          CFO bought $2.4M — largest disclosed purchase since 2023.</div>
+          <div class="foot">Research only — your decision.</div>
+        </div>
+        <button style="width:100%;background:var(--sky);color:var(--ink-0);border:none;padding:14px;border-radius:8px;font-weight:600;font-size:13px;margin-top:8px">View full analysis</button>
+        <div style="font-size:11px;color:var(--ink-600);text-align:center;margin-top:12px;padding:12px;background:var(--sky-lt);border-radius:6px;line-height:16px">
+          <strong style="color:var(--sky-dk)">Read:</strong> institutional, trustworthy, finance-default.
+          Schwab / Morgan Stanley / Fidelity lineage. Safer for first-time visitors;
+          blends into the category.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="qa">
+    <h4>Decision framework</h4>
+    <p>① If paywall conversion matters more than category differentiation → <strong>blue</strong>.
+    Finance is blue because users decide on "can I trust this?" in 2 seconds, and blue has 40 years of trust equity.<br>
+    ② If brand / editorial voice matters more (Lens is the product) → <strong>forest</strong>.
+    Forest is what sets Fintrest apart visually; changing it means the "Moleskine of finance" framing dies.<br>
+    ③ <strong>Hybrid (my recommendation):</strong> keep forest as brand, adopt the 4-family content palette from the Palette tab.
+    Visual gravity returns without burning differentiation. Re-test after shipping the palette expansion — if "too green" persists, revisit the rebrand.</p>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════
+     TODAY — MOBILE
+     ═════════════════════════════════════════════════════════════════ -->
+<section class="scene" id="today">
+  <h1>Today — mobile-first 390 px</h1>
+  <p class="sub">Morning briefing structure: Audit proof strip → "What changed overnight" → data-dense signal rows with logos, dual-display score, R:R, inline Run Lens. No verdict badge dominating; the score leads.</p>
+
+  <div class="phones">
+    <div class="phone">
+      <div class="phone-chrome">
+        <span class="logo">Fintrest</span>
+        <div class="search">/ search</div>
+        <div class="avatar">ST</div>
+      </div>
+      <div class="phone-body">
+
+        <div class="audit-strip">
+          <div>
+            <div class="ptxt">Track record · this week</div>
+            <div class="pval"><span class="win">7 wins</span> · <span class="lose">2 losses</span> · 78% hit rate</div>
+          </div>
+          <a class="viewall">View all →</a>
+        </div>
+
+        <div class="overnight">
+          <h4>What changed overnight</h4>
+          <div class="deltas">
+            <div class="delta up"><div class="k">Added</div><div class="v">+5 signals</div></div>
+            <div class="delta down"><div class="k">Fell off</div><div class="v">−3 signals</div></div>
+            <div class="delta up"><div class="k">Biggest jump</div><div class="v">PLTR +12</div></div>
+            <div class="delta down"><div class="k">Biggest drop</div><div class="v">COIN −8</div></div>
+          </div>
+        </div>
+
+        <h3 style="margin:16px 0 8px;font-size:11px;color:var(--ink-600);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Today's signals · 12</h3>
+
+        <div class="sig-list">
+
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo lg-ally">A</div>
+              <div>
+                <div class="tk">ALLY</div>
+                <div class="co">Ally Financial</div>
+              </div>
+              <div class="grade">
+                <div class="letter">A</div>
+                <div>
+                  <div class="num">87</div>
+                  <div class="delta">+4</div>
+                </div>
+              </div>
+            </div>
+            <div class="mid">
+              <div class="lvl"><span class="lbl">Entry</span><span class="entry">34.20</span></div>
+              <div class="lvl"><span class="lbl">Target</span><span class="target">38.50</span></div>
+              <div class="lvl"><span class="lbl">Stop</span><span class="stop">32.80</span></div>
+              <span class="rr">R:R 3.1</span>
+            </div>
+            <div class="bot">
+              <svg class="spark" viewBox="0 0 80 20"><polyline fill="none" stroke="#0A7F4F" stroke-width="1.5" points="0,14 10,13 20,15 30,11 40,9 50,10 60,6 70,5 80,3"/></svg>
+              <button class="runlens">↗ Run Lens</button>
+            </div>
+          </div>
+
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo lg-plnr">P</div>
+              <div>
+                <div class="tk">PLTR</div>
+                <div class="co">Palantir Technologies</div>
+              </div>
+              <div class="grade">
+                <div class="letter">A</div>
+                <div>
+                  <div class="num">84</div>
+                  <div class="delta">+12</div>
+                </div>
+              </div>
+            </div>
+            <div class="mid">
+              <div class="lvl"><span class="lbl">Entry</span><span class="entry">26.10</span></div>
+              <div class="lvl"><span class="lbl">Target</span><span class="target">31.50</span></div>
+              <div class="lvl"><span class="lbl">Stop</span><span class="stop">24.90</span></div>
+              <span class="rr">R:R 4.5</span>
+            </div>
+            <div class="bot">
+              <svg class="spark" viewBox="0 0 80 20"><polyline fill="none" stroke="#0A7F4F" stroke-width="1.5" points="0,16 10,15 20,12 30,13 40,10 50,6 60,5 70,4 80,2"/></svg>
+              <button class="runlens">↗ Run Lens</button>
+            </div>
+          </div>
+
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo lg-nvda">N</div>
+              <div>
+                <div class="tk">NVDA</div>
+                <div class="co">NVIDIA Corp</div>
+              </div>
+              <div class="grade">
+                <div class="letter b">B</div>
+                <div>
+                  <div class="num">76</div>
+                  <div class="delta neg">−2</div>
+                </div>
+              </div>
+            </div>
+            <div class="mid">
+              <div class="lvl"><span class="lbl">Entry</span><span class="entry">462.00</span></div>
+              <div class="lvl"><span class="lbl">Target</span><span class="target">498.00</span></div>
+              <div class="lvl"><span class="lbl">Stop</span><span class="stop">448.00</span></div>
+              <span class="rr">R:R 2.6</span>
+            </div>
+            <div class="bot">
+              <svg class="spark" viewBox="0 0 80 20"><polyline fill="none" stroke="#475467" stroke-width="1.5" points="0,8 10,7 20,6 30,8 40,7 50,9 60,10 70,11 80,10"/></svg>
+              <button class="runlens">↗ Run Lens</button>
+            </div>
+          </div>
+
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo lg-meta">M</div>
+              <div>
+                <div class="tk">META</div>
+                <div class="co">Meta Platforms</div>
+              </div>
+              <div class="grade">
+                <div class="letter c">C</div>
+                <div>
+                  <div class="num">62</div>
+                  <div class="delta neg">−5</div>
+                </div>
+              </div>
+            </div>
+            <div class="mid">
+              <div class="lvl"><span class="lbl">Entry</span><span class="entry">510.00</span></div>
+              <div class="lvl"><span class="lbl">Target</span><span class="target">545.00</span></div>
+              <div class="lvl"><span class="lbl">Stop</span><span class="stop">495.00</span></div>
+              <span class="rr">R:R 2.3</span>
+            </div>
+            <div class="bot">
+              <svg class="spark" viewBox="0 0 80 20"><polyline fill="none" stroke="#475467" stroke-width="1.5" points="0,5 10,6 20,7 30,9 40,8 50,10 60,11 70,12 80,13"/></svg>
+              <button class="runlens">↗ Run Lens</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="qa">
+    <h4>What's different from v2</h4>
+    <p>① BUY/WATCH/AVOID badge is gone — the letter grade (A–F) carries the verdict AND is scannable.
+    ② Score + delta sits in the row's top-right slot, visually equal to the letter.
+    ③ Row is three lines: identity + score / levels + R:R / sparkline + Run Lens. At 390 px nothing truncates.
+    ④ Stock logos anchor the scan. ⑤ "Run Lens" is the monetization primitive — free tier gets 3/day.</p>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════
+     TICKER — MOBILE
+     ═════════════════════════════════════════════════════════════════ -->
+<section class="scene" id="ticker">
+  <h1>Ticker detail — /stock/ALLY at 390 px</h1>
+  <p class="sub">New stack: Hero (logo + letter + score + price) → 8-factor <strong>radar</strong> with family tinting →
+  "What's driving today" chips → Lens thesis → Trade plan → Smart Money sub-card → Congress / Insider activity cards.
+  Lens explains the number; it doesn't sit parallel to it.</p>
+
+  <div class="phones">
+    <div class="phone">
+      <div class="phone-chrome">
+        <span class="logo">Fintrest</span>
+        <div class="search">← back · ALLY</div>
+        <div class="avatar">ST</div>
+      </div>
+      <div class="phone-body">
+
+        <!-- Hero -->
+        <div class="hero">
+          <div class="h-top">
+            <div class="h-logo lg-ally">A</div>
+            <div class="h-title">
+              <div class="tk">ALLY</div>
+              <div class="co">Ally Financial Inc.</div>
+            </div>
+            <div class="h-actions">
+              <button class="prim">＋ Pin</button>
+              <button>★</button>
+              <button>🔔</button>
+            </div>
+          </div>
+          <div class="h-score">
+            <div class="h-letter">A</div>
+            <div class="h-meta">
+              <div class="n">87<span style="color:var(--ink-500);font-size:14px">/100</span></div>
+              <div class="d">+4 vs. yesterday</div>
+              <div class="px">$34.82 <span class="ch">+0.62 (+1.81%)</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Factor radar -->
+        <div class="radar-card">
+          <h3>8-factor breakdown</h3>
+          <div class="radar-wrap">
+            <svg class="radar-svg" viewBox="0 0 200 200">
+              <!-- Grid -->
+              <g stroke="#E4E7EC" fill="none" stroke-width="1">
+                <polygon points="100,20 161,55 161,145 100,180 39,145 39,55"/>
+                <polygon points="100,40 144,65 144,135 100,160 56,135 56,65"/>
+                <polygon points="100,60 127,75 127,125 100,140 73,125 73,75"/>
+              </g>
+              <!-- Spokes -->
+              <g stroke="#E4E7EC" stroke-width="1">
+                <line x1="100" y1="100" x2="100" y2="20"/>
+                <line x1="100" y1="100" x2="161" y2="55"/>
+                <line x1="100" y1="100" x2="161" y2="145"/>
+                <line x1="100" y1="100" x2="100" y2="180"/>
+                <line x1="100" y1="100" x2="39" y2="145"/>
+                <line x1="100" y1="100" x2="39" y2="55"/>
+              </g>
+              <!-- Shape (6-axis avg — mom/trend/news/fund/val/risk weighted A-grade) -->
+              <polygon points="100,28 148,60 152,140 100,172 48,140 52,58"
+                fill="#0A7F4F" fill-opacity=".12" stroke="#0A7F4F" stroke-width="2"/>
+              <!-- Factor dots, family tinted -->
+              <circle cx="100" cy="28" r="4" fill="#1E3A5F"/>   <!-- Momentum (navy) -->
+              <circle cx="148" cy="60" r="4" fill="#1E3A5F"/>   <!-- Trend (navy) -->
+              <circle cx="152" cy="140" r="4" fill="#B8862F"/>  <!-- Fundamentals (amber) -->
+              <circle cx="100" cy="172" r="4" fill="#6B3B5E"/>  <!-- Sentiment (plum) -->
+              <circle cx="48" cy="140" r="4" fill="#2F7A7A"/>   <!-- Smart Money (teal) -->
+              <circle cx="52" cy="58" r="4" fill="#2F7A7A"/>    <!-- Risk (teal) -->
+            </svg>
+            <div class="radar-legend">
+              <div class="it navy"><span class="nm">Momentum</span><span class="vl">82</span></div>
+              <div class="it navy"><span class="nm">Trend</span><span class="vl">78</span></div>
+              <div class="it navy"><span class="nm">Rel Volume</span><span class="vl">74</span></div>
+              <div class="it amber"><span class="nm">Fundamentals</span><span class="vl">71</span></div>
+              <div class="it amber"><span class="nm">Valuation</span><span class="vl">66</span></div>
+              <div class="it plum"><span class="nm">Sentiment</span><span class="vl">58</span></div>
+              <div class="it plum"><span class="nm">News</span><span class="vl">82</span></div>
+              <div class="it teal"><span class="nm">Smart Money</span><span class="vl">74</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- What's driving today -->
+        <div class="driving">
+          <h4>What's driving today · +4</h4>
+          <div class="chips">
+            <div class="chip pos-plum">News +12</div>
+            <div class="chip pos">Momentum +8</div>
+            <div class="chip pos">Trend +3</div>
+            <div class="chip neg">Risk −5</div>
+            <div class="chip pos-amber">Valuation +1</div>
+          </div>
+        </div>
+
+        <!-- Lens thesis -->
+        <div class="lens">
+          <div class="eyb">Lens · thesis</div>
+          <div class="body">ALLY's composite pushed to 87 today on a News +12 from the Q1 EPS beat,
+          compounded by momentum (+8) as price cleared the 50-day. Smart Money at 74 —
+          the CFO bought $2.4M on 2026-04-18, largest disclosed purchase since records
+          begin (2023-05-12). Risk ticks down −5 as implied volatility spiked pre-earnings;
+          the stop at 32.80 sits just below the 20-day low.</div>
+          <div class="foot">Research only — your decision. Educational content, not financial advice.</div>
+        </div>
+
+        <!-- Trade plan -->
+        <div class="trade">
+          <div class="row">
+            <div class="col entry">
+              <div class="lbl">▲ Entry</div>
+              <div class="val">34.20</div>
+            </div>
+            <div class="col target">
+              <div class="lbl">▲ Target</div>
+              <div class="val">38.50</div>
+            </div>
+            <div class="col stop">
+              <div class="lbl">▼ Stop</div>
+              <div class="val">32.80</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Smart Money -->
+        <div class="smoney">
+          <h3>Smart Money · <span class="sc">74 composite</span></h3>
+          <div class="sub">
+            <div class="top"><div class="nm">Insider activity · 35% weight</div><div class="vl">82</div></div>
+            <div class="bar"><div class="fill" style="width:82%"></div></div>
+            <div class="ev">CFO Jane Doe bought $2.4M — largest purchase since records begin (2023-05-12).</div>
+          </div>
+          <div class="sub">
+            <div class="top"><div class="nm">Institutional flow · 25% weight</div><div class="vl empty">—</div></div>
+            <div class="ev pending">13F ingestion lands with Smart Money phase 2.</div>
+          </div>
+          <div class="sub">
+            <div class="top"><div class="nm">Options positioning · 15% weight</div><div class="vl empty">—</div></div>
+            <div class="ev pending">Phase 3 — paid feed deferred until Pro revenue justifies.</div>
+          </div>
+          <div class="sub">
+            <div class="top"><div class="nm">Congressional · 15% weight</div><div class="vl empty">—</div></div>
+            <div class="ev pending">Quiver integration lands with phase 2.</div>
+          </div>
+          <div class="sub">
+            <div class="top"><div class="nm">Short dynamics · 10% weight</div><div class="vl empty">—</div></div>
+            <div class="ev pending">FMP short-interest fetch queued for phase 2.</div>
+          </div>
+        </div>
+
+        <!-- Congress activity card (NEW — pulled from old /congress page) -->
+        <div class="act">
+          <h4>Congressional trades on ALLY</h4>
+          <div class="row">
+            <div>
+              <div class="who">Rep. Thompson (D-CA)</div>
+              <div class="wh">Purchase · 04/12/2026 · $50K–$100K</div>
+            </div>
+            <div class="amt">buy</div>
+          </div>
+          <div class="row">
+            <div>
+              <div class="who">Sen. Collins (R-ME)</div>
+              <div class="wh">Purchase · 03/24/2026 · $15K–$50K</div>
+            </div>
+            <div class="amt">buy</div>
+          </div>
+        </div>
+
+        <!-- Insider activity card (NEW) -->
+        <div class="act">
+          <h4>Recent insider activity</h4>
+          <div class="row">
+            <div>
+              <div class="who">Jane Doe, CFO</div>
+              <div class="wh">Open-market buy · 04/18/2026</div>
+            </div>
+            <div class="amt">+$2.4M</div>
+          </div>
+          <div class="row">
+            <div>
+              <div class="who">John Smith, Director</div>
+              <div class="wh">Open-market buy · 04/10/2026</div>
+            </div>
+            <div class="amt">+$180K</div>
+          </div>
+          <div class="row">
+            <div>
+              <div class="who">Sarah Lee, SVP</div>
+              <div class="wh">Option exercise · 03/28/2026</div>
+            </div>
+            <div class="amt neg">−$45K</div>
+          </div>
+        </div>
+
+        <div class="note">
+          Below this point sits the <strong>deep-dive accordion</strong>: Price chart ·
+          Fundamentals · Valuation · News · Analyst ratings · Ownership · Peers.
+          All collapsed by default.
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════
+     RESEARCH — DESKTOP
+     ═════════════════════════════════════════════════════════════════ -->
+<section class="scene" id="research">
+  <h1>Research — desktop, merged Markets + Screener</h1>
+  <p class="sub">Markets strip on top (indices + chart + latest news — the Google Finance pattern from the reference PDF),
+  movers grid below with tabs + inline "Run Lens" + "+ Watchlist" actions per row.
+  <strong>/congress and /insiders are killed</strong> — their data now lives on ticker detail only.</p>
+
+  <div class="desktop">
+    <div class="desktop-chrome">
+      <span>Fintrest.ai</span>
+      <span class="pill">Today</span>
+      <span class="pill active">Research</span>
+      <span class="pill">Portfolio</span>
+      <span class="pill">Audit log</span>
+      <span style="margin-left:auto;color:var(--ink-400)">Screener · Sectors · Heatmap · Calendars</span>
+    </div>
+
+    <!-- Markets strip -->
+    <div class="mkstrip">
+      <div class="col">
+        <h4>US indices</h4>
+        <div class="idx"><span class="nm">S&amp;P 500</span><span class="val">5,428.14</span><span class="ch up">+0.42%</span></div>
+        <div class="idx"><span class="nm">Nasdaq 100</span><span class="val">18,872.01</span><span class="ch up">+0.81%</span></div>
+        <div class="idx"><span class="nm">Dow</span><span class="val">39,214.88</span><span class="ch dn">−0.12%</span></div>
+        <div class="idx"><span class="nm">Russell 2000</span><span class="val">2,124.56</span><span class="ch up">+0.31%</span></div>
+        <div class="idx"><span class="nm">VIX</span><span class="val">14.82</span><span class="ch dn">−2.14%</span></div>
+        <div class="idx"><span class="nm">10Y Treasury</span><span class="val">4.218%</span><span class="ch up">+1.2 bp</span></div>
+      </div>
+      <div class="col">
+        <div class="chart">
+          <div class="chart-tabs">
+            <span class="t active">1D</span><span class="t">5D</span><span class="t">1M</span>
+            <span class="t">6M</span><span class="t">YTD</span><span class="t">1Y</span>
+            <span class="t">5Y</span><span class="t">MAX</span>
+          </div>
+          <svg viewBox="0 0 400 80" preserveAspectRatio="none" style="width:100%;height:90px">
+            <defs>
+              <linearGradient id="gr" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#0A7F4F" stop-opacity=".2"/>
+                <stop offset="100%" stop-color="#0A7F4F" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,60 L30,55 L60,50 L90,58 L120,45 L150,40 L180,42 L210,35 L240,30 L270,28 L300,25 L330,20 L360,18 L400,15 L400,80 L0,80 Z" fill="url(#gr)"/>
+            <polyline fill="none" stroke="#0A7F4F" stroke-width="1.6"
+              points="0,60 30,55 60,50 90,58 120,45 150,40 180,42 210,35 240,30 270,28 300,25 330,20 360,18 400,15"/>
+          </svg>
+        </div>
+      </div>
+      <div class="col">
+        <h4>Latest news</h4>
+        <div class="news">
+          <div class="item"><span class="ago">New</span><span class="hl">Fed minutes signal dovish pivot — rate cuts pushed to Q3</span></div>
+          <div class="item"><span class="ago">1m</span><span class="hl">AAPL guides Q2 revenue 4% above consensus</span></div>
+          <div class="item"><span class="ago">12m</span><span class="hl">NVDA files for H200 accelerator shipment ramp</span></div>
+          <div class="item"><span class="ago">28m</span><span class="hl">PLTR wins $800M DoD contract extension</span></div>
+          <div class="item"><span class="ago">45m</span><span class="hl">Oil sinks 2% on surprise US inventory build</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Movers grid -->
+    <div class="movers">
+      <div class="movers-head">
+        <h3 style="font-size:14px">Market movers</h3>
+        <div class="movers-tabs">
+          <span class="t active">Top Gainers</span>
+          <span class="t">Top Losers</span>
+          <span class="t">52wk High</span>
+          <span class="t">52wk Low</span>
+          <span class="t">Prev. Day</span>
+          <span class="t">All Sectors ▾</span>
+        </div>
+      </div>
+      <table class="mov-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th class="num">Price</th>
+            <th class="num">%Change</th>
+            <th class="num">M-Cap</th>
+            <th>Sector</th>
+            <th style="text-align:center">Score</th>
+            <th style="text-align:center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="lgo lg-plnr">P</span><span class="tksym">PLTR</span><div class="coname" style="margin-left:30px">Palantir Technologies</div></td>
+            <td class="num">28.42</td>
+            <td class="num"><span class="ch up">+22.92%</span></td>
+            <td class="num">62.05B</td>
+            <td>Technology</td>
+            <td class="grade-cell"><span class="g-letter">A</span></td>
+            <td class="num"><button class="act-btn">↗ Run Lens</button><button class="act-btn secondary">＋</button></td>
+          </tr>
+          <tr>
+            <td><span class="lgo lg-ally">A</span><span class="tksym">ALLY</span><div class="coname" style="margin-left:30px">Ally Financial</div></td>
+            <td class="num">34.82</td>
+            <td class="num"><span class="ch up">+1.81%</span></td>
+            <td class="num">10.54B</td>
+            <td>Financials</td>
+            <td class="grade-cell"><span class="g-letter">A</span></td>
+            <td class="num"><button class="act-btn">↗ Run Lens</button><button class="act-btn secondary">＋</button></td>
+          </tr>
+          <tr>
+            <td><span class="lgo lg-nvda">N</span><span class="tksym">NVDA</span><div class="coname" style="margin-left:30px">NVIDIA Corp</div></td>
+            <td class="num">478.28</td>
+            <td class="num"><span class="ch dn">−6.22%</span></td>
+            <td class="num">1.18T</td>
+            <td>Technology</td>
+            <td class="grade-cell"><span class="g-letter b">B</span></td>
+            <td class="num"><button class="act-btn">↗ Run Lens</button><button class="act-btn secondary">＋</button></td>
+          </tr>
+          <tr>
+            <td><span class="lgo lg-meta">M</span><span class="tksym">META</span><div class="coname" style="margin-left:30px">Meta Platforms</div></td>
+            <td class="num">518.94</td>
+            <td class="num"><span class="ch dn">−1.14%</span></td>
+            <td class="num">1.32T</td>
+            <td>Communications</td>
+            <td class="grade-cell"><span class="g-letter c">C</span></td>
+            <td class="num"><button class="act-btn">↗ Run Lens</button><button class="act-btn secondary">＋</button></td>
+          </tr>
+          <tr>
+            <td><span class="lgo lg-aapl">A</span><span class="tksym">AAPL</span><div class="coname" style="margin-left:30px">Apple Inc.</div></td>
+            <td class="num">189.47</td>
+            <td class="num"><span class="ch up">+0.72%</span></td>
+            <td class="num">2.92T</td>
+            <td>Technology</td>
+            <td class="grade-cell"><span class="g-letter b">B</span></td>
+            <td class="num"><button class="act-btn">↗ Run Lens</button><button class="act-btn secondary">＋</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Score heatmap (NEW — tint by composite, not price) -->
+  <div class="desktop" style="margin-top:24px">
+    <div class="desktop-chrome">
+      <span>Score heatmap</span>
+      <span class="pill">By score</span>
+      <span class="pill active">Size weighted</span>
+      <span style="margin-left:auto;color:var(--ink-400)">S&amp;P 500 · tinted by composite (not price %)</span>
+    </div>
+    <div style="padding:16px;display:grid;grid-template-columns:repeat(12,1fr);gap:4px;background:var(--ink-100)">
+      <!-- Row of tiles, tinted by score band -->
+      <div style="background:#0A7F4F;color:#fff;padding:10px;border-radius:4px;grid-column:span 3">
+        <div style="font-family:Sora;font-weight:700;font-size:14px">AAPL</div>
+        <div style="font-family:'DM Mono';font-size:11px;opacity:.85">A · 87</div>
+      </div>
+      <div style="background:#0A7F4F;color:#fff;padding:10px;border-radius:4px;grid-column:span 3">
+        <div style="font-family:Sora;font-weight:700;font-size:14px">MSFT</div>
+        <div style="font-family:'DM Mono';font-size:11px;opacity:.85">A · 91</div>
+      </div>
+      <div style="background:#49A677;color:#fff;padding:10px;border-radius:4px;grid-column:span 2">
+        <div style="font-family:Sora;font-weight:700;font-size:14px">GOOGL</div>
+        <div style="font-family:'DM Mono';font-size:11px;opacity:.85">B · 78</div>
+      </div>
+      <div style="background:#49A677;color:#fff;padding:10px;border-radius:4px;grid-column:span 2">
+        <div style="font-family:Sora;font-weight:700;font-size:14px">AMZN</div>
+        <div style="font-family:'DM Mono';font-size:11px;opacity:.85">B · 74</div>
+      </div>
+      <div style="background:#1E3A5F;color:#fff;padding:10px;border-radius:4px;grid-column:span 2">
+        <div style="font-family:Sora;font-weight:700;font-size:14px">NVDA</div>
+        <div style="font-family:'DM Mono';font-size:11px;opacity:.85">B · 76</div>
+      </div>
+      <div style="background:#0A7F4F;color:#fff;padding:10px;border-radius:4px;grid-column:span 2">
+        <div style="font-family:Sora;font-weight:700;font-size:14px">PLTR</div>
+        <div style="font-family:'DM Mono';font-size:11px;opacity:.85">A · 84</div>
+      </div>
+      <div style="background:#B8862F;color:#fff;padding:10px;border-radius:4px;grid-column:span 2">
+        <div style="font-family:Sora;font-weight:700;font-size:14px">META</div>
+        <div style="font-family:'DM Mono';font-size:11px;opacity:.85">C · 62</div>
+      </div>
+      <div style="background:#667085;color:#fff;padding:10px;border-radius:4px;grid-column:span 2">
+        <div style="font-family:Sora;font-weight:700;font-size:14px">TSLA</div>
+        <div style="font-family:'DM Mono';font-size:11px;opacity:.85">D · 48</div>
+      </div>
+      <div style="background:#49A677;color:#fff;padding:10px;border-radius:4px;grid-column:span 2">
+        <div style="font-family:Sora;font-weight:700;font-size:14px">ALLY</div>
+        <div style="font-family:'DM Mono';font-size:11px;opacity:.85">A · 87</div>
+      </div>
+      <div style="background:#6B5443;color:#fff;padding:10px;border-radius:4px;grid-column:span 2">
+        <div style="font-family:Sora;font-weight:700;font-size:14px">COIN</div>
+        <div style="font-family:'DM Mono';font-size:11px;opacity:.85">F · 38</div>
+      </div>
+    </div>
+    <div style="padding:12px 16px;background:var(--ink-50);border-top:1px solid var(--ink-200);display:flex;gap:16px;align-items:center;font-size:11px;color:var(--ink-600)">
+      <span>Legend:</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#0A7F4F;border-radius:2px"></span>A (85+)</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#49A677;border-radius:2px"></span>B (70–84)</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#B8862F;border-radius:2px"></span>C (55–69)</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#667085;border-radius:2px"></span>D (40–54)</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#6B5443;border-radius:2px"></span>F (&lt;40)</span>
+    </div>
+  </div>
+
+  <!-- Earnings calendar refresh (NEW — reference PDF two-column Pre/Post/Mkt/Est) -->
+  <div class="desktop" style="margin-top:24px">
+    <div class="desktop-chrome">
+      <span>Earnings calendar</span>
+      <span style="margin-left:auto;color:var(--ink-400)">Next 7 days · notable by market cap</span>
+    </div>
+    <div style="padding:16px">
+      <div style="font-size:12px;color:var(--ink-600);margin-bottom:12px">Earnings on notable stocks and stocks that you follow</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr><th style="text-align:left;padding:8px 0;color:var(--ink-500);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Upcoming · notable</th><th style="text-align:right;padding:8px 0;color:var(--ink-500);font-size:10px">M-Cap</th><th style="text-align:right;padding:8px 0;color:var(--ink-500);font-size:10px">Report date</th></tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:8px 0;border-top:1px solid var(--ink-100)"><span class="tksym" style="color:var(--sky)">PG</span> <span class="coname" style="margin-left:6px">Procter &amp; Gamble</span></td><td style="text-align:right;font-family:'DM Mono'">338.63B</td><td style="text-align:right;font-family:'DM Mono'"><span style="color:var(--ink-500)">Pre:</span> 04/24</td></tr>
+            <tr><td style="padding:8px 0;border-top:1px solid var(--ink-100)"><span class="tksym" style="color:var(--sky)">V</span> <span class="coname" style="margin-left:6px">Visa Inc.</span></td><td style="text-align:right;font-family:'DM Mono'">588.6B</td><td style="text-align:right;font-family:'DM Mono'"><span style="color:var(--ink-500)">Post:</span> 04/28</td></tr>
+            <tr><td style="padding:8px 0;border-top:1px solid var(--ink-100)"><span class="tksym" style="color:var(--sky)">KO</span> <span class="coname" style="margin-left:6px">Coca-Cola</span></td><td style="text-align:right;font-family:'DM Mono'">328.32B</td><td style="text-align:right;font-family:'DM Mono'"><span style="color:var(--ink-500)">Pre:</span> 04/28</td></tr>
+            <tr><td style="padding:8px 0;border-top:1px solid var(--ink-100)"><span class="tksym" style="color:var(--sky)">NVS</span> <span class="coname" style="margin-left:6px">Novartis AG</span></td><td style="text-align:right;font-family:'DM Mono'">282.19B</td><td style="text-align:right;font-family:'DM Mono'"><span style="color:var(--warn)">Mkt:</span> 04/28</td></tr>
+            <tr><td style="padding:8px 0;border-top:1px solid var(--ink-100)"><span class="tksym" style="color:var(--sky)">TMUS</span> <span class="coname" style="margin-left:6px">T-Mobile US</span></td><td style="text-align:right;font-family:'DM Mono'">213.84B</td><td style="text-align:right;font-family:'DM Mono'"><span style="color:var(--ink-500)">Post:</span> 04/28</td></tr>
+          </tbody>
+        </table>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr><th style="text-align:left;padding:8px 0;color:var(--ink-500);font-size:10px;text-transform:uppercase;letter-spacing:.08em">Upcoming · notable</th><th style="text-align:right;padding:8px 0;color:var(--ink-500);font-size:10px">M-Cap</th><th style="text-align:right;padding:8px 0;color:var(--ink-500);font-size:10px">Report date</th></tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:8px 0;border-top:1px solid var(--ink-100)"><span class="tksym" style="color:var(--sky)">AZN</span> <span class="coname" style="margin-left:6px">AstraZeneca PLC</span></td><td style="text-align:right;font-family:'DM Mono'">302.71B</td><td style="text-align:right;font-family:'DM Mono'"><span style="color:var(--ink-600)">Est:</span> 04/29</td></tr>
+            <tr><td style="padding:8px 0;border-top:1px solid var(--ink-100)"><span class="tksym" style="color:var(--sky)">AAPL</span> <span class="coname" style="margin-left:6px">Apple Inc.</span></td><td style="text-align:right;font-family:'DM Mono'">2.92T</td><td style="text-align:right;font-family:'DM Mono'"><span style="color:var(--ink-500)">Post:</span> 04/30</td></tr>
+            <tr><td style="padding:8px 0;border-top:1px solid var(--ink-100)"><span class="tksym" style="color:var(--sky)">LLY</span> <span class="coname" style="margin-left:6px">Eli Lilly and Company</span></td><td style="text-align:right;font-family:'DM Mono'">821.13B</td><td style="text-align:right;font-family:'DM Mono'"><span style="color:var(--warn)">Mkt:</span> 04/30</td></tr>
+            <tr><td style="padding:8px 0;border-top:1px solid var(--ink-100)"><span class="tksym" style="color:var(--sky)">MA</span> <span class="coname" style="margin-left:6px">Mastercard Inc.</span></td><td style="text-align:right;font-family:'DM Mono'">448.03B</td><td style="text-align:right;font-family:'DM Mono'"><span style="color:var(--warn)">Mkt:</span> 04/30</td></tr>
+            <tr><td style="padding:8px 0;border-top:1px solid var(--ink-100)"><span class="tksym" style="color:var(--sky)">CAT</span> <span class="coname" style="margin-left:6px">Caterpillar Inc.</span></td><td style="text-align:right;font-family:'DM Mono'">388.63B</td><td style="text-align:right;font-family:'DM Mono'"><span style="color:var(--ink-500)">Pre:</span> 04/30</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:var(--ink-500);margin-top:12px;display:flex;gap:16px">
+        <span><span style="color:var(--ink-500)">Pre:</span> before open</span>
+        <span><span style="color:var(--ink-500)">Post:</span> after close</span>
+        <span><span style="color:var(--warn)">Mkt:</span> during session</span>
+        <span><span style="color:var(--ink-600)">Est:</span> estimated date</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="qa">
+    <h4>What's different from v2 Markets</h4>
+    <p>① Three-column Markets strip (indices · chart · latest news) instead of scattered widgets.
+    ② "AI Research / Run Lens" inline per row — every grid is a monetization surface.
+    ③ Letter grade in the Score column so you can scan 50 rows for A's in under 5 seconds.
+    ④ Congress / Insider widgets are GONE from here — pulled to ticker detail.
+    ⑤ Score heatmap tints by composite (A green → F warm-gray), not price. Product reinforcement on every glance.
+    ⑥ Earnings calendar picks up the reference-PDF two-column Pre/Post/Mkt/Est pattern.</p>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════
+     PORTFOLIO — MOBILE
+     ═════════════════════════════════════════════════════════════════ -->
+<section class="scene" id="portfolio">
+  <h1>Portfolio — with an aggregate score</h1>
+  <p class="sub">If every stock has a score, the user's portfolio does too.
+  "Your portfolio is a B+ / 78. Up +4 this week." That turns Portfolio
+  from a holdings table into an ongoing verdict — the hook that makes
+  it worth a primary nav slot.</p>
+
+  <div class="phones">
+    <div class="phone">
+      <div class="phone-chrome">
+        <span class="logo">Fintrest</span>
+        <div class="search">Portfolio · $142,430</div>
+        <div class="avatar">ST</div>
+      </div>
+      <div class="phone-body">
+
+        <!-- Aggregate score hero -->
+        <div class="hero">
+          <div class="h-top">
+            <div class="h-logo" style="background:var(--teal);color:var(--ink-0)">Σ</div>
+            <div class="h-title">
+              <div class="tk">Your portfolio</div>
+              <div class="co">12 holdings · $142,430</div>
+            </div>
+            <div class="h-actions">
+              <button>⟲ Rebalance</button>
+            </div>
+          </div>
+          <div class="h-score">
+            <div class="h-letter" style="background:var(--navy)">B</div>
+            <div class="h-meta">
+              <div class="n">78<span style="color:var(--ink-500);font-size:14px">/100</span></div>
+              <div class="d">+4 vs. last week</div>
+              <div class="px">Returns: <span class="ch">+$6,218 (+4.58%) 30d</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Composition strip -->
+        <div class="driving">
+          <h4>Composition · score band mix</h4>
+          <div style="display:flex;height:12px;border-radius:4px;overflow:hidden;margin-bottom:10px">
+            <div style="background:var(--up);width:32%" title="A · 32%"></div>
+            <div style="background:#49A677;width:41%" title="B · 41%"></div>
+            <div style="background:var(--amber);width:18%" title="C · 18%"></div>
+            <div style="background:var(--ink-500);width:9%" title="D · 9%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-family:'DM Mono';font-size:11px;color:var(--ink-700)">
+            <span><span style="color:var(--up)">■</span> A · 32%</span>
+            <span style="color:#49A677">■ B · 41%</span>
+            <span><span style="color:var(--amber)">■</span> C · 18%</span>
+            <span><span style="color:var(--ink-500)">■</span> D · 9%</span>
+          </div>
+          <div style="font-size:11px;color:var(--ink-600);margin-top:10px;line-height:16px">
+            <strong>Lens note:</strong> 73% of your book sits in A/B quality. TSLA (D·48) is the biggest drag —
+            worth a re-score check.
+          </div>
+        </div>
+
+        <!-- Holdings list (compressed signal rows) -->
+        <h3 style="margin:16px 0 8px;font-size:11px;color:var(--ink-600);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Holdings · sorted by score</h3>
+        <div class="sig-list">
+
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo lg-aapl">A</div>
+              <div><div class="tk">AAPL</div><div class="co">200 sh · $37,894</div></div>
+              <div class="grade">
+                <div class="letter">A</div>
+                <div><div class="num">91</div><div class="delta">+2</div></div>
+              </div>
+            </div>
+            <div class="bot">
+              <svg class="spark" viewBox="0 0 80 20"><polyline fill="none" stroke="#0A7F4F" stroke-width="1.5" points="0,12 10,11 20,10 30,8 40,7 50,6 60,5 70,4 80,3"/></svg>
+              <span style="font-family:'DM Mono';font-size:11px;color:var(--up)">+$1,214 (3.3%)</span>
+            </div>
+          </div>
+
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo lg-ally">A</div>
+              <div><div class="tk">ALLY</div><div class="co">500 sh · $17,410</div></div>
+              <div class="grade">
+                <div class="letter">A</div>
+                <div><div class="num">87</div><div class="delta">+4</div></div>
+              </div>
+            </div>
+            <div class="bot">
+              <svg class="spark" viewBox="0 0 80 20"><polyline fill="none" stroke="#0A7F4F" stroke-width="1.5" points="0,14 10,13 20,15 30,11 40,9 50,10 60,6 70,5 80,3"/></svg>
+              <span style="font-family:'DM Mono';font-size:11px;color:var(--up)">+$892 (5.4%)</span>
+            </div>
+          </div>
+
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo lg-nvda">N</div>
+              <div><div class="tk">NVDA</div><div class="co">50 sh · $23,914</div></div>
+              <div class="grade">
+                <div class="letter b">B</div>
+                <div><div class="num">76</div><div class="delta neg">−2</div></div>
+              </div>
+            </div>
+            <div class="bot">
+              <svg class="spark" viewBox="0 0 80 20"><polyline fill="none" stroke="#475467" stroke-width="1.5" points="0,8 10,7 20,6 30,8 40,7 50,9 60,10 70,11 80,10"/></svg>
+              <span style="font-family:'DM Mono';font-size:11px;color:var(--down)">−$318 (−1.3%)</span>
+            </div>
+          </div>
+
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo" style="background:#CC0000">T</div>
+              <div><div class="tk">TSLA</div><div class="co">40 sh · $8,420</div></div>
+              <div class="grade">
+                <div class="letter" style="background:var(--ink-100);color:var(--ink-600)">D</div>
+                <div><div class="num">48</div><div class="delta neg">−6</div></div>
+              </div>
+            </div>
+            <div class="bot">
+              <svg class="spark" viewBox="0 0 80 20"><polyline fill="none" stroke="#6B5443" stroke-width="1.5" points="0,4 10,5 20,7 30,8 40,10 50,12 60,13 70,14 80,16"/></svg>
+              <span style="font-family:'DM Mono';font-size:11px;color:var(--down)">−$612 (−6.8%)</span>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="note" style="margin-top:16px">
+          <strong>New surface:</strong> "What would improve your score?" — suggests trims to D-graded positions and
+          entries from today's A-grade signals. Respects compliance: surfaces ideas, doesn't allocate.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="qa">
+    <h4>Why Portfolio earns a primary-nav slot now</h4>
+    <p>The portfolio score + delta turns the page from a passive holdings table into a daily
+    verdict — "your book is a B+ and rising." That's a reason to open the app even when there
+    are no new signals. Composition band chart shows *quality* mix, not just return — the same
+    lens Simply Wall St uses for their Snowflake, but at the portfolio level. Trims/entries
+    footer keeps us advice-adjacent without crossing into RIA territory.</p>
+  </div>
+</section>
+
+<div class="foot">Fintrest.ai v3 preview · 2026-04-24 · docs/UX_AUDIT.md · docs/COMPETITORS.md</div>
+
+<script>
+  document.querySelectorAll('.navbar .tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.navbar .tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('section.scene').forEach(s=>s.classList.remove('active'));
+      document.getElementById(btn.dataset.s).classList.add('active');
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  });
+</script>
+
+</body>
+</html>
