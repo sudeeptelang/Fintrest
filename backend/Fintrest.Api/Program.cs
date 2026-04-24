@@ -237,6 +237,14 @@ builder.Services.AddHostedService(sp =>
 // no new ingest, no cron. Scoped because it reads DbContext.
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.CongressSignalService>();
 
+// Intraday market-data refresh — fires at noon ET + 4:15 PM ET
+// weekdays for the top 500 active tickers (bars-only). Without this,
+// Movers tabs show stale prices all day. Admin endpoint
+// /admin/ingest/top-caps still works for on-demand refresh.
+builder.Services.AddSingleton<Fintrest.Api.Services.Ingestion.BarsRefreshJob>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<Fintrest.Api.Services.Ingestion.BarsRefreshJob>());
+
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
