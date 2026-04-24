@@ -188,14 +188,40 @@ public class ScanOrchestrator(
             // ─────────────────────────────────────────────────────────────
             var publishable = new List<ScoredSignal>();
 
-            var buySignals = scoredSignals
+            // BUY_TODAY: must clear composite threshold (handled by the
+            // classifier) AND pass the R:R gate AND have supporting
+            // evidence — news flow, insider buying, or a filed catalyst.
+            // A high composite without any real-world validator is a
+            // WATCH, not a BUY. Prevents the "everything is a BUY"
+            // compression when the scored universe is pre-filtered for
+            // quality.
+            var buyCandidates = scoredSignals
                 .Where(s => s.SignalType == "BUY_TODAY"
                          && s.RiskRewardRatio.HasValue
                          && s.RiskRewardRatio.Value >= _options.Thresholds.MinRiskReward)
                 .ToList();
 
+            var buySignals = new List<ScoredSignal>();
+            var demotedToWatch = new List<ScoredSignal>();
+            var demoteReasons = new Dictionary<string, int>();
+            foreach (var s in buyCandidates)
+            {
+                var (passes, reason) = _options.Thresholds.PassesBuyConfirmation(s.Breakdown, s.Provenance);
+                if (passes)
+                {
+                    buySignals.Add(s);
+                }
+                else
+                {
+                    demotedToWatch.Add(s);
+                    if (reason is not null)
+                        demoteReasons[reason] = demoteReasons.GetValueOrDefault(reason) + 1;
+                }
+            }
+
             var watchSignals = scoredSignals
                 .Where(s => s.SignalType == "WATCH" && s.EntryLow.HasValue)
+                .Concat(demotedToWatch) // demoted BUY_TODAY rows without confirmation
                 .Take(_options.Thresholds.MaxWatchSignals)
                 .ToList();
 
@@ -203,8 +229,11 @@ public class ScanOrchestrator(
             publishable.AddRange(watchSignals);
 
             logger.LogInformation(
-                "Publishing {Buy} BUY_TODAY + {Watch} WATCH signals (filtered from {Total} scored)",
-                buySignals.Count, watchSignals.Count, scoredSignals.Count);
+                "Publishing {Buy} BUY_TODAY + {Watch} WATCH signals " +
+                "(filtered from {Total} scored; {Demoted} BUY candidates demoted). " +
+                "Demote reasons: {Reasons}",
+                buySignals.Count, watchSignals.Count, scoredSignals.Count, demotedToWatch.Count,
+                string.Join(", ", demoteReasons.Select(kv => $"{kv.Key}={kv.Value}")));
 
             // 5. Persist signals + breakdowns
             foreach (var scored in publishable)
