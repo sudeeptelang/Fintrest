@@ -433,3 +433,11 @@ export function useAdminIngestTopCaps() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
   });
 }
+
+export function useAdminRecentScans(limit: number = 10) {
+  return useQuery({
+    queryKey: ["admin-recent-scans", limit],
+    queryFn: () => api.adminRecentScans(limit),
+    staleTime: 1000 * 60 * 2, // 2 min
+  });
+}

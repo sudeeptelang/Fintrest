@@ -379,6 +379,33 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         });
     }
 
+    /// <summary>Last N scan runs — powers the admin Overview
+    /// "Recent Scan Runs" table. Returns full timestamps so the UI
+    /// can render datetime, not just a time-of-day.</summary>
+    [HttpGet("scans/recent")]
+    public async Task<IActionResult> RecentScans([FromQuery] int limit = 10, CancellationToken ct = default)
+    {
+        limit = Math.Clamp(limit, 1, 100);
+        var rows = await db.ScanRuns
+            .AsNoTracking()
+            .OrderByDescending(s => s.StartedAt)
+            .Take(limit)
+            .Select(s => new
+            {
+                id = s.Id,
+                startedAt = s.StartedAt,
+                completedAt = s.CompletedAt,
+                signalsGenerated = s.SignalsGenerated,
+                status = s.Status,
+                durationMs = s.CompletedAt.HasValue
+                    ? (long?)(s.CompletedAt.Value - s.StartedAt).TotalMilliseconds
+                    : null,
+            })
+            .ToListAsync(ct);
+
+        return Ok(new { scans = rows });
+    }
+
     /// <summary>Refresh the intraday live-quotes cache for the top-N
     /// active stocks. One FMP /quote call batched internally, ~5-15 sec
     /// wall-clock even at count=500. Auto-runs every 15 min during

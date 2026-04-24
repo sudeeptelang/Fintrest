@@ -933,7 +933,18 @@ export const api = {
     authFetchApi<unknown>(`/admin/quotes/refresh?count=${count}`, { method: "POST" }),
   adminIngestTopCaps: (count = 100) =>
     authFetchApi<unknown>(`/admin/ingest/top-caps?count=${count}`, { method: "POST" }),
+  adminRecentScans: (limit = 10) =>
+    authFetchApi<{ scans: AdminRecentScan[] }>(`/admin/scans/recent?limit=${limit}`),
 };
+
+export interface AdminRecentScan {
+  id: number;
+  startedAt: string;
+  completedAt: string | null;
+  signalsGenerated: number;
+  status: string;
+  durationMs: number | null;
+}
 
 // --- Admin Types ---
 
