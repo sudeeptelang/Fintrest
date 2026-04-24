@@ -260,15 +260,14 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     [HttpGet("market/screener")]
     public async Task<ActionResult<List<ScreenerRowResponse>>> Screener([FromQuery] int limit = 50)
     {
-        // Get latest scan's signals (for score + signal type)
+        // Get latest scan's signals (for score + signal type). Fetched unfiltered —
+        // we attach them to whatever universe we assemble below.
         var latestScan = await db.ScanRuns.Where(s => s.Status == "COMPLETED")
             .OrderByDescending(s => s.CompletedAt).FirstOrDefaultAsync();
 
         var signalsByStock = latestScan is not null
             ? await db.Signals
                 .Where(s => s.ScanRunId == latestScan.Id)
-                .OrderByDescending(s => s.ScoreTotal)
-                .Take(limit)
                 .ToDictionaryAsync(s => s.StockId, s => new
                 {
                     s.ScoreTotal,
@@ -279,24 +278,24 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 })
             : new();
 
-        // If no scan has completed yet, fall back to top-N active stocks by market cap so
-        // screeners (gainers/losers/penny/etc.) still have data to filter. Signal fields
-        // will be null for these rows.
-        List<long> stockIds;
-        if (signalsByStock.Count == 0)
-        {
-            stockIds = await db.Stocks
-                .Where(s => s.Active)
-                .OrderByDescending(s => s.MarketCap ?? 0)
-                .Take(limit)
-                .Select(s => s.Id)
-                .ToListAsync();
-            if (stockIds.Count == 0) return Ok(new List<ScreenerRowResponse>());
-        }
-        else
-        {
-            stockIds = signalsByStock.Keys.ToList();
-        }
+        // Universe = top N active stocks by market cap, UNION with all stocks
+        // that have a signal on the latest scan. Previously we only returned
+        // rows that had a signal, which meant big movers (MU/AMD/INTC and
+        // friends) silently disappeared from the screener when they didn't
+        // clear the signal bar. Now every large-cap shows up with changePct
+        // populated; signal fields stay null for rows without a signal.
+        var topCapIds = await db.Stocks
+            .Where(s => s.Active)
+            .OrderByDescending(s => s.MarketCap ?? 0)
+            .Take(limit)
+            .Select(s => s.Id)
+            .ToListAsync();
+
+        var stockIds = topCapIds
+            .Concat(signalsByStock.Keys.Where(k => !topCapIds.Contains(k)))
+            .ToList();
+
+        if (stockIds.Count == 0) return Ok(new List<ScreenerRowResponse>());
 
         // Load stocks (has TTM metrics: Beta, Forward P/E, PEG, ROE, ROA, analyst target, next earnings)
         var stocks = await db.Stocks
