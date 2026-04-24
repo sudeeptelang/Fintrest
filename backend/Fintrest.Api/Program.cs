@@ -224,8 +224,13 @@ builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Scoring.InsiderScoreJob>());
 
 // Smart Money Phase 2 — FMP short-interest feed + derived sub-score.
-// No cron yet; data refreshes via /admin/short-interest/ingest.
+// ShortInterestJob fires 7:00 PM ET weekdays across the active
+// universe (capped at 1500 tickers per run); admin endpoint
+// /admin/short-interest/ingest still works for ticker-scoped triggers.
 builder.Services.AddScoped<Fintrest.Api.Services.Scoring.ShortInterestService>();
+builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.ShortInterestJob>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<Fintrest.Api.Services.Scoring.ShortInterestJob>());
 
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
