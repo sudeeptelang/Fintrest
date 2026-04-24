@@ -306,6 +306,24 @@ export interface IpoCalendarItem {
   marketCap: number | null;
 }
 
+// Smart Money (phase 1) per-ticker composite. Mirrors InsiderScoreResponse
+// on the backend — see MarketController.GetInsiderScore. Null-shaped fields
+// are present when the feed returned no qualifying activity.
+export interface InsiderScore {
+  ticker: string;
+  asOfDate: string;
+  score: number;
+  netDollarFlow30d: number | null;
+  clusterCount30d: number | null;
+  officerBuyCount: number | null;
+  directorBuyCount: number | null;
+  largestPurchaseValue: number | null;
+  largestPurchaserName: string | null;
+  largestPurchaserTitle: string | null;
+  largestPurchaserHistoryNote: string | null;
+  methodologyVersion: string;
+}
+
 export interface MarketIndex {
   ticker: string;
   label: string;
@@ -536,6 +554,15 @@ export const api = {
   marketNews: (limit = 10) => fetchApi<NewsItem[]>(`/market/news?limit=${limit}`),
   marketScreener: (limit = 50) => fetchApi<ScreenerRow[]>(`/market/screener?limit=${limit}`),
   marketInsidersLatest: (limit = 50) => authFetchApi<InsiderActivity[]>(`/market/insiders/latest?limit=${limit}`),
+  marketInsiderScore: async (ticker: string): Promise<InsiderScore | null> => {
+    // GET /market/insider-score/{ticker} returns 204 when there's no qualifying
+    // activity in the 30-day window. Treat that as null — the sub-card renders
+    // the "no recent insider buying" empty state.
+    const res = await fetch(`${API_BASE}/market/insider-score/${ticker}`);
+    if (res.status === 204) return null;
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    return res.json();
+  },
   marketCongressLatest: (limit = 50) => authFetchApi<CongressTradeRow[]>(`/market/congress/latest?limit=${limit}`),
   topPicks: (limit = 12) => fetchApi<SignalListResponse>(`/picks/top-today?limit=${limit}`),
   swingWeek: () => fetchApi<SignalListResponse>("/picks/swing-week"),

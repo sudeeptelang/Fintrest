@@ -935,6 +935,43 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
+    /// <summary>
+    /// Per-ticker Smart Money score card. Reads the most recent row from
+    /// insider_scores — produced nightly by InsiderScoreJob. Returns 204
+    /// when no qualifying insider buying has been recorded in the trailing
+    /// 30-day window (UI then renders "No recent insider buying").
+    /// Public because the card lives on the ticker detail page.
+    /// </summary>
+    [HttpGet("market/insider-score/{ticker}")]
+    public async Task<ActionResult<InsiderScoreResponse>> GetInsiderScore(string ticker)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+
+        var row = await db.InsiderScores
+            .AsNoTracking()
+            .Where(s => s.Ticker == normalized)
+            .OrderByDescending(s => s.AsOfDate)
+            .FirstOrDefaultAsync();
+
+        if (row is null) return NoContent();
+
+        return Ok(new InsiderScoreResponse(
+            row.Ticker,
+            row.AsOfDate,
+            row.Score,
+            row.NetDollarFlow30d,
+            row.ClusterCount30d,
+            row.OfficerBuyCount,
+            row.DirectorBuyCount,
+            row.LargestPurchaseValue,
+            row.LargestPurchaserName,
+            row.LargestPurchaserTitle,
+            row.LargestPurchaserHistoryNote,
+            row.MethodologyVersion
+        ));
+    }
+
     [Authorize]
     [RequiresPlan(PlanType.Pro)]
     [HttpGet("market/congress/latest")]

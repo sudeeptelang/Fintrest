@@ -203,6 +203,27 @@ public record CongressTradeItem(
     string? SourceUrl
 );
 
+/// <summary>
+/// Smart Money sub-card payload. Renders the composite score bar + the
+/// single-strongest open-market buy in the 30-day window with a Lens-
+/// style evidence line. A null response means there's no qualifying
+/// insider activity in the window (show "No recent insider buying").
+/// </summary>
+public record InsiderScoreResponse(
+    string Ticker,
+    DateTime AsOfDate,
+    decimal Score,
+    decimal? NetDollarFlow30d,
+    int? ClusterCount30d,
+    int? OfficerBuyCount,
+    int? DirectorBuyCount,
+    decimal? LargestPurchaseValue,
+    string? LargestPurchaserName,
+    string? LargestPurchaserTitle,
+    string? LargestPurchaserHistoryNote,
+    string MethodologyVersion
+);
+
 public record StockSnapshotResponse(
     // Identity
     string Ticker,

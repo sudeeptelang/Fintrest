@@ -15,6 +15,7 @@ import {
   useWatchlists,
   useAddWatchlistItem,
   useCreateWatchlist,
+  useInsiderScore,
 } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -36,6 +37,7 @@ import { PerformanceChart } from "@/components/charts/performance-chart";
 import { EarningsHistory } from "@/components/stock/earnings-history";
 import { EarningsChart } from "@/components/charts/earnings-chart";
 import { OwnershipStrip } from "@/components/stock/ownership-strip";
+import type { InsiderScore } from "@/lib/api";
 import {
   buildTakeaways,
   buildTradePlanBullets,
@@ -77,6 +79,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { data: chartData } = useStockChart(ticker, chartRange);
   const { data: earnings } = useStockEarnings(ticker);
   const { data: ownership } = useStockOwnership(ticker);
+  const { data: insiderScore } = useInsiderScore(ticker);
   const { data: watchlists } = useWatchlists();
   const addToWatchlist = useAddWatchlistItem();
   const createWatchlist = useCreateWatchlist();
@@ -95,10 +98,12 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const tradePlanBullets = signal ? buildTradePlanBullets({ signal, thesis }) : [];
   const tradePlanNote = signal ? getTradePlanNarrative(signal, thesis) : null;
 
-  // Smart Money sub-signals — §14.9. Until the phased feeds ship, scores are
-  // null and each row renders with its source/staleness in the honest
-  // "pending feed" state.
-  const smartMoneySignals: SmartMoneySubSignal[] = buildPlaceholderSmartMoney();
+  // Smart Money sub-signals — §14.9. Phase 1 (insider) is live; phases 2+3
+  // (institutional, options, congress, short) still show their honest
+  // "pending feed" state until the feeds ship.
+  const smartMoneySignals: SmartMoneySubSignal[] = buildPlaceholderSmartMoney().map((row) =>
+    row.key === "insider" ? hydrateInsiderRow(row, insiderScore ?? null) : row,
+  );
   const smartMoneyComposite = computeSmartMoneyComposite(smartMoneySignals);
 
   function scrollToSmartMoney() {
@@ -484,6 +489,34 @@ function computeSmartMoneyComposite(signals: SmartMoneySubSignal[]): number | nu
   if (totalWeight === 0) return null;
   const weighted = populated.reduce((acc, s) => acc + (s.score ?? 0) * s.weightPct, 0);
   return weighted / totalWeight;
+}
+
+// Swap the pending "insider" row for a live one when the nightly job has
+// posted a score. The evidence line assembles the single strongest
+// open-market buy + pre-computed history note so the row reads like the
+// Lens evidence sentences everywhere else (e.g. "CFO Jane Doe bought
+// $2.4M — largest purchase since records begin (2023-05-12)").
+function hydrateInsiderRow(row: SmartMoneySubSignal, score: InsiderScore | null): SmartMoneySubSignal {
+  if (!score) {
+    return { ...row, evidence: null, pendingMessage: "No qualifying insider buying in the last 30 days." };
+  }
+  const title = score.largestPurchaserTitle ?? "Insider";
+  const name = score.largestPurchaserName ?? "an insider";
+  const dollars = formatDollarsShort(score.largestPurchaseValue);
+  const history = score.largestPurchaserHistoryNote;
+  const evidence = dollars
+    ? `${title} ${name} bought ${dollars}${history ? ` — ${history}` : ""}.`
+    : `${score.clusterCount30d ?? 0} insider(s) bought in the last 30 days${history ? ` — ${history}` : ""}.`;
+  return { ...row, score: Number(score.score), evidence };
+}
+
+function formatDollarsShort(v: number | null | undefined): string | null {
+  if (v == null || v === 0) return null;
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
+  return `$${v.toFixed(0)}`;
 }
 
 function formatVolumeShort(v: number | null | undefined): string | undefined {

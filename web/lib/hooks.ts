@@ -155,6 +155,16 @@ export function useInsidersLatest(limit = 100) {
   return useQuery({ queryKey: ["market-insiders", limit], queryFn: () => api.marketInsidersLatest(limit) });
 }
 
+export function useInsiderScore(ticker: string) {
+  return useQuery({
+    queryKey: ["market-insider-score", ticker.toUpperCase()],
+    queryFn: () => api.marketInsiderScore(ticker.toUpperCase()),
+    enabled: !!ticker,
+    // Recomputed nightly at 8:45 PM ET — safe to cache aggressively.
+    staleTime: 1000 * 60 * 60, // 1 hour
+  });
+}
+
 export function useCongressLatest(limit = 100) {
   return useQuery({ queryKey: ["market-congress", limit], queryFn: () => api.marketCongressLatest(limit) });
 }
