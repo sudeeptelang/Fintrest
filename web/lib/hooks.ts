@@ -255,6 +255,16 @@ export function useScoreHistoryBulk(tickers: string[], days = 30) {
   });
 }
 
+export function usePeers(ticker: string) {
+  return useQuery({
+    queryKey: ["market-peers", ticker.toUpperCase()],
+    queryFn: () => api.marketPeers(ticker.toUpperCase()),
+    enabled: !!ticker,
+    // Peer lists rarely change; cache for a long time.
+    staleTime: 1000 * 60 * 60 * 24, // 24 hours
+  });
+}
+
 export function useAnalystRevisions(ticker: string, days = 30) {
   return useQuery({
     queryKey: ["market-analyst-revisions", ticker.toUpperCase(), days],

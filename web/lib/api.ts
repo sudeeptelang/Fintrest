@@ -336,6 +336,25 @@ export interface IpoCalendarItem {
   marketCap: number | null;
 }
 
+// Peer comparison set — FMP peers enriched with our own signal score
+// and live price. Powers the Compare Mode card.
+export interface PeersResponse {
+  ticker: string;
+  peerCount: number;
+  peers: PeerRow[];
+}
+
+export interface PeerRow {
+  ticker: string;
+  name: string | null;
+  sector: string | null;
+  marketCap: number | null;
+  price: number | null;
+  changePct: number | null;
+  score: number | null;
+  inUniverse: boolean;
+}
+
 // Real score-history points for sparklines + day-over-day delta.
 // Populated at scan time by the backend; each data point is one day.
 export interface ScoreHistoryPoint {
@@ -709,6 +728,12 @@ export const api = {
     authFetchApi<InsiderActivity[]>(`/market/insiders/${ticker}?limit=${limit}`),
   marketCongressByTicker: (ticker: string, limit = 10) =>
     authFetchApi<CongressTradeRow[]>(`/market/congress/${ticker}?limit=${limit}`),
+  marketPeers: async (ticker: string): Promise<PeersResponse | null> => {
+    const res = await fetch(`${API_BASE}/market/peers/${ticker}`);
+    if (res.status === 204) return null;
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    return res.json();
+  },
   stockScoreHistory: (ticker: string, days = 30) =>
     fetchApi<ScoreHistoryResponse>(`/stocks/${ticker}/score-history?days=${days}`),
   stockScoreHistoryBulk: (tickers: string[], days = 30) =>

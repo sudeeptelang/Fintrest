@@ -86,6 +86,12 @@ public interface IFundamentalsProvider
     /// live prices onto the screener response so users see today's
     /// move instead of yesterday's close. Empty list returns empty.</summary>
     Task<List<LiveQuoteDto>> GetQuotesAsync(IReadOnlyList<string> tickers, CancellationToken ct = default);
+
+    /// <summary>Sector / industry peers for a ticker per FMP's
+    /// /stock-peers endpoint. Powers the Compare Mode card on ticker
+    /// detail. Returns the peer list as plain ticker symbols; enrichment
+    /// (price, score, letter grade) happens downstream.</summary>
+    Task<List<string>> GetPeersAsync(string ticker, CancellationToken ct = default);
 }
 
 /// <summary>Intraday quote from FMP /quote. Contains today's price,

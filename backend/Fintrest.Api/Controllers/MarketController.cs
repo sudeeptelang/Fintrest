@@ -1079,6 +1079,78 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
+    /// <summary>Peer comparison set — FMP's /stock-peers list enriched
+    /// with our own signal score + live quote so each peer row can
+    /// render a letter grade, price, and today's % change. Powers the
+    /// Compare Mode card on ticker detail. Returns 204 when FMP has no
+    /// peer list (rare — happens for micro-caps or recent IPOs).</summary>
+    [HttpGet("market/peers/{ticker}")]
+    public async Task<IActionResult> GetPeers(
+        string ticker,
+        [FromServices] Fintrest.Api.Services.Providers.Contracts.IFundamentalsProvider fmp,
+        CancellationToken ct)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+
+        var peerTickers = await fmp.GetPeersAsync(normalized, ct);
+        if (peerTickers.Count == 0) return NoContent();
+
+        // Join our own data: Stock, latest Signal, LiveQuote.
+        var upperPeers = peerTickers.Select(p => p.ToUpperInvariant()).ToList();
+        var peerStocks = await db.Stocks
+            .AsNoTracking()
+            .Where(s => upperPeers.Contains(s.Ticker))
+            .Select(s => new { s.Id, s.Ticker, s.Name, s.Sector, s.MarketCap })
+            .ToListAsync(ct);
+
+        var latestScan = await db.ScanRuns
+            .Where(s => s.Status == "COMPLETED")
+            .OrderByDescending(s => s.CompletedAt)
+            .FirstOrDefaultAsync(ct);
+        var peerIds = peerStocks.Select(s => s.Id).ToList();
+        var peerSignals = latestScan is null
+            ? new Dictionary<long, double>()
+            : await db.Signals
+                .Where(s => s.ScanRunId == latestScan.Id && peerIds.Contains(s.StockId))
+                .ToDictionaryAsync(s => s.StockId, s => s.ScoreTotal, ct);
+        var peerQuotes = await db.LiveQuotes
+            .AsNoTracking()
+            .Where(l => upperPeers.Contains(l.Ticker))
+            .ToDictionaryAsync(l => l.Ticker, ct);
+
+        // Preserve FMP's peer ordering (they rank by relevance) but
+        // render only peers we actually carry. Fill any missing with
+        // name-only placeholders so the card doesn't feel empty.
+        var rows = new List<object>();
+        foreach (var peer in upperPeers)
+        {
+            var stock = peerStocks.FirstOrDefault(s => s.Ticker == peer);
+            peerQuotes.TryGetValue(peer, out var lq);
+            double? score = null;
+            if (stock is not null && peerSignals.TryGetValue(stock.Id, out var sc))
+                score = sc;
+            rows.Add(new
+            {
+                ticker = peer,
+                name = stock?.Name,
+                sector = stock?.Sector,
+                marketCap = stock?.MarketCap,
+                price = lq?.Price,
+                changePct = lq?.ChangePct,
+                score,
+                inUniverse = stock is not null,
+            });
+        }
+
+        return Ok(new
+        {
+            ticker = normalized,
+            peerCount = peerTickers.Count,
+            peers = rows,
+        });
+    }
+
     /// <summary>Per-ticker daily composite-score history. Written at
     /// scan time by ScanOrchestrator. Powers real sparklines on the
     /// Today grid + ticker hero and the real "delta vs yesterday"

@@ -485,6 +485,31 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         );
     }
 
+    public async Task<List<string>> GetPeersAsync(string ticker, CancellationToken ct = default)
+    {
+        // FMP stable: /stock-peers returns an array of objects with
+        // symbol + peersList (comma-separated string of peer tickers).
+        // Older shape shipped `peersList` as an array; we accept both.
+        var url = $"{_baseUrl}/stock-peers?symbol={ticker}&apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpStockPeers>>(url, ct);
+        if (rows is null || rows.Count == 0) return [];
+
+        var row = rows[0];
+        var peers = new List<string>();
+        if (row.PeersList is not null)
+        {
+            // Can be string[] or string depending on FMP tier — normalize.
+            peers = row.PeersList
+                .SelectMany(p => p.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .Select(p => p.ToUpperInvariant())
+                .Where(p => p.Length > 0 && p != ticker.ToUpperInvariant())
+                .Distinct()
+                .Take(12)
+                .ToList();
+        }
+        return peers;
+    }
+
     public async Task<List<LiveQuoteDto>> GetQuotesAsync(IReadOnlyList<string> tickers, CancellationToken ct = default)
     {
         if (tickers.Count == 0) return [];
@@ -809,6 +834,14 @@ file record FmpPriceTargetSummary(
     [property: JsonPropertyName("lastYearAvgPriceTarget")] double? LastYearAvgPriceTarget,
     [property: JsonPropertyName("allTime")] int? AllTime,
     [property: JsonPropertyName("allTimeAvgPriceTarget")] double? AllTimeAvgPriceTarget
+);
+
+/// <summary>FMP /stable/stock-peers row. peersList is a string[] on
+/// modern tiers but could also arrive as a comma-joined string — our
+/// parsing handles both shapes by splitting on commas after SelectMany.</summary>
+file record FmpStockPeers(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("peersList")] string[]? PeersList
 );
 
 /// <summary>FMP /stable/quote row. Field names match the exact JSON

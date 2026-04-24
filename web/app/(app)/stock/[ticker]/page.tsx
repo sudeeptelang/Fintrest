@@ -45,6 +45,7 @@ import { FinancialScoresCard } from "@/components/stock/financial-scores-card";
 import { DcfCard } from "@/components/stock/dcf-card";
 import { EarningsSurprisesCard } from "@/components/stock/earnings-surprises-card";
 import { AnalystRevisionsCard } from "@/components/stock/analyst-revisions-card";
+import { PeersCard } from "@/components/stock/peers-card";
 import type { InsiderScore, ShortInterestResponse, CongressSignalResponse } from "@/lib/api";
 import {
   buildTakeaways,
@@ -370,10 +371,11 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
 
         <DeepDiveRow
           title="Peer comparison"
-          summary=""
-          emptyMessage="Peer list ships with FMP /stock-peers integration — on the Week 3 roadmap."
+          summary="Sector peers from FMP · scored against our composite · click to compare"
           family="fundamentals"
-        />
+        >
+          <PeersCard ticker={ticker} />
+        </DeepDiveRow>
 
         <DeepDiveRow
           title="Insider activity"
