@@ -17,7 +17,7 @@ import { StockLogo } from "@/components/stock/stock-logo";
 import { NewsReaderDrawer } from "@/components/news/news-reader-drawer";
 import { PaywallGate } from "@/components/billing/paywall-gate";
 import { RegimeStrip } from "@/components/markets/regime-strip";
-import { TopMovers } from "@/components/markets/top-movers";
+import { MoversGrid } from "@/components/markets/movers-grid";
 import { IpoCalendarCard } from "@/components/markets/ipo-calendar-card";
 import { Newspaper, Sparkles } from "lucide-react";
 
@@ -98,9 +98,10 @@ export default function MarketsPage() {
           Silently hides when the macro classifier endpoint hasn't shipped. */}
       <RegimeStrip />
 
-      {/* Top movers — compact 3-col replacement for the old 6-card spec
-          grid. Full expanded view at /markets/screeners. */}
-      <TopMovers />
+      {/* Market movers — consolidated "one grid" per UX_AUDIT. Tabs for
+          gainers/losers/52w/unusual, sector + cap filters, inline
+          Run Lens + Watchlist. Full screener at /research/screener. */}
+      <MoversGrid />
 
       {/* Market Pulse + Global Indices grid */}
       <div className="grid lg:grid-cols-4 gap-5">
