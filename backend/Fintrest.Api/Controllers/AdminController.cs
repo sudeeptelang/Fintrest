@@ -133,6 +133,34 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     }
 
     /// <summary>
+    /// Trigger an SEC EDGAR Form 4 ingest run. Without params defaults
+    /// to the most recent trading day. Pass ?daysBack=5 to backfill the
+    /// last 5 days (capped at 30). Idempotent — re-running the same day
+    /// upserts against the composite unique index.
+    /// </summary>
+    [HttpPost("edgar/ingest")]
+    public async Task<IActionResult> IngestEdgar(
+        [FromServices] Fintrest.Api.Services.Providers.Edgar.EdgarIngestJob job,
+        [FromQuery] int daysBack = 0,
+        CancellationToken ct = default)
+    {
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            ActorUserId = AdminUserId,
+            Action = "ingest_edgar_form4",
+            EntityType = "insider_transactions",
+            MetadataJson = System.Text.Json.JsonSerializer.Serialize(new { daysBack }),
+        });
+        await db.SaveChangesAsync(ct);
+
+        daysBack = Math.Clamp(daysBack, 0, 30);
+        var today = DateTime.UtcNow.Date;
+        var dates = Enumerable.Range(0, daysBack + 1).Select(i => today.AddDays(-i)).ToArray();
+        var summaries = await job.RunOnceAsync(dates, ct);
+        return Ok(summaries);
+    }
+
+    /// <summary>
     /// Backfill / recompute the audit-log outcome table. Walks every open
     /// signal forward through market data and writes target_hit / stop_hit /
     /// horizon_expired rows into performance_tracking. Idempotent — already-

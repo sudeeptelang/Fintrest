@@ -61,6 +61,12 @@ builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.IFundam
 builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.INewsProvider,
     Fintrest.Api.Services.Providers.Finnhub.FinnhubProvider>();
 
+// SEC EDGAR — free data source for Smart Money Phase 1 (Form 4 insider
+// trades). Uses a named HttpClient so the EdgarClient wrapper can apply
+// the mandatory User-Agent header + internal 10-rps throttle.
+builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Edgar.EdgarClient>();
+builder.Services.AddScoped<Fintrest.Api.Services.Providers.Edgar.EdgarIngestService>();
+
 // Scoring configuration — weights, regime-conditional weight sets, thresholds.
 // Tune these in appsettings.json without a recompile.
 builder.Services.Configure<Fintrest.Api.Services.Scoring.ScoringOptions>(
@@ -201,6 +207,12 @@ builder.Services.AddHostedService<Fintrest.Api.Services.Email.AlertEvaluatorJob>
 // Background Jobs
 builder.Services.AddHostedService<Fintrest.Api.Services.Pipeline.DailyCronJob>();
 builder.Services.AddHostedService<Fintrest.Api.Services.Pipeline.IntradayDriftJob>();
+
+// Smart Money Phase 1 — SEC EDGAR Form 4 ingest. Fires 8 PM ET weekdays.
+// Admin can trigger a manual backfill via /admin/edgar/ingest.
+builder.Services.AddSingleton<Fintrest.Api.Services.Providers.Edgar.EdgarIngestJob>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<Fintrest.Api.Services.Providers.Edgar.EdgarIngestJob>());
 
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
