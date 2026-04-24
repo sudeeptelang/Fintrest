@@ -4,20 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Play,
-  History,
   HeartPulse,
-  ScrollText,
   ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Admin nav — only links to routes that actually exist. The
+// previous set (Run Scan, Scan History, Provider Health, Audit
+// Logs) was wishful — those pages were never built, so clicking
+// them 404'd. System health consolidates the live manual triggers,
+// provider status, job state, and recent admin actions.
 const adminLinks = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
-  { label: "Run Scan", href: "/admin/scan", icon: Play },
-  { label: "Scan History", href: "/admin/scans", icon: History },
-  { label: "Provider Health", href: "/admin/providers", icon: HeartPulse },
-  { label: "Audit Logs", href: "/admin/audit", icon: ScrollText },
+  { label: "System health", href: "/admin/health", icon: HeartPulse },
 ];
 
 export default function AdminLayout({
