@@ -47,14 +47,11 @@ const primary: readonly NavItem[] = [
     label: "Research",
     href: "/research",
     icon: FlaskConical,
-    // /dashboard + /picks remain as legacy routes for Today's drop until
-    // the move to /research completes.
+    // /dashboard + /picks + /research/smart-money redirect or live as
+    // internal routes; no separate nav items for them — Smart Money is
+    // a component inside every ticker, not a browsable surface of its
+    // own. The Research landing page owns the discovery surfaces.
     matchPaths: ["/research", "/dashboard", "/picks", "/swing"],
-    subItems: [
-      { label: "Today's drop",  href: "/research" },
-      { label: "Smart money",   href: "/research/smart-money" },
-      { label: "Screener",      href: "/research/screener" },
-    ],
   },
   {
     label: "My stuff",
