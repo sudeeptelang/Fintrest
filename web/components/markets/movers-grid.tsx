@@ -33,13 +33,6 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "low52", label: "52wk Low" },
 ];
 
-const CAP_BANDS: { key: string; label: string }[] = [
-  { key: "all",   label: "Any size" },
-  { key: "mega",  label: "Mega $200B+" },
-  { key: "large", label: "Large $10–200B" },
-  { key: "mid",   label: "Mid $2–10B" },
-  { key: "small", label: "Small <$2B" },
-];
 
 export function MoversGrid({
   initialTab = "gainers",
@@ -53,16 +46,11 @@ export function MoversGrid({
 } = {}) {
   const { data: screener, isLoading } = useMarketScreener(2000);
   const [tab, setTab] = useState<TabKey>(initialTab);
-  const [sector, setSector] = useState<string>("all");
-  const [capBand, setCapBand] = useState<string>("all");
 
-  const rows = useMemo(() => applyFilters(screener ?? [], { tab, sector, capBand }), [screener, tab, sector, capBand]);
-
-  const sectors = useMemo(() => {
-    const set = new Set<string>();
-    (screener ?? []).forEach((r) => r.sector && set.add(r.sector));
-    return ["all", ...Array.from(set).sort()];
-  }, [screener]);
+  // Sector + cap-band filters used to live inline with the tabs;
+  // they've moved up to the MarketOverviewStrip (page-level filters).
+  // MoversGrid stays focused on its primary pivot: tabs only.
+  const rows = useMemo(() => applyFilters(screener ?? [], { tab, sector: "all", capBand: "all" }), [screener, tab]);
 
   return (
     <section className="rounded-[12px] border border-ink-200 bg-ink-0 overflow-hidden">
@@ -79,8 +67,9 @@ export function MoversGrid({
           )}
         </div>
 
-        {/* Tabs — the "what bucket to show" dimension */}
-        <div className="flex flex-wrap items-center gap-2 mb-3">
+        {/* Tabs — the only MoversGrid filter dimension. Sector + cap
+            live on the Market Overview strip now (page-level filters). */}
+        <div className="flex flex-wrap items-center gap-2">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -96,56 +85,6 @@ export function MoversGrid({
               {t.label}
             </button>
           ))}
-        </div>
-
-        {/* Filter chips — sector + cap band, always visible */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-500 mr-1">
-            Filters
-          </span>
-          {CAP_BANDS.map((b) => (
-            <button
-              key={b.key}
-              type="button"
-              onClick={() => setCapBand(b.key)}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border",
-                capBand === b.key
-                  ? "bg-forest-light text-forest-dark border-forest"
-                  : "bg-ink-0 text-ink-700 border-ink-200 hover:border-ink-400",
-              )}
-            >
-              {b.label}
-            </button>
-          ))}
-          <div className="w-px h-4 bg-ink-200 mx-1" />
-          {sectors.slice(0, 9).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSector(s)}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border",
-                sector === s
-                  ? "bg-navy-light text-navy border-navy"
-                  : "bg-ink-0 text-ink-700 border-ink-200 hover:border-ink-400",
-              )}
-            >
-              {s === "all" ? "All sectors" : s}
-            </button>
-          ))}
-          {sectors.length > 9 && (
-            <select
-              value={sectors.slice(9).includes(sector) ? sector : ""}
-              onChange={(e) => e.target.value && setSector(e.target.value)}
-              className="font-[var(--font-sans)] text-[11px] px-2.5 py-1 rounded-full border border-ink-200 bg-ink-0 text-ink-700 hover:border-ink-400 transition-colors cursor-pointer"
-            >
-              <option value="">More sectors…</option>
-              {sectors.slice(9).map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          )}
         </div>
       </header>
 
