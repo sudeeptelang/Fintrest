@@ -929,6 +929,10 @@ export const api = {
     authFetchApi<unknown>("/admin/scan/run", { method: "POST" }),
   adminRunIngestion: () =>
     authFetchApi<unknown>("/admin/ingest/run", { method: "POST" }),
+  adminRefreshQuotes: (count = 500) =>
+    authFetchApi<unknown>(`/admin/quotes/refresh?count=${count}`, { method: "POST" }),
+  adminIngestTopCaps: (count = 100) =>
+    authFetchApi<unknown>(`/admin/ingest/top-caps?count=${count}`, { method: "POST" }),
 };
 
 // --- Admin Types ---

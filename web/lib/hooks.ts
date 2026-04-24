@@ -417,3 +417,19 @@ export function useAdminRunIngestion() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
   });
 }
+
+export function useAdminRefreshQuotes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (count: number = 500) => api.adminRefreshQuotes(count),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
+  });
+}
+
+export function useAdminIngestTopCaps() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (count: number = 100) => api.adminIngestTopCaps(count),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
+  });
+}

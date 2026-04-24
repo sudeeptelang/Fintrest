@@ -7,6 +7,8 @@ import {
   useAdminRunPipeline,
   useAdminRunScan,
   useAdminRunIngestion,
+  useAdminRefreshQuotes,
+  useAdminIngestTopCaps,
 } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import type { SystemHealthResponse } from "@/lib/api";
@@ -16,7 +18,10 @@ export default function AdminHealthPage() {
   const runPipeline = useAdminRunPipeline();
   const runScan = useAdminRunScan();
   const runIngestion = useAdminRunIngestion();
-  const [confirm, setConfirm] = useState<"pipeline" | "scan" | "ingestion" | null>(null);
+  const refreshQuotes = useAdminRefreshQuotes();
+  const ingestTopCaps = useAdminIngestTopCaps();
+  const [confirm, setConfirm] = useState<"pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | null>(null);
+  const [lastResult, setLastResult] = useState<string | null>(null);
 
   return (
     <div className="max-w-[1120px] mx-auto space-y-6 pt-2 pb-16">
@@ -69,12 +74,21 @@ export default function AdminHealthPage() {
           <JobsCard data={data} />
 
           <ManualTriggers
-            onRun={(which) => setConfirm(which)}
+            onRun={(which) => { setLastResult(null); setConfirm(which); }}
             confirm={confirm}
+            lastResult={lastResult}
             onConfirm={async () => {
-              if (confirm === "pipeline") await runPipeline.mutateAsync();
-              if (confirm === "scan") await runScan.mutateAsync();
-              if (confirm === "ingestion") await runIngestion.mutateAsync();
+              try {
+                let r: unknown;
+                if (confirm === "pipeline") r = await runPipeline.mutateAsync();
+                if (confirm === "scan") r = await runScan.mutateAsync();
+                if (confirm === "ingestion") r = await runIngestion.mutateAsync();
+                if (confirm === "quotes") r = await refreshQuotes.mutateAsync(500);
+                if (confirm === "topcaps") r = await ingestTopCaps.mutateAsync(200);
+                setLastResult(JSON.stringify(r));
+              } catch (e) {
+                setLastResult(`Error: ${String(e)}`);
+              }
               setConfirm(null);
             }}
             onCancel={() => setConfirm(null)}
@@ -279,12 +293,14 @@ function ManualTriggers({
   onConfirm,
   onCancel,
   loading,
+  lastResult,
 }: {
-  onRun: (which: "pipeline" | "scan" | "ingestion") => void;
-  confirm: "pipeline" | "scan" | "ingestion" | null;
+  onRun: (which: "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps") => void;
+  confirm: "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | null;
   onConfirm: () => void;
   onCancel: () => void;
   loading: boolean;
+  lastResult?: string | null;
 }) {
   return (
     <section className="rounded-[10px] border border-ink-200 bg-ink-0 px-6 py-5">
@@ -292,10 +308,18 @@ function ManualTriggers({
         <Activity className="h-4 w-4 text-forest" strokeWidth={1.75} /> Manual triggers
       </h3>
       <div className="flex flex-wrap gap-2">
+        <TriggerButton label="Refresh live quotes (500)" onClick={() => onRun("quotes")} />
+        <TriggerButton label="Ingest top-caps (200)" onClick={() => onRun("topcaps")} />
         <TriggerButton label="Full pipeline" onClick={() => onRun("pipeline")} />
         <TriggerButton label="Scan only" onClick={() => onRun("scan")} />
         <TriggerButton label="Ingestion only" onClick={() => onRun("ingestion")} />
       </div>
+      {lastResult && (
+        <div className="mt-4 rounded-[8px] border border-ink-200 bg-ink-50 px-4 py-3">
+          <div className="text-[10px] uppercase tracking-[0.1em] text-ink-500 font-semibold mb-1">Last response</div>
+          <pre className="font-mono text-[11px] text-ink-800 whitespace-pre-wrap break-all max-h-48 overflow-auto">{lastResult}</pre>
+        </div>
+      )}
       {confirm && (
         <div className="mt-4 rounded-[8px] border border-warn bg-warn-light px-4 py-3 flex items-center gap-3">
           <AlertCircle className="h-4 w-4 text-warn shrink-0" strokeWidth={1.75} />
