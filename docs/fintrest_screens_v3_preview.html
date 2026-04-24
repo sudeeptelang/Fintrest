@@ -312,6 +312,8 @@ section.scene.active{display:block}
     <button class="tab" data-s="today">Today (mobile)</button>
     <button class="tab" data-s="ticker">Ticker (mobile)</button>
     <button class="tab" data-s="research">Research (desktop)</button>
+    <button class="tab" data-s="screener">Screener</button>
+    <button class="tab" data-s="screener-detail">Screener detail</button>
     <button class="tab" data-s="portfolio">Portfolio (mobile)</button>
   </div>
   <span class="ctx">score-first · mobile-first · 2026-04-24</span>
@@ -1103,6 +1105,531 @@ section.scene.active{display:block}
     ④ Congress / Insider widgets are GONE from here — pulled to ticker detail.
     ⑤ Score heatmap tints by composite (A green → F warm-gray), not price. Product reinforcement on every glance.
     ⑥ Earnings calendar picks up the reference-PDF two-column Pre/Post/Mkt/Est pattern.</p>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════
+     SCREENER — desktop + mobile
+     ═════════════════════════════════════════════════════════════════ -->
+<section class="scene" id="screener">
+  <h1>Screener — filters + results</h1>
+  <p class="sub">The screener is where power users live. Preset chips on top
+  (editorial + community screens), filter row underneath, results table with
+  inline Run Lens + Save. Every filter is score-aware. Saved screens become
+  score-threshold alert sources.</p>
+
+  <!-- Desktop -->
+  <div class="desktop">
+    <div class="desktop-chrome">
+      <span>Fintrest.ai</span>
+      <span class="pill">Today</span>
+      <span class="pill active">Research</span>
+      <span class="pill">Portfolio</span>
+      <span class="pill">Audit log</span>
+      <span style="margin-left:auto;color:var(--ink-400)">Research › Screener</span>
+    </div>
+
+    <!-- Preset chip row -->
+    <div style="padding:16px 20px;border-bottom:1px solid var(--ink-200);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-500);font-weight:700;margin-right:8px">Presets</span>
+      <span style="background:var(--forest);color:var(--ink-0);font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer">★ High Conviction Buys</span>
+      <span style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-700);font-size:12px;font-weight:500;padding:6px 12px;border-radius:999px;cursor:pointer">Oversold A-grade</span>
+      <span style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-700);font-size:12px;font-weight:500;padding:6px 12px;border-radius:999px;cursor:pointer">Insider Buying</span>
+      <span style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-700);font-size:12px;font-weight:500;padding:6px 12px;border-radius:999px;cursor:pointer">Undervalued Quality</span>
+      <span style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-700);font-size:12px;font-weight:500;padding:6px 12px;border-radius:999px;cursor:pointer">Momentum Breakouts</span>
+      <span style="background:var(--rust-lt);border:1px solid var(--rust);color:var(--rust-dk);font-size:12px;font-weight:500;padding:6px 12px;border-radius:999px;cursor:pointer">✦ Lens Editorial: AI infra</span>
+      <span style="background:var(--ink-100);color:var(--ink-600);font-size:12px;font-weight:500;padding:6px 12px;border-radius:999px;cursor:pointer;border:1px dashed var(--ink-300)">＋ New screen</span>
+    </div>
+
+    <!-- Filter row (active chips) -->
+    <div style="padding:16px 20px;border-bottom:1px solid var(--ink-200);background:var(--ink-50);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-500);font-weight:700;margin-right:8px">Filters</span>
+
+      <span style="background:var(--navy-lt);color:var(--navy);border:1px solid var(--navy);font-size:11px;padding:4px 10px;border-radius:4px;font-family:'DM Mono';font-weight:500">Score ≥ 80 ✕</span>
+      <span style="background:var(--forest-lt);color:var(--forest-dk);border:1px solid var(--forest);font-size:11px;padding:4px 10px;border-radius:4px;font-family:'DM Mono';font-weight:500">R:R ≥ 2.5 ✕</span>
+      <span style="background:var(--teal-lt);color:var(--teal);border:1px solid var(--teal);font-size:11px;padding:4px 10px;border-radius:4px;font-family:'DM Mono';font-weight:500">Smart Money ≥ 70 ✕</span>
+      <span style="background:var(--amber-lt);color:var(--amber);border:1px solid var(--amber);font-size:11px;padding:4px 10px;border-radius:4px;font-family:'DM Mono';font-weight:500">Fundamentals ≥ 60 ✕</span>
+      <span style="background:var(--plum-lt);color:var(--plum);border:1px solid var(--plum);font-size:11px;padding:4px 10px;border-radius:4px;font-family:'DM Mono';font-weight:500">Has catalyst (news &gt; 5) ✕</span>
+      <span style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-700);font-size:11px;padding:4px 10px;border-radius:4px">Sector: any ▾</span>
+      <span style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-700);font-size:11px;padding:4px 10px;border-radius:4px">Mkt cap: &gt; $2B ▾</span>
+      <span style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-700);font-size:11px;padding:4px 10px;border-radius:4px">＋ Add filter</span>
+
+      <span style="margin-left:auto;display:flex;gap:8px">
+        <button style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);font-size:11px;padding:6px 12px;border-radius:6px;font-weight:600;cursor:pointer">Save screen</button>
+        <button style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);font-size:11px;padding:6px 12px;border-radius:6px;font-weight:600;cursor:pointer">🔔 Alert on new matches</button>
+        <button style="background:var(--forest);color:var(--ink-0);border:none;font-size:11px;padding:6px 12px;border-radius:6px;font-weight:600;cursor:pointer">Share link</button>
+      </span>
+    </div>
+
+    <!-- Factor sliders (advanced panel, shown expanded) -->
+    <div style="padding:16px 20px;border-bottom:1px solid var(--ink-200);display:grid;grid-template-columns:repeat(4,1fr);gap:24px 32px;background:var(--ink-0)">
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--navy);font-weight:700;margin-bottom:6px">Technical family</div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>Momentum ≥</span><span class="mono">60</span></div>
+        <div style="height:4px;background:var(--navy-lt);border-radius:999px;position:relative"><div style="position:absolute;left:0;top:0;width:60%;height:100%;background:var(--navy);border-radius:999px"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin:10px 0 4px"><span>Trend ≥</span><span class="mono">55</span></div>
+        <div style="height:4px;background:var(--navy-lt);border-radius:999px;position:relative"><div style="position:absolute;left:0;top:0;width:55%;height:100%;background:var(--navy);border-radius:999px"></div></div>
+      </div>
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--amber);font-weight:700;margin-bottom:6px">Fundamentals family</div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>Fundamentals ≥</span><span class="mono">60</span></div>
+        <div style="height:4px;background:var(--amber-lt);border-radius:999px;position:relative"><div style="position:absolute;left:0;top:0;width:60%;height:100%;background:var(--amber);border-radius:999px"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin:10px 0 4px"><span>Valuation ≥</span><span class="mono">any</span></div>
+        <div style="height:4px;background:var(--amber-lt);border-radius:999px;position:relative"><div style="position:absolute;left:0;top:0;width:0%;height:100%;background:var(--amber);border-radius:999px"></div></div>
+      </div>
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--plum);font-weight:700;margin-bottom:6px">Sentiment family</div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>News / catalyst ≥</span><span class="mono">5 items</span></div>
+        <div style="height:4px;background:var(--plum-lt);border-radius:999px;position:relative"><div style="position:absolute;left:0;top:0;width:55%;height:100%;background:var(--plum);border-radius:999px"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin:10px 0 4px"><span>Sentiment ≥</span><span class="mono">−0.1</span></div>
+        <div style="height:4px;background:var(--plum-lt);border-radius:999px;position:relative"><div style="position:absolute;left:0;top:0;width:48%;height:100%;background:var(--plum);border-radius:999px"></div></div>
+      </div>
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--teal);font-weight:700;margin-bottom:6px">Smart Money family</div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>Insider buying ≥</span><span class="mono">$250K</span></div>
+        <div style="height:4px;background:var(--teal-lt);border-radius:999px;position:relative"><div style="position:absolute;left:0;top:0;width:35%;height:100%;background:var(--teal);border-radius:999px"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin:10px 0 4px"><span>Congress activity</span><span class="mono">on</span></div>
+        <div style="height:4px;background:var(--teal-lt);border-radius:999px;position:relative"><div style="position:absolute;left:0;top:0;width:100%;height:100%;background:var(--teal);border-radius:999px"></div></div>
+      </div>
+    </div>
+
+    <!-- Results header -->
+    <div style="padding:12px 20px;border-bottom:1px solid var(--ink-200);display:flex;justify-content:space-between;align-items:center;background:var(--ink-0)">
+      <div>
+        <strong style="font-family:Sora;font-size:14px">14 matches</strong>
+        <span style="font-size:11px;color:var(--ink-500);margin-left:8px">as of 2026-04-24 09:04 ET · refreshes 6am ET daily</span>
+      </div>
+      <div style="display:flex;gap:8px;font-size:11px;color:var(--ink-600)">
+        <span>Sort:</span>
+        <span style="color:var(--forest);font-weight:600;cursor:pointer">Score ▾</span>
+        <span style="cursor:pointer">R:R</span>
+        <span style="cursor:pointer">Delta 1d</span>
+        <span style="cursor:pointer">% from entry</span>
+      </div>
+    </div>
+
+    <!-- Results table with "top reason" Lens line -->
+    <table class="mov-table">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th class="num">Price</th>
+          <th style="text-align:center">Score</th>
+          <th class="num">Δ 1d</th>
+          <th class="num">Entry</th>
+          <th class="num">Target</th>
+          <th class="num">R:R</th>
+          <th>Top reason</th>
+          <th style="text-align:center">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="lgo lg-plnr">P</span><span class="tksym">PLTR</span><div class="coname" style="margin-left:30px">Palantir Technologies</div></td>
+          <td class="num">28.42</td>
+          <td class="grade-cell"><span class="g-letter">A</span> <span style="font-family:'DM Mono';font-size:11px;color:var(--ink-700)">84</span></td>
+          <td class="num"><span class="ch up">+12</span></td>
+          <td class="num">26.10</td>
+          <td class="num">31.50</td>
+          <td class="num"><span style="background:var(--forest-lt);color:var(--forest-dk);padding:2px 6px;border-radius:4px;font-weight:600;font-family:'DM Mono'">4.5</span></td>
+          <td style="font-size:11px;color:var(--ink-700);max-width:260px;line-height:15px">News +12 on $800M DoD renewal · momentum cleared 50d · 3 analyst upgrades 30d</td>
+          <td><button class="act-btn">↗ Lens</button><button class="act-btn secondary">＋</button></td>
+        </tr>
+        <tr>
+          <td><span class="lgo lg-ally">A</span><span class="tksym">ALLY</span><div class="coname" style="margin-left:30px">Ally Financial</div></td>
+          <td class="num">34.82</td>
+          <td class="grade-cell"><span class="g-letter">A</span> <span style="font-family:'DM Mono';font-size:11px;color:var(--ink-700)">87</span></td>
+          <td class="num"><span class="ch up">+4</span></td>
+          <td class="num">34.20</td>
+          <td class="num">38.50</td>
+          <td class="num"><span style="background:var(--forest-lt);color:var(--forest-dk);padding:2px 6px;border-radius:4px;font-weight:600;font-family:'DM Mono'">3.1</span></td>
+          <td style="font-size:11px;color:var(--ink-700);max-width:260px;line-height:15px">CFO bought $2.4M · largest insider buy since 2023 · Q1 EPS beat</td>
+          <td><button class="act-btn">↗ Lens</button><button class="act-btn secondary">＋</button></td>
+        </tr>
+        <tr>
+          <td><span class="lgo" style="background:#4b2e7e">U</span><span class="tksym">URI</span><div class="coname" style="margin-left:30px">United Rentals</div></td>
+          <td class="num">986.78</td>
+          <td class="grade-cell"><span class="g-letter">A</span> <span style="font-family:'DM Mono';font-size:11px;color:var(--ink-700)">86</span></td>
+          <td class="num"><span class="ch up">+8</span></td>
+          <td class="num">960.00</td>
+          <td class="num">1,080.00</td>
+          <td class="num"><span style="background:var(--forest-lt);color:var(--forest-dk);padding:2px 6px;border-radius:4px;font-weight:600;font-family:'DM Mono'">2.8</span></td>
+          <td style="font-size:11px;color:var(--ink-700);max-width:260px;line-height:15px">Fundamentals A · ROE 29% · infrastructure cycle · two director buys last week</td>
+          <td><button class="act-btn">↗ Lens</button><button class="act-btn secondary">＋</button></td>
+        </tr>
+        <tr>
+          <td><span class="lgo" style="background:#d01c1f">H</span><span class="tksym">HELE</span><div class="coname" style="margin-left:30px">Helen of Troy Limited</div></td>
+          <td class="num">23.82</td>
+          <td class="grade-cell"><span class="g-letter">A</span> <span style="font-family:'DM Mono';font-size:11px;color:var(--ink-700)">82</span></td>
+          <td class="num"><span class="ch up">+20</span></td>
+          <td class="num">23.00</td>
+          <td class="num">29.00</td>
+          <td class="num"><span style="background:var(--forest-lt);color:var(--forest-dk);padding:2px 6px;border-radius:4px;font-weight:600;font-family:'DM Mono'">6.0</span></td>
+          <td style="font-size:11px;color:var(--ink-700);max-width:260px;line-height:15px">Earnings surprise +38% · undervalued on DCF 34% · sentiment flipped positive</td>
+          <td><button class="act-btn">↗ Lens</button><button class="act-btn secondary">＋</button></td>
+        </tr>
+        <tr>
+          <td><span class="lgo" style="background:#0A3528">T</span><span class="tksym">TXN</span><div class="coname" style="margin-left:30px">Texas Instruments</div></td>
+          <td class="num">282.23</td>
+          <td class="grade-cell"><span class="g-letter">A</span> <span style="font-family:'DM Mono';font-size:11px;color:var(--ink-700)">81</span></td>
+          <td class="num"><span class="ch up">+6</span></td>
+          <td class="num">278.00</td>
+          <td class="num">318.00</td>
+          <td class="num"><span style="background:var(--forest-lt);color:var(--forest-dk);padding:2px 6px;border-radius:4px;font-weight:600;font-family:'DM Mono'">3.3</span></td>
+          <td style="font-size:11px;color:var(--ink-700);max-width:260px;line-height:15px">Analog semis cycle bottoming · dividend growth streak · 4 institutional accum.</td>
+          <td><button class="act-btn">↗ Lens</button><button class="act-btn secondary">＋</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="padding:12px 20px;background:var(--ink-50);font-size:11px;color:var(--ink-600);border-top:1px solid var(--ink-200);text-align:center">
+      Showing 5 of 14 matches · <span style="color:var(--forest);font-weight:600;cursor:pointer">View all 14 →</span>
+    </div>
+  </div>
+
+  <!-- Mobile version (compressed) -->
+  <h2>Mobile — 390 px</h2>
+  <p class="sub">Filters collapse to a bottom sheet; presets stay as horizontal-scroll chips.</p>
+  <div class="phones">
+    <div class="phone">
+      <div class="phone-chrome">
+        <span class="logo">Fintrest</span>
+        <div class="search">Screener · 14 matches</div>
+        <div class="avatar">ST</div>
+      </div>
+      <div class="phone-body">
+        <!-- Preset scroll -->
+        <div style="display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;margin:-4px 0 8px">
+          <span style="flex-shrink:0;background:var(--forest);color:var(--ink-0);font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;white-space:nowrap">★ High Conviction</span>
+          <span style="flex-shrink:0;background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-700);font-size:11px;font-weight:500;padding:5px 10px;border-radius:999px;white-space:nowrap">Oversold A</span>
+          <span style="flex-shrink:0;background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-700);font-size:11px;font-weight:500;padding:5px 10px;border-radius:999px;white-space:nowrap">Insider buys</span>
+          <span style="flex-shrink:0;background:var(--rust-lt);border:1px solid var(--rust);color:var(--rust-dk);font-size:11px;font-weight:500;padding:5px 10px;border-radius:999px;white-space:nowrap">✦ Lens Ed.</span>
+        </div>
+
+        <!-- Filter summary bar (tap to open bottom sheet) -->
+        <div style="background:var(--ink-100);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:11px;color:var(--ink-700)">
+            <strong>5 filters</strong> · Score ≥ 80 · R:R ≥ 2.5 · Smart $ ≥ 70…
+          </div>
+          <span style="font-size:11px;color:var(--forest);font-weight:600">Edit ▾</span>
+        </div>
+
+        <!-- Compact result rows -->
+        <div class="sig-list">
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo lg-plnr">P</div>
+              <div><div class="tk">PLTR</div><div class="co">Palantir</div></div>
+              <div class="grade"><div class="letter">A</div><div><div class="num">84</div><div class="delta">+12</div></div></div>
+            </div>
+            <div class="mid">
+              <div class="lvl"><span class="lbl">Entry</span><span class="entry">26.10</span></div>
+              <div class="lvl"><span class="lbl">Tgt</span><span class="target">31.50</span></div>
+              <span class="rr">R:R 4.5</span>
+            </div>
+            <div style="font-size:11px;color:var(--ink-700);line-height:15px;padding:4px 0">News +12 on DoD renewal · momentum cleared 50d</div>
+          </div>
+
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo lg-ally">A</div>
+              <div><div class="tk">ALLY</div><div class="co">Ally Financial</div></div>
+              <div class="grade"><div class="letter">A</div><div><div class="num">87</div><div class="delta">+4</div></div></div>
+            </div>
+            <div class="mid">
+              <div class="lvl"><span class="lbl">Entry</span><span class="entry">34.20</span></div>
+              <div class="lvl"><span class="lbl">Tgt</span><span class="target">38.50</span></div>
+              <span class="rr">R:R 3.1</span>
+            </div>
+            <div style="font-size:11px;color:var(--ink-700);line-height:15px;padding:4px 0">CFO bought $2.4M · Q1 EPS beat</div>
+          </div>
+
+          <div class="sig-row">
+            <div class="top">
+              <div class="logo" style="background:#d01c1f">H</div>
+              <div><div class="tk">HELE</div><div class="co">Helen of Troy</div></div>
+              <div class="grade"><div class="letter">A</div><div><div class="num">82</div><div class="delta">+20</div></div></div>
+            </div>
+            <div class="mid">
+              <div class="lvl"><span class="lbl">Entry</span><span class="entry">23.00</span></div>
+              <div class="lvl"><span class="lbl">Tgt</span><span class="target">29.00</span></div>
+              <span class="rr">R:R 6.0</span>
+            </div>
+            <div style="font-size:11px;color:var(--ink-700);line-height:15px;padding:4px 0">Earnings surprise +38% · DCF −34%</div>
+          </div>
+        </div>
+
+        <!-- Action rail -->
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button style="flex:1;background:var(--forest);color:var(--ink-0);border:none;padding:12px;border-radius:8px;font-weight:600;font-size:12px">🔔 Alert on new matches</button>
+          <button style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);padding:12px 16px;border-radius:8px;font-weight:600;font-size:12px">Save</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="qa">
+    <h4>What's different from v2 Screener</h4>
+    <p>① Preset chips on top (curated Lens screens + editorial) — beats a blank filter panel for new users.
+    ② Filter chips are <strong>family-tinted</strong> so the active filters read as a visual quadrant of the score.
+    ③ Factor sliders are grouped by family (Technical / Fundamentals / Sentiment / Smart Money) not in one long list.
+    ④ Results table has a <strong>"Top reason"</strong> column — one Lens-style sentence per row — so users don't need to click to know why a match is a match.
+    ⑤ <strong>"Alert on new matches"</strong> is the monetization hook: Pro gets unlimited saved screens + alerts; Free gets 1.</p>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════════════
+     SCREENER DETAIL — preset page
+     ═════════════════════════════════════════════════════════════════ -->
+<section class="scene" id="screener-detail">
+  <h1>Screener detail — a preset page</h1>
+  <p class="sub">Click a preset chip from the screener and you land here.
+  Header explains what the screen tests. Criteria list shows the exact rules.
+  Results carry a mini-Lens thesis per row. Alert + share at the bottom.
+  This is the SEO-friendly canonical page for each editorial screen.</p>
+
+  <div class="desktop">
+    <div class="desktop-chrome">
+      <span>Fintrest.ai</span>
+      <span class="pill">Today</span>
+      <span class="pill active">Research</span>
+      <span class="pill">Portfolio</span>
+      <span class="pill">Audit log</span>
+      <span style="margin-left:auto;color:var(--ink-400)">Research › Screener › High Conviction Buys</span>
+    </div>
+
+    <!-- Header block -->
+    <div style="padding:24px 28px;background:linear-gradient(to right,var(--forest-lt),var(--ink-0));border-bottom:1px solid var(--ink-200)">
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+        <div style="width:56px;height:56px;border-radius:14px;background:var(--forest);color:var(--ink-0);display:grid;place-items:center;font-size:22px">★</div>
+        <div style="flex:1;min-width:320px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--forest-dk);font-weight:700">Editorial screen · updated daily 6 am ET</div>
+          <h2 style="font-family:Sora;font-weight:700;font-size:26px;color:var(--ink-900);margin:4px 0 8px">High Conviction Buys</h2>
+          <p style="font-size:14px;color:var(--ink-700);max-width:680px;line-height:22px">
+            A-grade composite score (≥ 85) plus R:R ≥ 2.5, Smart Money ≥ 70, and at least
+            5 news catalysts in the last 14 days. This is what we'd buy if the compliance
+            rules let us. (They don't — <em>your decision.</em>)
+          </p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <div style="font-family:'DM Mono';font-size:11px;color:var(--ink-500)">Historical hit rate · last 180 d</div>
+          <div style="font-family:Sora;font-weight:700;font-size:32px;color:var(--up);line-height:1">64%</div>
+          <div style="font-size:10px;color:var(--ink-600)">avg hold 11 days · avg return +6.2%</div>
+        </div>
+      </div>
+
+      <!-- Action rail -->
+      <div style="display:flex;gap:8px;margin-top:20px">
+        <button style="background:var(--forest);color:var(--ink-0);border:none;font-size:12px;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer">🔔 Alert on new matches</button>
+        <button style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);font-size:12px;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer">☆ Save to my screens</button>
+        <button style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);font-size:12px;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer">↗ Share link</button>
+        <button style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);font-size:12px;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer">⇵ Edit filters</button>
+      </div>
+    </div>
+
+    <!-- Criteria list -->
+    <div style="padding:20px 28px;border-bottom:1px solid var(--ink-200);background:var(--ink-0)">
+      <h3 style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-600);margin-bottom:14px">Screen criteria · 6 rules</h3>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="padding:12px;border:1px solid var(--ink-200);border-left:3px solid var(--up);border-radius:6px">
+          <div style="font-size:10px;color:var(--ink-500);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Composite</div>
+          <div style="font-family:'DM Mono';font-size:14px;font-weight:500;color:var(--ink-900);margin-top:2px">Score ≥ 85 (A grade)</div>
+        </div>
+        <div style="padding:12px;border:1px solid var(--ink-200);border-left:3px solid var(--forest);border-radius:6px">
+          <div style="font-size:10px;color:var(--ink-500);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Trade plan</div>
+          <div style="font-family:'DM Mono';font-size:14px;font-weight:500;color:var(--ink-900);margin-top:2px">R:R ≥ 2.5 · has stop</div>
+        </div>
+        <div style="padding:12px;border:1px solid var(--ink-200);border-left:3px solid var(--teal);border-radius:6px">
+          <div style="font-size:10px;color:var(--ink-500);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Smart Money</div>
+          <div style="font-family:'DM Mono';font-size:14px;font-weight:500;color:var(--ink-900);margin-top:2px">Smart $ ≥ 70</div>
+        </div>
+        <div style="padding:12px;border:1px solid var(--ink-200);border-left:3px solid var(--plum);border-radius:6px">
+          <div style="font-size:10px;color:var(--ink-500);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Sentiment</div>
+          <div style="font-family:'DM Mono';font-size:14px;font-weight:500;color:var(--ink-900);margin-top:2px">News &gt; 5 items · 14 d</div>
+        </div>
+        <div style="padding:12px;border:1px solid var(--ink-200);border-left:3px solid var(--navy);border-radius:6px">
+          <div style="font-size:10px;color:var(--ink-500);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Technical</div>
+          <div style="font-family:'DM Mono';font-size:14px;font-weight:500;color:var(--ink-900);margin-top:2px">Trend ≥ 55</div>
+        </div>
+        <div style="padding:12px;border:1px solid var(--ink-200);border-left:3px solid var(--ink-400);border-radius:6px">
+          <div style="font-size:10px;color:var(--ink-500);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Universe</div>
+          <div style="font-family:'DM Mono';font-size:14px;font-weight:500;color:var(--ink-900);margin-top:2px">Mkt cap &gt; $2B · US</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Matches (rich signal rows with Lens thesis) -->
+    <div style="padding:20px 28px;background:var(--ink-0)">
+      <h3 style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-600);margin-bottom:14px">4 current matches</h3>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+
+        <!-- match 1 -->
+        <div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:16px;border:1px solid var(--ink-200);border-radius:10px;background:var(--ink-0)">
+          <div style="display:flex;gap:12px;align-items:center">
+            <div style="width:44px;height:44px;border-radius:8px;background:#1B2B4A;color:#fff;display:grid;place-items:center;font-weight:700">P</div>
+            <div>
+              <div style="font-family:Sora;font-weight:700;font-size:15px">PLTR</div>
+              <div style="font-size:11px;color:var(--ink-500)">Palantir Technologies</div>
+            </div>
+            <div style="margin-left:12px">
+              <span style="font-family:Sora;font-weight:700;font-size:20px;background:var(--up);color:var(--ink-0);width:32px;height:32px;border-radius:6px;display:inline-grid;place-items:center;line-height:1">A</span>
+              <span style="font-family:'DM Mono';font-size:12px;color:var(--ink-700);margin-left:6px">84 <span style="color:var(--up)">+12</span></span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:13px;color:var(--ink-800);line-height:19px">
+              PLTR passes on News +12 from $800M DoD renewal, Smart Money at 74 with three director buys last week,
+              and momentum cleared the 50-day. <strong>R:R 4.5</strong> · entry 26.10 / target 31.50 / stop 24.90.
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <span style="background:var(--navy-lt);color:var(--navy);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">Momentum 82</span>
+              <span style="background:var(--plum-lt);color:var(--plum);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">News 92</span>
+              <span style="background:var(--teal-lt);color:var(--teal);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">Smart $ 74</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button style="background:var(--forest);color:var(--ink-0);border:none;font-size:11px;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer">↗ Run Lens</button>
+            <button style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);font-size:11px;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer">＋ Watchlist</button>
+          </div>
+        </div>
+
+        <!-- match 2 -->
+        <div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:16px;border:1px solid var(--ink-200);border-radius:10px;background:var(--ink-0)">
+          <div style="display:flex;gap:12px;align-items:center">
+            <div style="width:44px;height:44px;border-radius:8px;background:#6B2C91;color:#fff;display:grid;place-items:center;font-weight:700">A</div>
+            <div>
+              <div style="font-family:Sora;font-weight:700;font-size:15px">ALLY</div>
+              <div style="font-size:11px;color:var(--ink-500)">Ally Financial</div>
+            </div>
+            <div style="margin-left:12px">
+              <span style="font-family:Sora;font-weight:700;font-size:20px;background:var(--up);color:var(--ink-0);width:32px;height:32px;border-radius:6px;display:inline-grid;place-items:center;line-height:1">A</span>
+              <span style="font-family:'DM Mono';font-size:12px;color:var(--ink-700);margin-left:6px">87 <span style="color:var(--up)">+4</span></span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:13px;color:var(--ink-800);line-height:19px">
+              ALLY passes on CFO Jane Doe's $2.4M insider purchase (largest since records begin 2023-05-12), Q1 EPS beat driving News +12, and a clean setup just above the 20-day low.
+              <strong>R:R 3.1</strong> · entry 34.20 / target 38.50 / stop 32.80.
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <span style="background:var(--teal-lt);color:var(--teal);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">Smart $ 82</span>
+              <span style="background:var(--plum-lt);color:var(--plum);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">News 82</span>
+              <span style="background:var(--amber-lt);color:var(--amber);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">Fundamentals 71</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button style="background:var(--forest);color:var(--ink-0);border:none;font-size:11px;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer">↗ Run Lens</button>
+            <button style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);font-size:11px;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer">＋ Watchlist</button>
+          </div>
+        </div>
+
+        <!-- match 3 -->
+        <div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:16px;border:1px solid var(--ink-200);border-radius:10px;background:var(--ink-0)">
+          <div style="display:flex;gap:12px;align-items:center">
+            <div style="width:44px;height:44px;border-radius:8px;background:#d01c1f;color:#fff;display:grid;place-items:center;font-weight:700">H</div>
+            <div>
+              <div style="font-family:Sora;font-weight:700;font-size:15px">HELE</div>
+              <div style="font-size:11px;color:var(--ink-500)">Helen of Troy Limited</div>
+            </div>
+            <div style="margin-left:12px">
+              <span style="font-family:Sora;font-weight:700;font-size:20px;background:var(--up);color:var(--ink-0);width:32px;height:32px;border-radius:6px;display:inline-grid;place-items:center;line-height:1">A</span>
+              <span style="font-family:'DM Mono';font-size:12px;color:var(--ink-700);margin-left:6px">82 <span style="color:var(--up)">+20</span></span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:13px;color:var(--ink-800);line-height:19px">
+              HELE passes on a 38% EPS surprise, DCF 34% below fair value, and sentiment flipped positive after three consecutive analyst upgrades.
+              <strong>R:R 6.0</strong> · entry 23.00 / target 29.00 / stop 22.00.
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <span style="background:var(--amber-lt);color:var(--amber);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">Valuation 91</span>
+              <span style="background:var(--plum-lt);color:var(--plum);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">News 76</span>
+              <span style="background:var(--amber-lt);color:var(--amber);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">Fundamentals 78</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button style="background:var(--forest);color:var(--ink-0);border:none;font-size:11px;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer">↗ Run Lens</button>
+            <button style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);font-size:11px;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer">＋ Watchlist</button>
+          </div>
+        </div>
+
+        <!-- match 4 -->
+        <div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:16px;border:1px solid var(--ink-200);border-radius:10px;background:var(--ink-0)">
+          <div style="display:flex;gap:12px;align-items:center">
+            <div style="width:44px;height:44px;border-radius:8px;background:#4b2e7e;color:#fff;display:grid;place-items:center;font-weight:700">U</div>
+            <div>
+              <div style="font-family:Sora;font-weight:700;font-size:15px">URI</div>
+              <div style="font-size:11px;color:var(--ink-500)">United Rentals</div>
+            </div>
+            <div style="margin-left:12px">
+              <span style="font-family:Sora;font-weight:700;font-size:20px;background:var(--up);color:var(--ink-0);width:32px;height:32px;border-radius:6px;display:inline-grid;place-items:center;line-height:1">A</span>
+              <span style="font-family:'DM Mono';font-size:12px;color:var(--ink-700);margin-left:6px">86 <span style="color:var(--up)">+8</span></span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:13px;color:var(--ink-800);line-height:19px">
+              URI passes on a Fundamentals A (29% ROE), two director buys in the last week, and a secular infrastructure tailwind.
+              <strong>R:R 2.8</strong> · entry 960 / target 1,080 / stop 920.
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <span style="background:var(--amber-lt);color:var(--amber);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">Fundamentals 89</span>
+              <span style="background:var(--teal-lt);color:var(--teal);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">Smart $ 72</span>
+              <span style="background:var(--navy-lt);color:var(--navy);font-size:10px;padding:2px 6px;border-radius:4px;font-family:'DM Mono'">Trend 76</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button style="background:var(--forest);color:var(--ink-0);border:none;font-size:11px;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer">↗ Run Lens</button>
+            <button style="background:var(--ink-0);border:1px solid var(--ink-300);color:var(--ink-800);font-size:11px;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer">＋ Watchlist</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Historical performance chart -->
+    <div style="padding:20px 28px;background:var(--ink-50);border-top:1px solid var(--ink-200)">
+      <h3 style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-600);margin-bottom:14px">Track record · this screen · last 180 days</h3>
+      <div style="display:grid;grid-template-columns:120px 120px 120px 120px 1fr;gap:16px;font-family:'DM Mono'">
+        <div>
+          <div style="font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em">Hit rate</div>
+          <div style="font-size:24px;font-weight:500;color:var(--up);line-height:1.2">64%</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em">Avg return</div>
+          <div style="font-size:24px;font-weight:500;color:var(--up);line-height:1.2">+6.2%</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em">Avg hold</div>
+          <div style="font-size:24px;font-weight:500;color:var(--ink-800);line-height:1.2">11 d</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em">Signals</div>
+          <div style="font-size:24px;font-weight:500;color:var(--ink-800);line-height:1.2">138</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Cumulative return vs. SPY</div>
+          <svg viewBox="0 0 400 60" style="width:100%;height:60px" preserveAspectRatio="none">
+            <polyline fill="none" stroke="#0A7F4F" stroke-width="1.8" points="0,48 30,45 60,40 90,38 120,33 150,34 180,28 210,26 240,22 270,20 300,18 330,14 360,10 400,8"/>
+            <polyline fill="none" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="3 3" points="0,48 30,47 60,46 90,45 120,43 150,44 180,40 210,39 240,38 270,37 300,35 330,34 360,32 400,30"/>
+          </svg>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-500);margin-top:10px">
+        Methodology: closed signals in the trailing 180 days, T+target or T+stop, whichever first. Past performance does not guarantee future results. <span style="color:var(--forest);cursor:pointer">View audit log →</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="qa">
+    <h4>Why this page matters</h4>
+    <p>① Editorial screens are <strong>canonical SEO pages</strong> — "/screens/high-conviction-buys" can rank for
+    long-tail queries like "best AI stocks to buy" or "stocks with heavy insider buying."<br>
+    ② The <strong>criteria block</strong> turns the screen into a teaching moment — users learn factor language
+    by looking at what an A-grade screen requires.<br>
+    ③ <strong>Track record block</strong> is the trust wedge nobody else publishes — Danelfin shows aggregate
+    backtest, we show this specific screen's 180-day hit rate. Directly reinforces the "explainable" moat.<br>
+    ④ <strong>"Alert on new matches"</strong> CTA turns the page into a standing Pro-tier hook.</p>
   </div>
 </section>
 
