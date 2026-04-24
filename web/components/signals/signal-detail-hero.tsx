@@ -2,19 +2,8 @@
 
 import { cn } from "@/lib/utils";
 import type { Signal, StockInfo } from "@/lib/api";
-import { ScoreRing } from "@/components/signals/score-ring";
-import { SignalBadge } from "@/components/signals/signal-badge";
-
-// Non-directive variant per QA-P0-4 + docs/DESIGN_TICKER_DEEP_DIVE.md.
-// "BUY TODAY" reads like investment advice; "In research set" reads like an
-// editorial label. Avoid / setup / high-score cover the other buckets.
-function researchSetVariant(signalType: string, scoreTotal: number) {
-  const t = signalType.toUpperCase();
-  if (t === "AVOID" || t === "HIGH_RISK") return "avoid" as const;
-  if (scoreTotal >= 85) return "high-score" as const;
-  if (t === "BUY_TODAY" || t === "BUY") return "setup" as const;
-  return "research" as const;
-}
+import { StockLogo } from "@/components/ui/stock-logo";
+import { ScoreGradeChip } from "@/components/ui/score-grade-chip";
 
 // Signal horizon is a single int on the wire today; the UI presents it as a
 // range because the scoring engine writes the center of a window. Soft range
@@ -24,15 +13,19 @@ function formatHorizon(horizonDays: number | null): string | null {
   if (horizonDays == null || horizonDays <= 0) return null;
   const lo = Math.max(1, Math.round(horizonDays * 0.8));
   const hi = Math.max(lo + 1, Math.round(horizonDays * 1.25));
-  return `${lo}–${hi} day horizon`;
+  return `${lo}–${hi}d horizon`;
 }
 
 /**
- * Signal/Ticker detail hero — ticker + badge, company, price/change, action
- * buttons on the left; 140px composite score ring on the right.
+ * v3 Ticker detail hero. Two stacks:
+ *   1. Identity row — logo + ticker + company meta + action buttons
+ *   2. Score panel — letter grade (A–F) + numeric composite + delta
+ *      alongside price + change + market cap + volume
  *
- * The hero is deliberately flat (no card surrounding the whole thing) because
- * it's the page's title area. The score ring is the only chrome-heavy element.
+ * The v2 ScoreRing is retired at the hero level in favor of the letter +
+ * numeric dual-display (see UX_AUDIT open question #4 resolution). The
+ * full 8-factor radar still renders below the hero via
+ * FactorBreakdownPanel — the hero is just the glance surface.
  */
 export function SignalDetailHero({
   ticker,
@@ -46,98 +39,88 @@ export function SignalDetailHero({
   ticker: string;
   signal: Signal | null | undefined;
   stock: StockInfo | null | undefined;
-  /** Pre-formatted market cap string, e.g. "$2.18T" */
   marketCap?: string;
-  /** Pre-formatted volume string, e.g. "28.4M" */
   volume?: string;
-  /** Optional action buttons (Pin, Add to watchlist, etc.) */
   actions?: React.ReactNode;
   className?: string;
 }) {
   const up = (signal?.changePct ?? 0) >= 0;
-  const variant = signal
-    ? researchSetVariant(signal.signalType, signal.scoreTotal)
-    : "research";
-
   const horizonLabel = signal ? formatHorizon(signal.horizonDays) : null;
-  // Company + signal meta on one line, mockup order:
-  //   Microsoft Corp · Signal #106 · 15–20 day horizon
-  // Sector + exchange move into the Fundamentals deep-dive row — keeps the
-  // hero tight on the ticker identity.
   const metaParts = [
     stock?.name,
     signal ? `Signal #${signal.id}` : null,
     horizonLabel,
   ].filter((v): v is string => !!v);
-  const companyLine = metaParts.join(" · ");
 
   return (
     <section
       className={cn(
-        "grid gap-8 items-start rounded-[10px] border border-ink-200 bg-ink-0 p-8",
-        "grid-cols-1 lg:grid-cols-[1fr_140px]",
+        "rounded-[12px] border border-ink-200 bg-ink-0 p-6 md:p-8",
         className,
       )}
     >
-      <div className="min-w-0">
-        <div className="flex items-center gap-3 mb-1.5">
-          <h1 className="font-[var(--font-heading)] text-[36px] leading-none font-bold text-ink-950 tracking-[-0.02em]">
+      {/* Identity row */}
+      <div className="flex items-start gap-4 md:gap-5">
+        <StockLogo ticker={ticker} size="lg" className="flex-shrink-0" />
+
+        <div className="min-w-0 flex-1">
+          <h1 className="font-[var(--font-heading)] text-[28px] md:text-[32px] leading-[1.05] font-bold text-ink-950 tracking-[-0.02em]">
             {ticker.toUpperCase()}
           </h1>
-          {signal && <SignalBadge variant={variant} />}
+          <p className="font-[var(--font-sans)] text-[13px] text-ink-500 mt-1 truncate">
+            {metaParts.join(" · ") || "—"}
+          </p>
         </div>
 
-        <p className="font-[var(--font-sans)] text-[14px] text-ink-500 mb-5">
-          {companyLine || "—"}
-        </p>
-
-        <div className="flex flex-wrap items-baseline gap-3">
-          {signal?.currentPrice != null && (
-            <div className="font-[var(--font-mono)] text-[28px] font-medium text-ink-950 tracking-[-0.02em] leading-none">
-              ${formatPrice(signal.currentPrice)}
-            </div>
-          )}
-          {signal?.changePct != null && (
-            <div
-              className={cn(
-                "font-[var(--font-mono)] text-[15px] font-medium leading-none",
-                up ? "text-up" : "text-down",
-              )}
-            >
-              {up ? "▲" : "▼"} {up ? "+" : ""}{signal.changePct.toFixed(2)}% today
-            </div>
-          )}
-          {(marketCap || volume) && (
-            <div className="font-[var(--font-mono)] text-[12px] text-ink-500">
-              {marketCap && `Market cap ${marketCap}`}
-              {marketCap && volume && " · "}
-              {volume && `Vol ${volume}`}
-            </div>
-          )}
-        </div>
-
-        {actions && <div className="mt-6 flex flex-wrap gap-2">{actions}</div>}
+        {actions && (
+          <div className="hidden md:flex flex-wrap gap-2 flex-shrink-0">
+            {actions}
+          </div>
+        )}
       </div>
 
+      {/* Score panel — wash background so it reads as a distinct focal block */}
       {signal && (
-        <div className="justify-self-center lg:justify-self-end">
-          <ScoreRing
+        <div className="mt-5 rounded-[10px] bg-ink-50 p-4 md:p-5 grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4 md:gap-6 items-center">
+          <ScoreGradeChip
             score={signal.scoreTotal}
-            segments={
-              signal.breakdown
-                ? [
-                    signal.breakdown.momentumScore,
-                    signal.breakdown.relVolumeScore,
-                    signal.breakdown.newsScore,
-                    signal.breakdown.fundamentalsScore,
-                    signal.breakdown.sentimentScore,
-                    signal.breakdown.trendScore,
-                    signal.breakdown.riskScore,
-                  ]
-                : undefined
-            }
+            delta={null /* TODO: wire to yesterday's score once history table ships */}
+            size="lg"
+            showNum={true}
+            showDelta={false}
           />
+          <div className="min-w-0 flex flex-col gap-1.5">
+            {signal.currentPrice != null && (
+              <div className="flex flex-wrap items-baseline gap-3">
+                <span className="font-[var(--font-mono)] text-[26px] md:text-[28px] font-medium text-ink-950 tracking-[-0.01em] leading-none">
+                  ${formatPrice(signal.currentPrice)}
+                </span>
+                {signal.changePct != null && (
+                  <span
+                    className={cn(
+                      "font-[var(--font-mono)] text-[14px] font-medium leading-none",
+                      up ? "text-up" : "text-down",
+                    )}
+                  >
+                    {up ? "+" : ""}{signal.changePct.toFixed(2)}% today
+                  </span>
+                )}
+              </div>
+            )}
+            {(marketCap || volume) && (
+              <div className="font-[var(--font-mono)] text-[11px] text-ink-500">
+                {marketCap && `Market cap ${marketCap}`}
+                {marketCap && volume && " · "}
+                {volume && `Vol ${volume}`}
+              </div>
+            )}
+          </div>
         </div>
+      )}
+
+      {/* Mobile action bar (hidden on md+ since actions float in the identity row) */}
+      {actions && (
+        <div className="mt-4 flex flex-wrap gap-2 md:hidden">{actions}</div>
       )}
     </section>
   );
