@@ -379,6 +379,72 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         });
     }
 
+    /// <summary>Fast-path bulk refresh for the top-N active stocks by
+    /// market cap. Bars-only (skips fundamentals + news) so one call
+    /// finishes in ~30–60s instead of the 5–10 minutes of
+    /// /admin/ingest/run. Use this when Top Gainers is stale — the
+    /// "INTC up 22% today isn't showing" class of ask.</summary>
+    [HttpPost("ingest/top-caps")]
+    public async Task<IActionResult> IngestTopCaps(
+        [FromQuery] int count = 100,
+        [FromQuery] int maxParallel = 8,
+        CancellationToken ct = default)
+    {
+        count = Math.Clamp(count, 1, 1000);
+        maxParallel = Math.Clamp(maxParallel, 1, 20);
+
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            ActorUserId = AdminUserId,
+            Action = "ingest_top_caps",
+            EntityType = "market_data",
+        });
+        await db.SaveChangesAsync(ct);
+
+        var tickers = await db.Stocks
+            .AsNoTracking()
+            .Where(s => s.Active)
+            .OrderByDescending(s => s.MarketCap ?? 0)
+            .Select(s => s.Ticker)
+            .Take(count)
+            .ToListAsync(ct);
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var results = new System.Collections.Concurrent.ConcurrentBag<(string Ticker, int Bars, string? Error)>();
+        using var gate = new SemaphoreSlim(maxParallel);
+
+        var tasks = tickers.Select(async t =>
+        {
+            await gate.WaitAsync(ct);
+            try
+            {
+                var r = await ingestion.IngestStockAsync(t, ct, backfill: false, barsOnly: true);
+                results.Add((t, r.Bars, null));
+            }
+            catch (Exception ex)
+            {
+                results.Add((t, 0, ex.Message));
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+        sw.Stop();
+
+        return Ok(new
+        {
+            requested = tickers.Count,
+            succeeded = results.Count(r => r.Error is null),
+            failed = results.Count(r => r.Error is not null),
+            totalBars = results.Sum(r => r.Bars),
+            elapsedMs = sw.ElapsedMilliseconds,
+            errors = results.Where(r => r.Error is not null).Take(10).Select(r => new { r.Ticker, r.Error }),
+        });
+    }
+
     /// <summary>Ingest data for a single stock (on-demand).</summary>
     [HttpPost("ingest/{ticker}")]
     public async Task<IActionResult> IngestStock(string ticker, CancellationToken ct)
