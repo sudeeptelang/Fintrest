@@ -36,11 +36,15 @@ type FactorSpec = {
   smart?: boolean;
 };
 
+// Using the /10 opacity modifier on the base color instead of -light
+// tokens so the classes work even if the Tailwind token registration
+// hits a JIT cache edge case. Same visual weight, no dependency on the
+// -light variant picking up.
 const FAMILY_STYLE: Record<Family, { label: string; pillBg: string; pillText: string; dot: string; bar: string; rowBg: string }> = {
-  technical:    { label: "Technical",    pillBg: "bg-navy-light",  pillText: "text-navy",  dot: "#1E3A5F", bar: "bg-navy",  rowBg: "bg-navy-light/40" },
-  fundamentals: { label: "Fundamentals", pillBg: "bg-amber-light", pillText: "text-amber", dot: "#B8862F", bar: "bg-amber", rowBg: "bg-amber-light/40" },
-  sentiment:    { label: "Sentiment",    pillBg: "bg-plum-light",  pillText: "text-plum",  dot: "#6B3B5E", bar: "bg-plum",  rowBg: "bg-plum-light/40" },
-  smart:        { label: "Smart Money",  pillBg: "bg-teal-light",  pillText: "text-teal",  dot: "#2F7A7A", bar: "bg-teal",  rowBg: "bg-teal-light/40" },
+  technical:    { label: "Technical",    pillBg: "bg-navy/10",  pillText: "text-navy",  dot: "#1E3A5F", bar: "bg-navy",  rowBg: "bg-navy/5" },
+  fundamentals: { label: "Fundamentals", pillBg: "bg-amber/10", pillText: "text-amber", dot: "#B8862F", bar: "bg-amber", rowBg: "bg-amber/5" },
+  sentiment:    { label: "Sentiment",    pillBg: "bg-plum/10",  pillText: "text-plum",  dot: "#6B3B5E", bar: "bg-plum",  rowBg: "bg-plum/5" },
+  smart:        { label: "Smart Money",  pillBg: "bg-teal/10",  pillText: "text-teal",  dot: "#2F7A7A", bar: "bg-teal",  rowBg: "bg-teal/5" },
 };
 
 export function FactorBreakdownPanel({

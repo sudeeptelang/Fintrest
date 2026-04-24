@@ -34,10 +34,10 @@ type Preset = {
 };
 
 const FAMILY_STYLE: Record<Family, { accent: string; bg: string; pill: string; pillText: string; dot: string }> = {
-  technical:    { accent: "border-l-navy",  bg: "bg-navy-light/30",  pill: "bg-navy-light",  pillText: "text-navy",  dot: "bg-navy" },
-  fundamentals: { accent: "border-l-amber", bg: "bg-amber-light/30", pill: "bg-amber-light", pillText: "text-amber", dot: "bg-amber" },
-  sentiment:    { accent: "border-l-plum",  bg: "bg-plum-light/30",  pill: "bg-plum-light",  pillText: "text-plum",  dot: "bg-plum" },
-  smart:        { accent: "border-l-teal",  bg: "bg-teal-light/30",  pill: "bg-teal-light",  pillText: "text-teal",  dot: "bg-teal" },
+  technical:    { accent: "border-l-navy",  bg: "bg-navy/5",   pill: "bg-navy/10",  pillText: "text-navy",  dot: "bg-navy" },
+  fundamentals: { accent: "border-l-amber", bg: "bg-amber/5",  pill: "bg-amber/10", pillText: "text-amber", dot: "bg-amber" },
+  sentiment:    { accent: "border-l-plum",  bg: "bg-plum/5",   pill: "bg-plum/10",  pillText: "text-plum",  dot: "bg-plum" },
+  smart:        { accent: "border-l-teal",  bg: "bg-teal/5",   pill: "bg-teal/10",  pillText: "text-teal",  dot: "bg-teal" },
 };
 
 const PRESETS: Preset[] = [

@@ -23,11 +23,14 @@ type FactorContribution = {
   family: Family;
 };
 
+// Using /10 opacity on base colors — more resilient than depending on
+// the -light variant tokens being registered at JIT time. Borders use
+// /30 so the pill edge stays visible without being loud.
 const FAMILY_STYLE: Record<Family, { chipPos: string; chipNeg: string }> = {
-  technical:    { chipPos: "bg-navy-light text-navy border-navy",        chipNeg: "bg-ink-50 text-ink-700 border-ink-300" },
-  fundamentals: { chipPos: "bg-amber-light text-amber border-amber",     chipNeg: "bg-ink-50 text-ink-700 border-ink-300" },
-  sentiment:    { chipPos: "bg-plum-light text-plum border-plum",        chipNeg: "bg-ink-50 text-ink-700 border-ink-300" },
-  smart:        { chipPos: "bg-teal-light text-teal border-teal",        chipNeg: "bg-ink-50 text-ink-700 border-ink-300" },
+  technical:    { chipPos: "bg-navy/10 text-navy border-navy/30",     chipNeg: "bg-ink-50 text-ink-700 border-ink-300" },
+  fundamentals: { chipPos: "bg-amber/10 text-amber border-amber/30",  chipNeg: "bg-ink-50 text-ink-700 border-ink-300" },
+  sentiment:    { chipPos: "bg-plum/10 text-plum border-plum/30",     chipNeg: "bg-ink-50 text-ink-700 border-ink-300" },
+  smart:        { chipPos: "bg-teal/10 text-teal border-teal/30",     chipNeg: "bg-ink-50 text-ink-700 border-ink-300" },
 };
 
 export function DrivingToday({
