@@ -25,7 +25,7 @@ export default async function Image() {
               width: 48,
               height: 48,
               borderRadius: 10,
-              backgroundColor: "#0F4F3A",
+              backgroundColor: "#1E63B8",
               color: "#FFFFFF",
               display: "flex",
               alignItems: "center",
@@ -48,14 +48,14 @@ export default async function Image() {
               alignItems: "center",
               gap: 10,
               padding: "8px 14px",
-              backgroundColor: "#E8F1EC",
+              backgroundColor: "#E7EFF9",
               borderRadius: 999,
               alignSelf: "flex-start",
-              border: "1px solid rgba(15, 79, 58, 0.2)",
+              border: "1px solid rgba(30, 99, 184, 0.2)",
             }}
           >
-            <div style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: "#0F4F3A" }} />
-            <span style={{ fontSize: 16, color: "#0A3528", fontWeight: 500 }}>
+            <div style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: "#1E63B8" }} />
+            <span style={{ fontSize: 16, color: "#154785", fontWeight: 500 }}>
               Research layer · Updated every morning before the open
             </span>
           </div>
@@ -72,7 +72,7 @@ export default async function Image() {
             }}
           >
             <span>Every stock idea,&nbsp;</span>
-            <span style={{ color: "#0F4F3A" }}>stress-tested before the open.</span>
+            <span style={{ color: "#1E63B8" }}>stress-tested before the open.</span>
           </div>
           <div style={{ fontSize: 22, color: "#475467", lineHeight: 1.4, maxWidth: 880, marginTop: 8 }}>
             Explainable signals, 7-factor scoring, a public audit log.

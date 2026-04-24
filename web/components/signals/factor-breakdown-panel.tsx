@@ -114,11 +114,11 @@ export function FactorBreakdownPanel({
               <Radar
                 name="Score"
                 dataKey="score"
-                stroke="#0F4F3A"
-                fill="#0F4F3A"
+                stroke="#1E63B8"
+                fill="#1E63B8"
                 fillOpacity={0.18}
                 strokeWidth={2}
-                dot={{ r: 3.5, fill: "#0F4F3A", stroke: "#fff", strokeWidth: 2 }}
+                dot={{ r: 3.5, fill: "#1E63B8", stroke: "#fff", strokeWidth: 2 }}
               />
             </RadarChart>
           </ResponsiveContainer>

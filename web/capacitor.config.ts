@@ -49,13 +49,13 @@ const config = {
   plugins: {
     SplashScreen: {
       launchShowDuration: 1200,
-      backgroundColor: "#0F6E56",
+      backgroundColor: "#1E63B8",
       androidScaleType: "CENTER_CROP",
       splashImmersive: true,
     },
     StatusBar: {
       style: "LIGHT",
-      backgroundColor: "#0F6E56",
+      backgroundColor: "#1E63B8",
     },
   },
 };

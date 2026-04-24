@@ -20,15 +20,21 @@
 | **Data** | Polygon.io, FMP, Finnhub, Yahoo Finance (fallback) |
 | **Infra** | Vercel (web), Supabase (DB/auth), AWS SES (email), Stripe (billing) |
 
-## Design Tokens — v2.0 Forest & Rust
+## Design Tokens — v3 Sky & Rust (2026-04-24, migrated from Forest)
 
-> Full spec: `@docs/DESIGN_LANGUAGE_V2.md` · Clickable preview: `docs/fintrest_screens_v2_preview.html`
-> v2 supersedes v1. All new UI work uses v2 tokens.
+> Full spec: `@docs/DESIGN_LANGUAGE_V2.md` (rename to V3 pending) · Clickable previews:
+> `docs/fintrest_screens_v3_preview.html` (current) · `docs/fintrest_screens_v2_preview.html` (historical)
+> v3 supersedes v2. Brand migrated from Forest Green to Sky Blue — forest flattened the
+> Today grid's visual hierarchy and the whole page read as one green mass. Blue pairs
+> cleanly with performance green and fits the finance-category trust expectation.
+> CSS / Tailwind token names retained as `forest*` for minimal component diff; proper
+> rename (`forest` → `sky`/`brand`) lands in a follow-up once downstream code is verified.
 
 ```
-Brand:        forest      #0F4F3A   forest-dark  #0A3528   forest-light #E8F1EC
+Brand:        sky         #1E63B8   sky-dark     #154785   sky-light    #E7EFF9
+                          (CSS tokens still named --forest, --forest-dark, --forest-light)
 Accent:       rust        #B8502F   rust-dark    #8A3B1F   rust-light   #FBF0EA
-Semantic up:  #0A7F4F     (positive performance — separate from brand)
+Semantic up:  #0A7F4F     (positive performance — now clean, no conflict with brand)
 Semantic dn:  #6B5443     (negative performance — warm gray-brown, NOT red)
 Warn:         #B25E09     Danger: #912018
 
@@ -46,7 +52,7 @@ Motion:       120ms ease-out default, no parallax, no skeleton shimmer
 
 ## Non-Negotiable Rules
 
-1. **Three greens, three jobs** — forest = brand (nav, CTA, logo, Lens gutter), forest-dark = hover/pressed, up `#0A7F4F` = performance data. Never swap.
+1. **Two greens, two jobs** — up `#0A7F4F` = positive performance data, down `#6B5443` = negative performance. Brand is sky blue now, no more tension with performance green.
 2. **Down is warm gray-brown, never red.** Red (`danger`) is reserved for destructive actions.
 3. **No emoji in the UI.** Lucide icons only, 1.5px stroke.
 4. **Lens thesis always has the forest gutter** (2px forest left border + 16px padding + body-lg DM Sans). The typographic signature. Rust gutter when Lens is quoting a source.

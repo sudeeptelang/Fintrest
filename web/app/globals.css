@@ -142,20 +142,25 @@
   --ink-900: #101828;
   --ink-950: #060C1A;
 
-  /* Brand — forest (MVP-1 spec: #0F6E56, up-shifted from #0F4F3A for
-     better contrast against ink-50 surface per FINTREST_UX_SPEC §03).
-     Token names kept as `forest*` so every existing Tailwind class
-     (bg-forest, text-forest-dark, etc.) picks up the new color
-     without per-component edits. */
-  --forest:       #0F6E56;
-  --forest-light: #E8F2ED;
-  --forest-dark:  #0A5540;
+  /* Brand — Sky Blue (locked in 2026-04-24, migrated from Forest Green
+     #0F6E56 / #0F4F3A). Token names retained as `forest*` so every
+     existing Tailwind class (bg-forest, text-forest-dark, etc.) picks
+     up the new color atomically without per-component edits. Proper
+     rename (`forest` → `sky` or `brand`) ships in a follow-up once all
+     downstream code is verified. Rationale: forest flattened visual
+     hierarchy on the Today grid (the score got drowned in brand
+     chrome), and the new "two greens, two jobs" doctrine is cleaner
+     than "three greens" — brand blue no longer fights performance
+     green. See docs/fintrest_screens_v3_preview.html (Brand A/B tab). */
+  --forest:       #1E63B8;
+  --forest-light: #E7EFF9;
+  --forest-dark:  #154785;
 
-  /* Lens card bg — mid-tone between forest-light and ink-100. Only used for Lens thesis cards. */
-  --lens-bg:      #DBEBE3;
+  /* Lens card bg — mid-tone between sky-light and ink-100. */
+  --lens-bg:      #D8E5F2;
 
   /* Board cover palette — 8 colors, low-saturation, no primaries */
-  --cover-forest: #0F6E56;
+  --cover-forest: #1E63B8;
   --cover-rust:   #B8502F;
   --cover-ink-700: #344054;
   --cover-ink-500: #667085;

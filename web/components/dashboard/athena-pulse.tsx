@@ -178,9 +178,9 @@ function getRegimeMeta(regime: string | undefined): {
   label: string;
 } {
   switch (regime) {
-    case "bull":    return { color: "#0F4F3A", colorDark: "#0A3528", label: "Bull regime" };
+    case "bull":    return { color: "#1E63B8", colorDark: "#154785", label: "Bull regime" };
     case "bear":    return { color: "#6B5443", colorDark: "#4A3B2E", label: "Bear regime" };
     case "highvol": return { color: "#B25E09", colorDark: "#8A4A07", label: "Fear spike" };
-    default:        return { color: "#0F4F3A", colorDark: "#0A3528", label: "Neutral regime" };
+    default:        return { color: "#1E63B8", colorDark: "#154785", label: "Neutral regime" };
   }
 }

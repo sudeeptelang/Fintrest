@@ -12,29 +12,31 @@
 
 ## Design Language — v2 Forest & Rust
 
-Full spec: `@docs/DESIGN_LANGUAGE_V2.md`.
-Clickable preview: `docs/fintrest_screens_v2_preview.html` (Home / Pricing / About / Disclaimer).
+Full spec: `@docs/DESIGN_LANGUAGE_V2.md` (v3 rename pending).
+Clickable preview: `docs/fintrest_screens_v3_preview.html` (score-first + Sky Blue brand).
 
-**Tokens at a glance:**
-- Brand: `forest #0F4F3A` — nav active, primary CTA, logo, Lens gutter, focus ring
-- Hover: `forest-dark #0A3528`
+**Tokens at a glance (v3, Sky & Rust, 2026-04-24):**
+- Brand: sky blue `#1E63B8` — nav active, primary CTA, logo, Lens gutter, focus ring
+  (CSS tokens still named `--forest`, Tailwind classes still `bg-forest`/`text-forest` for
+  minimal component diff; proper rename lands in a follow-up)
+- Hover: `#154785` (CSS token `--forest-dark`)
 - Accent: `rust #B8502F` — editorial emphasis only ("Lens Editorial", Board-of-the-Day, in-copy highlights)
-- Semantic up: `#0A7F4F` — positive performance (separate from brand)
+- Semantic up: `#0A7F4F` — positive performance (now fully separate from brand)
 - Semantic down: `#6B5443` — negative performance, warm gray-brown (NOT red)
 - Warn: `#B25E09` · Danger: `#912018`
 - Ink stack: 13 grays from `#FFFFFF` (ink-0) to `#060C1A` (ink-950)
 
-**The three greens, reconciled:**
-- `forest` — the brand is wearing this (nav, buttons, logo).
-- `forest-dark` — the brand hovers (pressed/active states).
-- `up` — the data is showing this (stock went up, score is high, bullish regime).
+**The two greens, reconciled (was three, simpler now):**
+- `up #0A7F4F` — stock went up, score is high, bullish regime
+- `down #6B5443` — stock went down, score dropped, bearish regime
+- Brand is blue now, not green — no more conflict between brand green and performance green.
 
 ## Non-Negotiable Rules
 
 1. **No emoji in the UI.** Lucide icons only, 1.5px stroke.
-2. **Three greens, three jobs.** Never swap `forest`, `forest-dark`, `up`.
+2. **Two greens, two jobs.** `up` for positive performance, `down` for negative. Brand is blue.
 3. **Down is warm gray-brown, never red.** Red = `danger` (destructive actions only).
-4. **Lens thesis always has the forest gutter** (2px forest left border + 16px padding + body-lg DM Sans + ink-800). The typographic signature. Rust gutter when Lens is quoting a source.
+4. **Lens thesis always has the brand-blue gutter** (2px `forest`-tokened blue left border + 16px padding + body-lg DM Sans + ink-800). The typographic signature. Rust gutter when Lens is quoting a source.
 5. **Signal levels (entry/target/stop) always together** — never separated in layout. Entry/Target use `up`, Stop uses `down`.
 6. **Compliance disclaimer on every signal page** — "Research only — your decision." on any Lens thesis that references a ticker.
 7. **Mobile-first**: 390px iPhone 15 Pro is the base canvas.
