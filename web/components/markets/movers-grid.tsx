@@ -43,7 +43,7 @@ export function MoversGrid({
   /** Hide the "Full screener →" link when already on the full page */
   showFullScreenerLink?: boolean;
 } = {}) {
-  const { data: screener, isLoading } = useMarketScreener(500);
+  const { data: screener, isLoading } = useMarketScreener(2000);
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [sector, setSector] = useState<string>("all");
   const [capBand, setCapBand] = useState<string>("all");

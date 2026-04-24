@@ -242,18 +242,38 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     public async Task<ActionResult<List<NewsResponse>>> TrendingNews([FromQuery] int limit = 10)
     {
         var cutoff = DateTime.UtcNow.AddDays(-3);
-        var news = await db.NewsItems
+        // Sources we drop from the market-news feed: low-signal
+        // template spam that posts the same headline for every ticker
+        // ("Top S&P500 movers in Friday's session" across KLAC / AMD /
+        // INTC / CHTR / ...). Still indexed for per-ticker news where
+        // the ticker context rescues the redundancy; excluded from the
+        // cross-market feed.
+        var blockedSources = new[] { "ChartMill" };
+        // We overfetch so that after de-duplication by headline we can
+        // still return `limit` distinct stories.
+        var fetchLimit = Math.Min(limit * 4, 200);
+
+        var raw = await db.NewsItems
             .Include(n => n.Stock)
-            .Where(n => n.PublishedAt >= cutoff)
+            .Where(n => n.PublishedAt >= cutoff && !blockedSources.Contains(n.Source ?? ""))
             .OrderByDescending(n => n.PublishedAt)
+            .Take(fetchLimit)
+            .ToListAsync();
+
+        // Headline-prefix dedupe — two news items sharing the first 60
+        // characters are almost always the same story republished per
+        // ticker. Keep the first (most recent).
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var deduped = raw
+            .Where(n => seen.Add((n.Headline ?? "").Length > 60 ? n.Headline!.Substring(0, 60) : (n.Headline ?? "")))
             .Take(limit)
             .Select(n => new NewsResponse(
                 n.Id, n.Headline, n.Summary, n.Source, n.Url,
                 n.SentimentScore, n.CatalystType, n.PublishedAt, n.Stock.Ticker
             ))
-            .ToListAsync();
+            .ToList();
 
-        return Ok(news);
+        return Ok(deduped);
     }
 
     /// <summary>Dashboard screener table — batch of stocks with full snapshot + signal data.</summary>

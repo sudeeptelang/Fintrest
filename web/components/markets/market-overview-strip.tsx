@@ -1,37 +1,33 @@
 "use client";
 
 import { useMemo } from "react";
-import { TrendingUp, TrendingDown, Activity } from "lucide-react";
+import { Activity, TrendingUp, TrendingDown } from "lucide-react";
 import { useMarketIndices, useMarketScreener } from "@/lib/hooks";
 import type { MarketIndex } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 /**
- * Unified Market Overview strip — replaces the old MarketPulse +
- * GlobalIndicesGrid two-card layout with a single three-panel strip
- * showing (1) overall breadth / pulse, (2) key US indices, and
- * (3) Treasury yields. Sits above MoversGrid as the first visual
- * block on /markets.
+ * Unified Market Overview strip. Single block on top of /markets with:
  *
- * Treasury yields are gated behind a "pending feed" placeholder until
- * the FMP /treasury endpoint is wired (FMP_ROADMAP Week 2). No fake
- * data — empty slots with an honest "coming" tag.
+ *   Left:  Market pulse (breadth gauge + up/down/flat split)
+ *   Right: Dense 5-category grid — US equities · International ·
+ *          Commodities · Bonds · Crypto — pulled from /market/indices
+ *          (ETF proxies: SPY/QQQ/EFA/GLD/IBIT and friends).
  *
- * Mobile (<md): panels stack vertically. Desktop (md+): three columns
- * with dividers between them.
+ * Every asset class the backend currently carries surfaces here — no
+ * placeholder slots, no chart. The dataset has ~20 proxies; we show
+ * them all at once so the block is genuinely a "market overview" and
+ * not just a US-indices recap.
+ *
+ * Mobile: category columns stack vertically beneath the pulse card.
  */
 
-// Preferred US-equity index tickers in display order. Anything else
-// returned by /market/indices gets filtered out of this strip — the
-// full global indices picker lives on a dedicated page if needed.
-const US_INDEX_TICKERS = ["SPY", "QQQ", "DIA", "IWM", "VIX"];
-
-// Treasury yield placeholders — displayed as "— pending" until the
-// real feed lands. Structure is ready for a drop-in swap.
-const TREASURY_SLOTS = [
-  { label: "2-year", ticker: "US2Y" },
-  { label: "10-year", ticker: "US10Y" },
-  { label: "30-year", ticker: "US30Y" },
+const CATEGORIES: { key: string; label: string }[] = [
+  { key: "US", label: "US equities" },
+  { key: "International", label: "International" },
+  { key: "Commodities", label: "Commodities" },
+  { key: "Bonds", label: "Bonds" },
+  { key: "Crypto", label: "Crypto" },
 ];
 
 export function MarketOverviewStrip() {
@@ -54,12 +50,15 @@ export function MarketOverviewStrip() {
     return { score, label, up, down, flat, total: rows.length };
   }, [screener]);
 
-  const usIndices = useMemo(() => {
-    const all = indices ?? [];
-    const byTicker = new Map(all.map((i) => [i.ticker.toUpperCase(), i]));
-    return US_INDEX_TICKERS
-      .map((t) => byTicker.get(t))
-      .filter((i): i is MarketIndex => !!i);
+  const grouped = useMemo(() => {
+    const g = new Map<string, MarketIndex[]>();
+    (indices ?? []).forEach((idx) => {
+      const cat = idx.category || "Other";
+      const arr = g.get(cat) ?? [];
+      arr.push(idx);
+      g.set(cat, arr);
+    });
+    return g;
   }, [indices]);
 
   return (
@@ -68,102 +67,108 @@ export function MarketOverviewStrip() {
         <h2 className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-600">
           Market overview
         </h2>
-        <span className="font-mono text-[11px] text-ink-500">
-          Breadth · indices · rates
+        <span className="font-mono text-[11px] text-ink-500 hidden md:inline">
+          Breadth · US · International · Commodities · Bonds · Crypto
         </span>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(200px,260px)_1fr_minmax(180px,240px)] divide-y md:divide-y-0 md:divide-x divide-ink-100">
-        {/* ─── Pulse ─── */}
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(200px,240px)_1fr] divide-y md:divide-y-0 md:divide-x divide-ink-100">
+        {/* ─── Pulse card ─── */}
         <div className="px-5 py-4">
-          <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-600 mb-3 flex items-center gap-1.5">
+          <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-600 mb-2 flex items-center gap-1.5">
             <Activity className="h-3 w-3" strokeWidth={2} />
             Market pulse
           </div>
           {pulse ? (
             <>
-              <div className="flex items-baseline gap-3">
-                <span className={cn("font-[var(--font-heading)] text-[34px] font-bold leading-none tracking-[-0.02em]", pulseTone(pulse.score))}>
+              <div className="flex items-baseline gap-2.5">
+                <span className={cn("font-[var(--font-heading)] text-[36px] font-bold leading-none tracking-[-0.02em]", pulseTone(pulse.score))}>
                   {pulse.score}
                 </span>
-                <span className={cn("font-[var(--font-sans)] text-[13px] font-semibold uppercase tracking-[0.08em]", pulseTone(pulse.score))}>
+                <span className={cn("font-[var(--font-sans)] text-[12px] font-bold uppercase tracking-[0.08em]", pulseTone(pulse.score))}>
                   {pulse.label}
                 </span>
               </div>
-              <p className="mt-1 font-mono text-[11px] text-ink-600">
-                Breadth · {pulse.up} up / {pulse.down} down / {pulse.flat} flat
+              <p className="mt-1.5 font-mono text-[11px] text-ink-600 leading-tight">
+                {pulse.up} up · {pulse.down} down · {pulse.flat} flat
               </p>
-              <div className="mt-3 h-1.5 rounded-full bg-ink-100 overflow-hidden relative">
+              <div className="mt-2.5 h-1.5 rounded-full bg-ink-100 overflow-hidden relative">
                 <div className="absolute inset-0 flex">
                   <div style={{ flex: pulse.down }} className="bg-down" />
                   <div style={{ flex: pulse.flat }} className="bg-ink-300" />
                   <div style={{ flex: pulse.up }} className="bg-up" />
                 </div>
               </div>
+              <p className="mt-2 font-[var(--font-sans)] text-[10px] text-ink-500 leading-tight">
+                Breadth across {pulse.total} tracked tickers
+              </p>
             </>
           ) : (
             <div className="font-mono text-[12px] text-ink-500">Loading…</div>
           )}
         </div>
 
-        {/* ─── US indices ─── */}
+        {/* ─── Category grid ─── */}
         <div className="px-5 py-4">
-          <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-600 mb-3">
-            US indices
-          </div>
-          {usIndices.length === 0 ? (
-            <div className="font-mono text-[12px] text-ink-500">Loading indices…</div>
+          {(indices?.length ?? 0) === 0 ? (
+            <div className="font-mono text-[12px] text-ink-500 py-6 text-center">
+              Loading indices…
+            </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-3">
-              {usIndices.map((idx) => (
-                <IndexCell key={idx.ticker} idx={idx} />
-              ))}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-5 gap-y-4">
+              {CATEGORIES.map(({ key, label }) => {
+                const rows = grouped.get(key) ?? [];
+                if (rows.length === 0) return null;
+                return <CategoryColumn key={key} label={label} rows={rows} />;
+              })}
             </div>
           )}
-        </div>
-
-        {/* ─── Treasury yields ─── */}
-        <div className="px-5 py-4">
-          <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-600 mb-3 flex items-baseline justify-between">
-            <span>US Treasuries</span>
-            <span className="font-mono text-[9px] tracking-normal text-ink-400 normal-case">live feed soon</span>
-          </div>
-          <div className="space-y-2">
-            {TREASURY_SLOTS.map((slot) => (
-              <div key={slot.ticker} className="flex items-baseline justify-between border-b border-ink-100 pb-2 last:border-b-0">
-                <span className="font-[var(--font-sans)] text-[12px] text-ink-700 font-medium">
-                  {slot.label}
-                </span>
-                <span className="font-mono text-[13px] text-ink-400">
-                  —
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-3 font-[var(--font-sans)] text-[10px] text-ink-500 italic leading-tight">
-            FMP /treasury endpoint ships in the Week 2 roadmap — 2y / 10y / 30y yields and yield-curve signal populate here.
-          </p>
         </div>
       </div>
     </section>
   );
 }
 
-function IndexCell({ idx }: { idx: MarketIndex }) {
-  const positive = (idx.changePct ?? 0) >= 0;
+function CategoryColumn({ label, rows }: { label: string; rows: MarketIndex[] }) {
   return (
     <div>
-      <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-500 leading-none">
-        {idx.ticker}
+      <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.09em] text-ink-500 mb-2.5 pb-1.5 border-b border-ink-100">
+        {label}
       </div>
-      <div className="font-mono text-[15px] font-medium text-ink-900 leading-tight mt-1">
-        {idx.price != null
-          ? idx.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : "—"}
+      <ul className="space-y-2.5">
+        {rows.map((idx) => (
+          <IndexRow key={idx.ticker} idx={idx} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function IndexRow({ idx }: { idx: MarketIndex }) {
+  const positive = (idx.changePct ?? 0) >= 0;
+
+  // Label comes like "SPY · S&P 500" — split for compact display.
+  const [symbol, ...rest] = (idx.label ?? idx.ticker).split("·").map((s) => s.trim());
+  const name = rest.join(" · ");
+
+  return (
+    <li className="flex items-baseline justify-between gap-2 leading-none">
+      <div className="min-w-0">
+        <div className="font-[var(--font-heading)] text-[12px] font-bold text-ink-900 leading-tight truncate">
+          {symbol || idx.ticker}
+        </div>
+        <div className="font-[var(--font-sans)] text-[10px] text-ink-500 truncate mt-0.5 leading-tight">
+          {name || "—"}
+        </div>
+        <div className="font-mono text-[12px] font-medium text-ink-900 mt-1 leading-tight">
+          {idx.price != null
+            ? idx.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : "—"}
+        </div>
       </div>
       <div
         className={cn(
-          "font-mono text-[11px] font-medium mt-0.5 inline-flex items-center gap-0.5",
+          "font-mono text-[10px] font-semibold whitespace-nowrap inline-flex items-center gap-0.5",
           positive ? "text-up" : "text-down",
         )}
       >
@@ -174,7 +179,7 @@ function IndexCell({ idx }: { idx: MarketIndex }) {
         )}
         {idx.changePct == null ? "—" : `${positive ? "+" : ""}${idx.changePct.toFixed(2)}%`}
       </div>
-    </div>
+    </li>
   );
 }
 

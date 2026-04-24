@@ -37,7 +37,9 @@ public class SeedController(AppDbContext db, DataIngestionService ingestion, Sca
     /// Supported keys:
     ///   sp500 (~503), nasdaq (~100), dowjones (~30),
     ///   midcap (~400–500, market cap $2B–$20B),
-    ///   russell1k (~900–1100, market cap ≥ $2B).
+    ///   russell1k (~900–1100, market cap ≥ $2B),
+    ///   russell2k (~2000, market cap ≥ $500M),
+    ///   russell3k (~3000, market cap ≥ $150M — covers ~98% of US equity market cap).
     /// Idempotent — only inserts new tickers. Always also adds index ETF proxies (SPY/QQQ/DIA/IWM)
     /// so the /market/indices endpoint has data. Does NOT trigger ingestion — call /seed/ingest after.</summary>
     [HttpPost("preset/{key}")]

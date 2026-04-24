@@ -173,6 +173,12 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
             // Russell 1000 approximation — everything ≥ $2B (covers large + mid).
             // S&P 500 members are already ≥ $14B, so this is additive when merged.
             "russell1k" or "russell1000" => ((long?)2_000_000_000L, (long?)null),
+            // Russell 2000 approximation — mid + smaller names, cap ≥ $500M.
+            // Adds ~1500–2000 tickers on top of russell1k.
+            "russell2k" or "russell2000" => ((long?)500_000_000L, (long?)null),
+            // Russell 3000 approximation — covers ~98% of US equity market cap.
+            // Drops the floor to $150M to pull in the long tail. Can return 3000+.
+            "russell3k" or "russell3000" => ((long?)150_000_000L, (long?)null),
             // Pure mid-cap band ($2B–$20B) — the S&P 400 substitute. Excludes most
             // mega-caps already in the sp500 preset, so combined coverage is
             // sp500 ∪ midcap ≈ Russell 1000 without the noisy small-cap tail.
@@ -194,7 +200,7 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
             "isFund=false",
             "isActivelyTrading=true",
             "country=US",
-            "limit=2000",
+            "limit=3500",
             $"apikey={_apiKey}",
         };
         if (maxCap is not null) parts.Insert(1, $"marketCapLowerThan={maxCap}");
