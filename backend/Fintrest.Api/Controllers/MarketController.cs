@@ -1399,16 +1399,28 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     {
         if (signals.Count == 0) return new();
         var tickers = signals.Select(s => s.Stock.Ticker).Distinct().ToList();
+
+        // Fetch flat then group in-memory. The EF Core query
+        //   GroupBy(t => t.Ticker).Select(g => g.OrderByDescending(...).First())
+        // does not translate to PG SQL and throws
+        // "EmptyProjectionMember not present in the dictionary". Pulling
+        // the raw rows for N tickers (typical N=12) is trivially cheap
+        // and groups cleanly in memory.
         var rows = await db.FundamentalSubscores
             .AsNoTracking()
             .Where(f => tickers.Contains(f.Ticker))
-            .GroupBy(f => f.Ticker)
-            .Select(g => g.OrderByDescending(f => f.AsOfDate).First())
-            .Select(f => new { f.Ticker, f.QualityScore, f.ProfitabilityScore, f.GrowthScore })
+            .Select(f => new { f.Ticker, f.AsOfDate, f.QualityScore, f.ProfitabilityScore, f.GrowthScore })
             .ToListAsync();
-        return rows.ToDictionary(
-            r => r.Ticker,
-            r => (r.QualityScore, r.ProfitabilityScore, r.GrowthScore));
+
+        return rows
+            .GroupBy(r => r.Ticker)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var latest = g.OrderByDescending(r => r.AsOfDate).First();
+                    return (latest.QualityScore, latest.ProfitabilityScore, latest.GrowthScore);
+                });
     }
 
     private static SignalResponse ToDto(
