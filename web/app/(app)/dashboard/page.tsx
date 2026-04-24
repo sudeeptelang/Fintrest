@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useTopPicks, usePlan, planMeets } from "@/lib/hooks";
 import { RegimeStrip } from "@/components/today/regime-strip";
+import { AuditStrip } from "@/components/today/audit-strip";
 import { FeaturedSignalCard } from "@/components/today/featured-signal-card";
 import { SignalTable } from "@/components/today/signal-table";
 import { LensCardGated } from "@/components/lens/lens-card";
@@ -55,6 +56,8 @@ export default function TodayPage() {
           Published {publishedAt()} · {counts.total} signals · {counts.buys} BUY TODAY · {counts.watch} WATCH · Regime: Neutral
         </p>
       </header>
+
+      <AuditStrip />
 
       <RegimeStrip />
 
