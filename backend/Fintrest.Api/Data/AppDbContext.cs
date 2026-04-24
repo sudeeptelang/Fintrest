@@ -58,6 +58,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     // Fundamentals Q/P/G sub-scores — migration 021, §14.1.
     public DbSet<FundamentalSubscore> FundamentalSubscores => Set<FundamentalSubscore>();
 
+    // Smart Money Phase 1 — SEC EDGAR Form 4 insider trades + derived
+    // per-ticker score (migration 024, docs/SMART_MONEY_BUILD_SPEC.md).
+    public DbSet<InsiderTransaction> InsiderTransactions => Set<InsiderTransaction>();
+    public DbSet<InsiderScore> InsiderScores => Set<InsiderScore>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
