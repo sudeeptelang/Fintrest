@@ -78,14 +78,35 @@ public class FundamentalSubscoreService(AppDbContext db, ILogger<FundamentalSubs
             .Select(r => (r.Ticker, r.Sector, r.Quality, r.Profitability, r.Growth))
             .ToList());
 
-        // Replace existing rows for this date (idempotent rerun)
-        var existing = await db.FundamentalSubscores
+        // Replace existing rows for this date (idempotent rerun).
+        // ExecuteDeleteAsync is a single SQL statement — much faster
+        // than loading + RemoveRange for the universe-wide set.
+        await db.FundamentalSubscores
             .Where(f => f.AsOfDate == asOf)
-            .ToListAsync(ct);
-        db.FundamentalSubscores.RemoveRange(existing);
+            .ExecuteDeleteAsync(ct);
 
+        // Chunk inserts. Previously this accumulated ~14,000 entities
+        // into one SaveChanges call, which Npgsql dispatched as a single
+        // multi-statement batch that starved the DB connection pool for
+        // the duration — /admin/system-health and other endpoints would
+        // fail to connect for minutes. Chunking to 500 rows per batch
+        // keeps each write inside a reasonable transaction window.
+        const int chunkSize = 500;
         var written = 0;
         var now = DateTime.UtcNow;
+        var buffer = new List<FundamentalSubscore>(chunkSize);
+
+        async Task FlushAsync()
+        {
+            if (buffer.Count == 0) return;
+            db.FundamentalSubscores.AddRange(buffer);
+            await db.SaveChangesAsync(ct);
+            // Detach to keep the change-tracker light — otherwise memory
+            // grows linearly across chunks for a full-universe run.
+            foreach (var e in buffer) db.Entry(e).State = EntityState.Detached;
+            buffer.Clear();
+        }
+
         foreach (var r in rawByTicker)
         {
             var rk = ranks.TryGetValue(r.Ticker, out var rr) ? rr : (null as (double? q, double? p, double? g)?);
@@ -93,7 +114,7 @@ public class FundamentalSubscoreService(AppDbContext db, ILogger<FundamentalSubs
             var pRank = rk?.p;
             var gRank = rk?.g;
 
-            db.FundamentalSubscores.Add(new FundamentalSubscore
+            buffer.Add(new FundamentalSubscore
             {
                 Ticker = r.Ticker,
                 AsOfDate = asOf,
@@ -111,12 +132,13 @@ public class FundamentalSubscoreService(AppDbContext db, ILogger<FundamentalSubs
                 ComputedAt = now,
             });
             written++;
+            if (buffer.Count >= chunkSize) await FlushAsync();
         }
+        await FlushAsync();
 
-        await db.SaveChangesAsync(ct);
         logger.LogInformation(
-            "FundamentalSubscoreService: wrote {Written} rows for {AsOf} across {Universe} tickers",
-            written, asOf, stocks.Count);
+            "FundamentalSubscoreService: wrote {Written} rows for {AsOf} across {Universe} tickers (chunked {Chunk}/batch)",
+            written, asOf, stocks.Count, chunkSize);
         return new FundamentalSubscoreRunSummary(stocks.Count, written, ranks.Count);
     }
 
