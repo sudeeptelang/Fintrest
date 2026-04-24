@@ -554,6 +554,10 @@ export const api = {
   marketNews: (limit = 10) => fetchApi<NewsItem[]>(`/market/news?limit=${limit}`),
   marketScreener: (limit = 50) => fetchApi<ScreenerRow[]>(`/market/screener?limit=${limit}`),
   marketInsidersLatest: (limit = 50) => authFetchApi<InsiderActivity[]>(`/market/insiders/latest?limit=${limit}`),
+  marketInsidersByTicker: (ticker: string, limit = 10) =>
+    authFetchApi<InsiderActivity[]>(`/market/insiders/${ticker}?limit=${limit}`),
+  marketCongressByTicker: (ticker: string, limit = 10) =>
+    authFetchApi<CongressTradeRow[]>(`/market/congress/${ticker}?limit=${limit}`),
   marketInsiderScore: async (ticker: string): Promise<InsiderScore | null> => {
     // GET /market/insider-score/{ticker} returns 204 when there's no qualifying
     // activity in the 30-day window. Treat that as null — the sub-card renders

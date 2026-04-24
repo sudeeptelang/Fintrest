@@ -38,6 +38,7 @@ import { PerformanceChart } from "@/components/charts/performance-chart";
 import { EarningsHistory } from "@/components/stock/earnings-history";
 import { EarningsChart } from "@/components/charts/earnings-chart";
 import { OwnershipStrip } from "@/components/stock/ownership-strip";
+import { InsiderActivityCard, CongressActivityCard } from "@/components/stock/ticker-activity-cards";
 import type { InsiderScore } from "@/lib/api";
 import {
   buildTakeaways,
@@ -353,6 +354,22 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           emptyMessage="Peer list ships with FMP /stock-peers integration — on the Week 3 roadmap."
           family="fundamentals"
         />
+
+        <DeepDiveRow
+          title="Insider activity"
+          summary="Recent Form 4 filings · cash buys, option exercises, dispositions"
+          family="smart"
+        >
+          <InsiderActivityCard ticker={ticker} />
+        </DeepDiveRow>
+
+        <DeepDiveRow
+          title="Congressional trades"
+          summary="Senate + House disclosures · STOCK Act filings"
+          family="sentiment"
+        >
+          <CongressActivityCard ticker={ticker} />
+        </DeepDiveRow>
 
         {ownership && (
           <DeepDiveRow

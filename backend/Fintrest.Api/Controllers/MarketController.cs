@@ -972,6 +972,83 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         ));
     }
 
+    /// <summary>
+    /// Per-ticker insider activity feed. Reads the same
+    /// market_firehose_snapshots cache as /market/insiders/latest but
+    /// filtered by ticker. Powers the "Insider activity" card on the
+    /// ticker detail page — the replacement for the retired
+    /// /insiders firehose page.
+    /// </summary>
+    [Authorize]
+    [RequiresPlan(PlanType.Pro)]
+    [HttpGet("market/insiders/{ticker}")]
+    public async Task<ActionResult<List<InsiderActivityItem>>> GetInsiderTradesForTicker(
+        string ticker,
+        [FromQuery] int limit = 10)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+        var clamped = Math.Clamp(limit, 1, 100);
+
+        var rows = await db.MarketFirehoseSnapshots
+            .AsNoTracking()
+            .Where(s => s.Kind == "insider" && s.Ticker == normalized)
+            .OrderByDescending(s => s.FilingDate ?? s.TransactionDate)
+            .ThenByDescending(s => s.Id)
+            .Take(clamped)
+            .ToListAsync();
+
+        return Ok(rows.Select(r => new InsiderActivityItem(
+            r.Ticker ?? "",
+            r.TransactionDate?.ToDateTime(TimeOnly.MinValue),
+            r.FilingDate?.ToDateTime(TimeOnly.MinValue),
+            r.ActorName,
+            r.ActorRole,
+            r.TransactionType,
+            r.Shares,
+            r.Price,
+            r.TotalValue
+        )).ToList());
+    }
+
+    /// <summary>
+    /// Per-ticker Congressional activity feed (Senate + House). Reads
+    /// the same market_firehose_snapshots cache as
+    /// /market/congress/latest but filtered by ticker. Powers the
+    /// "Congressional activity" card on the ticker detail page.
+    /// </summary>
+    [Authorize]
+    [RequiresPlan(PlanType.Pro)]
+    [HttpGet("market/congress/{ticker}")]
+    public async Task<ActionResult<List<CongressTradeItem>>> GetCongressTradesForTicker(
+        string ticker,
+        [FromQuery] int limit = 10)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+        var clamped = Math.Clamp(limit, 1, 100);
+
+        var rows = await db.MarketFirehoseSnapshots
+            .AsNoTracking()
+            .Where(s => (s.Kind == "senate" || s.Kind == "house") && s.Ticker == normalized)
+            .OrderByDescending(s => s.DisclosureDate ?? s.TransactionDate)
+            .ThenByDescending(s => s.Id)
+            .Take(clamped)
+            .ToListAsync();
+
+        return Ok(rows.Select(r => new CongressTradeItem(
+            r.Chamber ?? r.Kind,
+            r.Ticker ?? "",
+            r.AssetDescription,
+            r.ActorName,
+            r.TransactionType,
+            r.TransactionDate?.ToDateTime(TimeOnly.MinValue),
+            r.DisclosureDate?.ToDateTime(TimeOnly.MinValue),
+            r.AmountRange,
+            r.SourceUrl
+        )).ToList());
+    }
+
     [Authorize]
     [RequiresPlan(PlanType.Pro)]
     [HttpGet("market/congress/latest")]

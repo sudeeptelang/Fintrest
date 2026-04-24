@@ -155,6 +155,24 @@ export function useInsidersLatest(limit = 100) {
   return useQuery({ queryKey: ["market-insiders", limit], queryFn: () => api.marketInsidersLatest(limit) });
 }
 
+export function useInsidersByTicker(ticker: string, limit = 10) {
+  return useQuery({
+    queryKey: ["market-insiders-ticker", ticker.toUpperCase(), limit],
+    queryFn: () => api.marketInsidersByTicker(ticker.toUpperCase(), limit),
+    enabled: !!ticker,
+    staleTime: 1000 * 60 * 15, // 15 min — firehose cache refreshes nightly anyway
+  });
+}
+
+export function useCongressByTicker(ticker: string, limit = 10) {
+  return useQuery({
+    queryKey: ["market-congress-ticker", ticker.toUpperCase(), limit],
+    queryFn: () => api.marketCongressByTicker(ticker.toUpperCase(), limit),
+    enabled: !!ticker,
+    staleTime: 1000 * 60 * 15,
+  });
+}
+
 export function useInsiderScore(ticker: string) {
   return useQuery({
     queryKey: ["market-insider-score", ticker.toUpperCase()],
