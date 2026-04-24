@@ -439,11 +439,25 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         // EOD bars; without this overlay, intraday users see yesterday's
         // close until 4 PM when today's bar lands. live_quotes is
         // refreshed every 15 min during market hours by LiveQuoteRefreshJob.
+        //
+        // Wrapped in try/catch so the screener degrades gracefully when
+        // migration 027 hasn't been applied yet — callers get
+        // EOD-close data instead of a 500. Log once at Warning so ops
+        // notices the missing migration without spamming every request.
         var tickerUpperSet = stocks.Select(s => s.Ticker).ToList();
-        var liveQuotes = await db.LiveQuotes
-            .AsNoTracking()
-            .Where(l => tickerUpperSet.Contains(l.Ticker))
-            .ToDictionaryAsync(l => l.Ticker);
+        Dictionary<string, Models.LiveQuote> liveQuotes = new();
+        try
+        {
+            liveQuotes = await db.LiveQuotes
+                .AsNoTracking()
+                .Where(l => tickerUpperSet.Contains(l.Ticker))
+                .ToDictionaryAsync(l => l.Ticker);
+        }
+        catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
+        {
+            // live_quotes table missing — migration 027 not applied yet.
+            // Continue without the intraday overlay.
+        }
 
         var rows = new List<ScreenerRowResponse>();
 
