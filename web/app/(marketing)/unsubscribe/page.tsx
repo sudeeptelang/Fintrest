@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Check, AlertCircle, Loader2 } from "lucide-react";
@@ -12,10 +12,34 @@ import { Check, AlertCircle, Loader2 } from "lucide-react";
 // Missing params → show a "use the link from your email" state rather
 // than a confusing error, since bookmarked /unsubscribe URLs without
 // params are a real failure mode.
+//
+// Next.js 16 requires useSearchParams() callers to be wrapped in a
+// Suspense boundary so the build can prerender the shell while the
+// client reads the live URL params. Default export is the Suspense
+// wrapper; UnsubscribeInner does the actual work.
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5185/api/v1";
 
 export default function UnsubscribePage() {
+  return (
+    <Suspense fallback={<UnsubscribeFallback />}>
+      <UnsubscribeInner />
+    </Suspense>
+  );
+}
+
+function UnsubscribeFallback() {
+  return (
+    <main className="max-w-[640px] mx-auto px-4 sm:px-6 py-20">
+      <div className="rounded-[12px] border border-ink-200 bg-ink-0 p-10 text-center">
+        <Loader2 className="h-10 w-10 text-forest mx-auto mb-4 animate-spin" strokeWidth={1.5} />
+        <h1 className="font-[var(--font-heading)] text-[22px] font-semibold text-ink-900">Loading…</h1>
+      </div>
+    </main>
+  );
+}
+
+function UnsubscribeInner() {
   const params = useSearchParams();
   const uid = params?.get("uid");
   const sig = params?.get("sig");
