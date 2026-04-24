@@ -63,6 +63,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<InsiderTransaction> InsiderTransactions => Set<InsiderTransaction>();
     public DbSet<InsiderScore> InsiderScores => Set<InsiderScore>();
 
+    // Smart Money Phase 2 — FMP short interest snapshots (migration 025).
+    // Feeds the "Short dynamics" sub-signal on the Smart Money card.
+    public DbSet<ShortInterestSnapshot> ShortInterestSnapshots => Set<ShortInterestSnapshot>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

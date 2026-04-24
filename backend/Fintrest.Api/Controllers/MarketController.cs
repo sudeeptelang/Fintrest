@@ -1049,6 +1049,40 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
+    /// <summary>Per-ticker short-interest snapshot — the Smart Money
+    /// Phase 2 "Short dynamics" sub-signal. Reads the latest snapshot from
+    /// short_interest_snapshots (populated by
+    /// /admin/short-interest/ingest). Returns 204 if we haven't pulled
+    /// one for this ticker yet.</summary>
+    [HttpGet("market/short-interest/{ticker}")]
+    public async Task<IActionResult> GetShortInterest(
+        string ticker,
+        [FromServices] Fintrest.Api.Services.Scoring.ShortInterestService shortSvc,
+        CancellationToken ct)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+
+        var snap = await shortSvc.GetLatestAsync(normalized, ct);
+        if (snap is null) return NoContent();
+
+        var score = Fintrest.Api.Services.Scoring.ShortInterestService.ScoreFromShortPct(snap.ShortPctFloat);
+        var evidence = Fintrest.Api.Services.Scoring.ShortInterestService.EvidenceFor(snap);
+
+        return Ok(new
+        {
+            ticker = snap.Ticker,
+            settlementDate = snap.SettlementDate,
+            shortPctFloat = snap.ShortPctFloat,
+            daysToCover = snap.DaysToCover,
+            shortInterestShares = snap.ShortInterestShares,
+            floatShares = snap.FloatShares,
+            avgDailyVolume = snap.AvgDailyVolume,
+            score,
+            evidence,
+        });
+    }
+
     /// <summary>
     /// Per-ticker Smart Money score card. Reads the most recent row from
     /// insider_scores — produced nightly by InsiderScoreJob. Returns 204

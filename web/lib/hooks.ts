@@ -183,6 +183,17 @@ export function useInsiderScore(ticker: string) {
   });
 }
 
+export function useShortInterest(ticker: string) {
+  return useQuery({
+    queryKey: ["market-short-interest", ticker.toUpperCase()],
+    queryFn: () => api.marketShortInterest(ticker.toUpperCase()),
+    enabled: !!ticker,
+    // FINRA short-interest publishes bi-monthly; we're well inside that
+    // cadence caching for an hour.
+    staleTime: 1000 * 60 * 60,
+  });
+}
+
 export function useCongressLatest(limit = 100) {
   return useQuery({ queryKey: ["market-congress", limit], queryFn: () => api.marketCongressLatest(limit) });
 }

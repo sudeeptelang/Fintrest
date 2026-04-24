@@ -16,6 +16,7 @@ import {
   useAddWatchlistItem,
   useCreateWatchlist,
   useInsiderScore,
+  useShortInterest,
 } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -39,7 +40,7 @@ import { EarningsHistory } from "@/components/stock/earnings-history";
 import { EarningsChart } from "@/components/charts/earnings-chart";
 import { OwnershipStrip } from "@/components/stock/ownership-strip";
 import { InsiderActivityCard, CongressActivityCard } from "@/components/stock/ticker-activity-cards";
-import type { InsiderScore } from "@/lib/api";
+import type { InsiderScore, ShortInterestResponse } from "@/lib/api";
 import {
   buildTakeaways,
   buildTradePlanBullets,
@@ -82,6 +83,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { data: earnings } = useStockEarnings(ticker);
   const { data: ownership } = useStockOwnership(ticker);
   const { data: insiderScore } = useInsiderScore(ticker);
+  const { data: shortInterest } = useShortInterest(ticker);
   const { data: watchlists } = useWatchlists();
   const addToWatchlist = useAddWatchlistItem();
   const createWatchlist = useCreateWatchlist();
@@ -104,7 +106,11 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   // (institutional, options, congress, short) still show their honest
   // "pending feed" state until the feeds ship.
   const smartMoneySignals: SmartMoneySubSignal[] = buildPlaceholderSmartMoney().map((row) =>
-    row.key === "insider" ? hydrateInsiderRow(row, insiderScore ?? null) : row,
+    row.key === "insider"
+      ? hydrateInsiderRow(row, insiderScore ?? null)
+      : row.key === "short"
+      ? hydrateShortRow(row, shortInterest ?? null)
+      : row,
   );
   const smartMoneyComposite = computeSmartMoneyComposite(smartMoneySignals);
 
@@ -540,6 +546,23 @@ function hydrateInsiderRow(row: SmartMoneySubSignal, score: InsiderScore | null)
     ? `${title} ${name} bought ${dollars}${history ? ` — ${history}` : ""}.`
     : `${score.clusterCount30d ?? 0} insider(s) bought in the last 30 days${history ? ` — ${history}` : ""}.`;
   return { ...row, score: Number(score.score), evidence };
+}
+
+// Swap the pending "short" row for a live one when the FMP short-interest
+// snapshot has been pulled. Score + evidence come straight from the backend
+// — the service owns the scoring curve and the sentence template.
+function hydrateShortRow(
+  row: SmartMoneySubSignal,
+  snap: ShortInterestResponse | null,
+): SmartMoneySubSignal {
+  if (!snap) {
+    return {
+      ...row,
+      evidence: null,
+      pendingMessage: "No short-interest snapshot on file yet — run /admin/short-interest/ingest for this ticker.",
+    };
+  }
+  return { ...row, score: snap.score, evidence: snap.evidence };
 }
 
 function formatDollarsShort(v: number | null | undefined): string | null {

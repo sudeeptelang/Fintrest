@@ -343,6 +343,42 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         });
     }
 
+    /// <summary>Backfill short interest for a list of tickers. Pulls the
+    /// latest FMP short-interest snapshot per ticker and persists.
+    /// Idempotent — re-runs refresh existing rows if FMP revised the
+    /// settlement data. No cron wired yet; this is the manual trigger.</summary>
+    [HttpPost("short-interest/ingest")]
+    public async Task<IActionResult> IngestShortInterest(
+        [FromBody] SyncUniverseRequest request,
+        [FromServices] Fintrest.Api.Services.Scoring.ShortInterestService shortSvc,
+        CancellationToken ct)
+    {
+        if (request?.Tickers is null || request.Tickers.Count == 0)
+            return BadRequest(new { message = "Body { \"tickers\": [\"MU\",\"AMD\",...] } required" });
+
+        db.AdminAuditLogs.Add(new AdminAuditLog
+        {
+            ActorUserId = AdminUserId,
+            Action = "ingest_short_interest",
+            EntityType = "short_interest_snapshots",
+        });
+        await db.SaveChangesAsync(ct);
+
+        var results = new List<object>();
+        foreach (var t in request.Tickers.Take(500))
+        {
+            var r = await shortSvc.FetchAndStoreAsync(t, ct);
+            results.Add(new { r.Ticker, r.Persisted, r.ShortPctFloat, r.Note });
+        }
+
+        return Ok(new
+        {
+            requested = request.Tickers.Count,
+            processed = results.Count,
+            results,
+        });
+    }
+
     /// <summary>Ingest data for a single stock (on-demand).</summary>
     [HttpPost("ingest/{ticker}")]
     public async Task<IActionResult> IngestStock(string ticker, CancellationToken ct)

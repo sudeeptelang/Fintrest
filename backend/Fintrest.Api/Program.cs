@@ -223,6 +223,10 @@ builder.Services.AddSingleton<Fintrest.Api.Services.Scoring.InsiderScoreJob>();
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<Fintrest.Api.Services.Scoring.InsiderScoreJob>());
 
+// Smart Money Phase 2 — FMP short-interest feed + derived sub-score.
+// No cron yet; data refreshes via /admin/short-interest/ingest.
+builder.Services.AddScoped<Fintrest.Api.Services.Scoring.ShortInterestService>();
+
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>

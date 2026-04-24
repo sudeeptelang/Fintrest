@@ -58,7 +58,25 @@ public interface IFundamentalsProvider
     /// reiterations). Returned newest-first. Drives the v3 breadth feature that
     /// reads net direction of sentiment changes over rolling windows.</summary>
     Task<List<AnalystGradeEvent>> GetAnalystGradeEventsAsync(string ticker, DateTime since, CancellationToken ct = default);
+
+    /// <summary>Latest short-interest snapshot for a ticker (FINRA bi-monthly,
+    /// delivered via FMP). Returns null if FMP has no record. Feeds the
+    /// Smart Money "Short dynamics" sub-signal.</summary>
+    Task<ShortInterestSnapshotDto?> GetShortInterestAsync(string ticker, CancellationToken ct = default);
 }
+
+/// <summary>One short-interest snapshot. Percent-of-float is the key
+/// number for the Smart Money sub-score; days-to-cover + avg-daily-volume
+/// are kept for future squeeze/conviction modeling.</summary>
+public record ShortInterestSnapshotDto(
+    string Ticker,
+    DateTime SettlementDate,
+    long? ShortInterestShares,
+    long? FloatShares,
+    decimal? ShortPctFloat,
+    decimal? DaysToCover,
+    long? AvgDailyVolume
+);
 
 /// <summary>One rating-change event from a covering analyst. Action is a
 /// string because FMP surfaces a half-dozen values ("up", "down", "initialize",

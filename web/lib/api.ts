@@ -336,6 +336,20 @@ export interface IpoCalendarItem {
   marketCap: number | null;
 }
 
+// Smart Money (phase 2) short-interest snapshot. Mirrors the anonymous
+// response shape of MarketController.GetShortInterest.
+export interface ShortInterestResponse {
+  ticker: string;
+  settlementDate: string;
+  shortPctFloat: number | null;
+  daysToCover: number | null;
+  shortInterestShares: number | null;
+  floatShares: number | null;
+  avgDailyVolume: number | null;
+  score: number;
+  evidence: string | null;
+}
+
 // Smart Money (phase 1) per-ticker composite. Mirrors InsiderScoreResponse
 // on the backend — see MarketController.GetInsiderScore. Null-shaped fields
 // are present when the feed returned no qualifying activity.
@@ -588,6 +602,14 @@ export const api = {
     authFetchApi<InsiderActivity[]>(`/market/insiders/${ticker}?limit=${limit}`),
   marketCongressByTicker: (ticker: string, limit = 10) =>
     authFetchApi<CongressTradeRow[]>(`/market/congress/${ticker}?limit=${limit}`),
+  marketShortInterest: async (ticker: string): Promise<ShortInterestResponse | null> => {
+    // GET /market/short-interest/{ticker} returns 204 when we haven't
+    // pulled a snapshot for this ticker yet. Treat that as null.
+    const res = await fetch(`${API_BASE}/market/short-interest/${ticker}`);
+    if (res.status === 204) return null;
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    return res.json();
+  },
   marketInsiderScore: async (ticker: string): Promise<InsiderScore | null> => {
     // GET /market/insider-score/{ticker} returns 204 when there's no qualifying
     // activity in the 30-day window. Treat that as null — the sub-card renders

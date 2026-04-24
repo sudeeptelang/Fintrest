@@ -485,6 +485,36 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         );
     }
 
+    public async Task<ShortInterestSnapshotDto?> GetShortInterestAsync(string ticker, CancellationToken ct = default)
+    {
+        // FMP stable: /short-interest returns the latest FINRA snapshot per
+        // symbol. FINRA publishes bi-monthly; this endpoint surfaces the
+        // most recent settlement. If the path isn't live on the caller's
+        // tier, the response is null or empty — returns null so callers
+        // degrade gracefully.
+        var url = $"{_baseUrl}/short-interest?symbol={ticker}&apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpShortInterest>>(url, ct);
+        if (rows is null || rows.Count == 0) return null;
+
+        var latest = rows
+            .Where(r => DateTime.TryParse(r.SettlementDate, out _))
+            .OrderByDescending(r => DateTime.Parse(r.SettlementDate!))
+            .FirstOrDefault();
+        if (latest is null) return null;
+
+        return new ShortInterestSnapshotDto(
+            Ticker: ticker.ToUpperInvariant(),
+            SettlementDate: DateTime.SpecifyKind(DateTime.Parse(latest.SettlementDate!), DateTimeKind.Utc),
+            ShortInterestShares: latest.ShortInterest,
+            FloatShares: latest.FloatShares,
+            ShortPctFloat: latest.ShortPercentOfFloat ?? (latest.ShortInterest.HasValue && latest.FloatShares is > 0
+                ? (decimal)latest.ShortInterest.Value / latest.FloatShares.Value * 100m
+                : null),
+            DaysToCover: latest.DaysToCover,
+            AvgDailyVolume: latest.AvgDailyVolume
+        );
+    }
+
     private async Task<T?> TryFetch<T>(string url, CancellationToken ct) where T : class
     {
         // Throttle through the shared rate limiter (650/min leaves headroom under FMP Premier 750/min)
@@ -667,4 +697,19 @@ file record FmpPriceTargetSummary(
     [property: JsonPropertyName("lastYearAvgPriceTarget")] double? LastYearAvgPriceTarget,
     [property: JsonPropertyName("allTime")] int? AllTime,
     [property: JsonPropertyName("allTimeAvgPriceTarget")] double? AllTimeAvgPriceTarget
+);
+
+/// <summary>FMP /stable/short-interest row. Field names are best-guess
+/// based on FMP's short-interest docs; if the live API uses different
+/// names we fall back to null values and the sub-signal just stays
+/// empty rather than crashing. Verify with a curl before wiring
+/// heavy reliance on specific fields.</summary>
+file record FmpShortInterest(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("settlementDate")] string? SettlementDate,
+    [property: JsonPropertyName("shortInterest")] long? ShortInterest,
+    [property: JsonPropertyName("floatShares")] long? FloatShares,
+    [property: JsonPropertyName("shortPercentOfFloat")] decimal? ShortPercentOfFloat,
+    [property: JsonPropertyName("daysToCover")] decimal? DaysToCover,
+    [property: JsonPropertyName("avgDailyVolume")] long? AvgDailyVolume
 );
