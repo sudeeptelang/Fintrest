@@ -63,7 +63,32 @@ public interface IFundamentalsProvider
     /// delivered via FMP). Returns null if FMP has no record. Feeds the
     /// Smart Money "Short dynamics" sub-signal.</summary>
     Task<ShortInterestSnapshotDto?> GetShortInterestAsync(string ticker, CancellationToken ct = default);
+
+    /// <summary>FMP-computed financial-health scores — Altman Z, Piotroski F,
+    /// working-capital score. Returns null if FMP has no record. Adds
+    /// institutional-grade rigor to the Fundamentals factor.</summary>
+    Task<FinancialScoresDto?> GetFinancialScoresAsync(string ticker, CancellationToken ct = default);
 }
+
+/// <summary>FMP /stable/financial-scores output. All three scores are
+/// well-known quant measures:
+///
+///   Altman Z:  composite bankruptcy-risk score. &gt;3 safe, 1.8–3 grey, &lt;1.8 distress.
+///   Piotroski F: 0–9 score of fundamental improvement. 7+ strong, &lt;=3 weak.
+///   Working Cap: FMP-proprietary short-term liquidity metric.
+/// </summary>
+public record FinancialScoresDto(
+    string Ticker,
+    decimal? AltmanZScore,
+    decimal? PiotroskiScore,
+    decimal? WorkingCapital,
+    decimal? TotalAssets,
+    decimal? RetainedEarnings,
+    decimal? Ebit,
+    decimal? MarketCap,
+    decimal? TotalLiabilities,
+    decimal? Revenue
+);
 
 /// <summary>One short-interest snapshot. Percent-of-float is the key
 /// number for the Smart Money sub-score; days-to-cover + avg-daily-volume

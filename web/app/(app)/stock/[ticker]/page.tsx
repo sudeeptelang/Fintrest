@@ -41,6 +41,7 @@ import { EarningsHistory } from "@/components/stock/earnings-history";
 import { EarningsChart } from "@/components/charts/earnings-chart";
 import { OwnershipStrip } from "@/components/stock/ownership-strip";
 import { InsiderActivityCard, CongressActivityCard } from "@/components/stock/ticker-activity-cards";
+import { FinancialScoresCard } from "@/components/stock/financial-scores-card";
 import type { InsiderScore, ShortInterestResponse, CongressSignalResponse } from "@/lib/api";
 import {
   buildTakeaways,
@@ -304,6 +305,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
                 </p>
               </div>
             )}
+            <FinancialScoresCard ticker={ticker} />
             {snapshot && (
               <AthenaSnowflake snapshot={snapshot} breakdown={breakdown} dividendYield={null} />
             )}

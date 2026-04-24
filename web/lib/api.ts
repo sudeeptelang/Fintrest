@@ -336,6 +336,23 @@ export interface IpoCalendarItem {
   marketCap: number | null;
 }
 
+// Institutional-grade financial health scores from FMP — Altman Z +
+// Piotroski F. Surfaces in the Fundamentals deep-dive on ticker
+// detail. Bands come pre-computed from the backend so the UI never
+// hardcodes the thresholds.
+export interface FinancialScoresResponse {
+  ticker: string;
+  altmanZScore: number | null;
+  altmanBand: "safe" | "grey" | "distress" | "unknown";
+  piotroskiScore: number | null;
+  piotroskiBand: "strong" | "mid" | "weak" | "unknown";
+  workingCapital: number | null;
+  totalAssets: number | null;
+  marketCap: number | null;
+  totalLiabilities: number | null;
+  revenue: number | null;
+}
+
 // Smart Money (phase 2) congressional sub-signal derived from the last
 // 90 days of firehose disclosures. Shape matches
 // MarketController.GetCongressSignal.
@@ -615,6 +632,12 @@ export const api = {
     authFetchApi<InsiderActivity[]>(`/market/insiders/${ticker}?limit=${limit}`),
   marketCongressByTicker: (ticker: string, limit = 10) =>
     authFetchApi<CongressTradeRow[]>(`/market/congress/${ticker}?limit=${limit}`),
+  marketFinancialScores: async (ticker: string): Promise<FinancialScoresResponse | null> => {
+    const res = await fetch(`${API_BASE}/market/financial-scores/${ticker}`);
+    if (res.status === 204) return null;
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    return res.json();
+  },
   marketCongressSignal: async (ticker: string): Promise<CongressSignalResponse | null> => {
     const res = await fetch(`${API_BASE}/market/congress-signal/${ticker}`);
     if (res.status === 204) return null;

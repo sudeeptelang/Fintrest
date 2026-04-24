@@ -1049,6 +1049,54 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
+    /// <summary>FMP-computed financial health scores: Altman Z +
+    /// Piotroski F + working capital. Surfaces on the Fundamentals
+    /// deep-dive as institutional-grade rigor markers. Returns 204
+    /// if FMP has no record for this ticker.</summary>
+    [HttpGet("market/financial-scores/{ticker}")]
+    public async Task<IActionResult> GetFinancialScores(
+        string ticker,
+        [FromServices] Fintrest.Api.Services.Providers.Contracts.IFundamentalsProvider fmp,
+        CancellationToken ct)
+    {
+        var normalized = (ticker ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length == 0) return BadRequest("ticker required");
+
+        var scores = await fmp.GetFinancialScoresAsync(normalized, ct);
+        if (scores is null) return NoContent();
+
+        // Enrich with interpretation bands so the frontend doesn't hardcode them.
+        return Ok(new
+        {
+            ticker = scores.Ticker,
+            altmanZScore = scores.AltmanZScore,
+            altmanBand = AltmanBand(scores.AltmanZScore),
+            piotroskiScore = scores.PiotroskiScore,
+            piotroskiBand = PiotroskiBand(scores.PiotroskiScore),
+            workingCapital = scores.WorkingCapital,
+            totalAssets = scores.TotalAssets,
+            marketCap = scores.MarketCap,
+            totalLiabilities = scores.TotalLiabilities,
+            revenue = scores.Revenue,
+        });
+    }
+
+    private static string AltmanBand(decimal? z)
+    {
+        if (z is null) return "unknown";
+        if (z >= 3m) return "safe";
+        if (z >= 1.8m) return "grey";
+        return "distress";
+    }
+
+    private static string PiotroskiBand(decimal? p)
+    {
+        if (p is null) return "unknown";
+        if (p >= 7m) return "strong";
+        if (p >= 4m) return "mid";
+        return "weak";
+    }
+
     /// <summary>Per-ticker Congressional sub-signal — Smart Money Phase 2.
     /// Derived at query-time from the last 90 days of firehose
     /// snapshots. Returns 204 when there are no disclosures on file for

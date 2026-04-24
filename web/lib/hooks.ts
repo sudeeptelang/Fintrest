@@ -203,6 +203,17 @@ export function useCongressSignal(ticker: string) {
   });
 }
 
+export function useFinancialScores(ticker: string) {
+  return useQuery({
+    queryKey: ["market-financial-scores", ticker.toUpperCase()],
+    queryFn: () => api.marketFinancialScores(ticker.toUpperCase()),
+    enabled: !!ticker,
+    // Financial-scores move on quarterly filing cadence — safe to
+    // cache aggressively within a session.
+    staleTime: 1000 * 60 * 60 * 6, // 6 hours
+  });
+}
+
 export function useCongressLatest(limit = 100) {
   return useQuery({ queryKey: ["market-congress", limit], queryFn: () => api.marketCongressLatest(limit) });
 }

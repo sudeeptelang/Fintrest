@@ -485,6 +485,29 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         );
     }
 
+    public async Task<FinancialScoresDto?> GetFinancialScoresAsync(string ticker, CancellationToken ct = default)
+    {
+        // FMP stable: /financial-scores returns Altman Z + Piotroski F +
+        // a few underlying balance-sheet items. One row per symbol; we
+        // take the first (FMP only ships current-period).
+        var url = $"{_baseUrl}/financial-scores?symbol={ticker}&apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpFinancialScores>>(url, ct);
+        if (rows is null || rows.Count == 0) return null;
+        var r = rows[0];
+        return new FinancialScoresDto(
+            Ticker: ticker.ToUpperInvariant(),
+            AltmanZScore: r.AltmanZScore,
+            PiotroskiScore: r.PiotroskiScore,
+            WorkingCapital: r.WorkingCapital,
+            TotalAssets: r.TotalAssets,
+            RetainedEarnings: r.RetainedEarnings,
+            Ebit: r.Ebit,
+            MarketCap: r.MarketCap,
+            TotalLiabilities: r.TotalLiabilities,
+            Revenue: r.Revenue
+        );
+    }
+
     public async Task<ShortInterestSnapshotDto?> GetShortInterestAsync(string ticker, CancellationToken ct = default)
     {
         // FMP stable: /short-interest returns the latest FINRA snapshot per
@@ -697,6 +720,24 @@ file record FmpPriceTargetSummary(
     [property: JsonPropertyName("lastYearAvgPriceTarget")] double? LastYearAvgPriceTarget,
     [property: JsonPropertyName("allTime")] int? AllTime,
     [property: JsonPropertyName("allTimeAvgPriceTarget")] double? AllTimeAvgPriceTarget
+);
+
+/// <summary>FMP /stable/financial-scores row. Altman Z + Piotroski F
+/// are the two primary quant-health measures we surface; the rest of
+/// the fields (total assets, retained earnings, EBIT, etc.) are the
+/// raw inputs that FMP exposes alongside — kept for future audit /
+/// recomputation.</summary>
+file record FmpFinancialScores(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("altmanZScore")] decimal? AltmanZScore,
+    [property: JsonPropertyName("piotroskiScore")] decimal? PiotroskiScore,
+    [property: JsonPropertyName("workingCapital")] decimal? WorkingCapital,
+    [property: JsonPropertyName("totalAssets")] decimal? TotalAssets,
+    [property: JsonPropertyName("retainedEarnings")] decimal? RetainedEarnings,
+    [property: JsonPropertyName("ebit")] decimal? Ebit,
+    [property: JsonPropertyName("marketCap")] decimal? MarketCap,
+    [property: JsonPropertyName("totalLiabilities")] decimal? TotalLiabilities,
+    [property: JsonPropertyName("revenue")] decimal? Revenue
 );
 
 /// <summary>FMP /stable/short-interest row. Field names are best-guess
