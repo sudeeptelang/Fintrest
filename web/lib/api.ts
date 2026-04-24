@@ -295,6 +295,17 @@ export interface EarningsCalendarItem {
   signalScore: number | null;
 }
 
+export interface IpoCalendarItem {
+  ticker: string;
+  company: string;
+  date: string;
+  exchange: string | null;
+  status: string | null;    // "Expected", "Priced", "Withdrawn"
+  shares: number | null;
+  priceRange: string | null;
+  marketCap: number | null;
+}
+
 export interface MarketIndex {
   ticker: string;
   label: string;
@@ -521,6 +532,7 @@ export const api = {
   marketTrending: (limit = 10) => fetchApi<TrendingStock[]>(`/market/trending?limit=${limit}`),
   marketMostActive: (limit = 10) => fetchApi<TrendingStock[]>(`/market/most-active?limit=${limit}`),
   marketEarningsCalendar: (days = 14) => fetchApi<EarningsCalendarItem[]>(`/market/earnings-calendar?days=${days}`),
+  marketIposCalendar: (limit = 20) => fetchApi<IpoCalendarItem[]>(`/market/ipos-calendar?limit=${limit}`),
   marketNews: (limit = 10) => fetchApi<NewsItem[]>(`/market/news?limit=${limit}`),
   marketScreener: (limit = 50) => fetchApi<ScreenerRow[]>(`/market/screener?limit=${limit}`),
   marketInsidersLatest: (limit = 50) => authFetchApi<InsiderActivity[]>(`/market/insiders/latest?limit=${limit}`),

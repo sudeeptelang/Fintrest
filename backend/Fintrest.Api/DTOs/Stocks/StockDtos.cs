@@ -132,6 +132,17 @@ public record EarningsCalendarItem(
     double? SignalScore
 );
 
+public record IpoCalendarItem(
+    string Ticker,
+    string Company,
+    DateTime Date,
+    string? Exchange,
+    string? Status,
+    long? Shares,
+    string? PriceRange,
+    long? MarketCap
+);
+
 public record SectorPerformanceResponse(
     string Sector,
     int StockCount,

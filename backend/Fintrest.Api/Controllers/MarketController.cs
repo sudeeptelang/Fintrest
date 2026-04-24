@@ -220,6 +220,23 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
+    /// <summary>Upcoming + recent IPOs from FMP. No date-range params — the FMP
+    /// feed returns a ~30d forward / ~7d back window. Sorted newest-first.</summary>
+    [HttpGet("market/ipos-calendar")]
+    public async Task<ActionResult<List<IpoCalendarItem>>> IposCalendar(
+        [FromQuery] int limit = 30,
+        CancellationToken ct = default)
+    {
+        limit = Math.Clamp(limit, 1, 200);
+        var rows = await fundamentalsProvider.GetIpoCalendarAsync(ct);
+        return Ok(rows
+            .Take(limit)
+            .Select(r => new IpoCalendarItem(
+                r.Ticker, r.Company, r.Date,
+                r.Exchange, r.Status, r.Shares, r.PriceRange, r.MarketCap))
+            .ToList());
+    }
+
     /// <summary>Latest market-moving news across all stocks — "Trending News" widget.</summary>
     [HttpGet("market/news")]
     public async Task<ActionResult<List<NewsResponse>>> TrendingNews([FromQuery] int limit = 10)

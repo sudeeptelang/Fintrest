@@ -63,6 +63,14 @@ export function useMarketEarningsCalendar(days = 14) {
   return useQuery({ queryKey: ["market-earnings-calendar", days], queryFn: () => api.marketEarningsCalendar(days), staleTime: TEN_MIN });
 }
 
+export function useMarketIposCalendar(limit = 20) {
+  return useQuery({
+    queryKey: ["market-ipos-calendar", limit],
+    queryFn: () => api.marketIposCalendar(limit),
+    staleTime: TEN_MIN,
+  });
+}
+
 export function useMarketNews(limit = 10) {
   return useQuery({ queryKey: ["market-news", limit], queryFn: () => api.marketNews(limit), staleTime: TWO_MIN });
 }

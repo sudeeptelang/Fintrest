@@ -18,6 +18,7 @@ import { NewsReaderDrawer } from "@/components/news/news-reader-drawer";
 import { PaywallGate } from "@/components/billing/paywall-gate";
 import { RegimeStrip } from "@/components/markets/regime-strip";
 import { TopMovers } from "@/components/markets/top-movers";
+import { IpoCalendarCard } from "@/components/markets/ipo-calendar-card";
 import { Newspaper, Sparkles } from "lucide-react";
 
 export default function MarketsPage() {
@@ -172,7 +173,8 @@ export default function MarketsPage() {
       </div>
       </PaywallGate>
 
-      {/* Earnings Calendar — upcoming reports in the next 14 days */}
+      {/* Earnings + IPO calendars side by side on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-[var(--font-heading)] text-lg font-semibold flex items-center gap-2">
@@ -218,6 +220,8 @@ export default function MarketsPage() {
             ))}
           </div>
         )}
+      </div>
+      <IpoCalendarCard />
       </div>
 
       {/* Market News — macro context for the "why" behind the moves above.

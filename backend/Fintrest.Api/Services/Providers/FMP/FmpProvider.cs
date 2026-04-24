@@ -411,6 +411,31 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
             .ToList();
     }
 
+    public async Task<List<IpoCalendarEntry>> GetIpoCalendarAsync(CancellationToken ct = default)
+    {
+        // FMP stable: /ipos-calendar (plural). No date range params supported;
+        // server returns a ~30-day forward + small back window. Filter at the
+        // controller if we want a narrower window.
+        var url = $"{_baseUrl}/ipos-calendar?apikey={_apiKey}";
+        var rows = await TryFetch<List<FmpIpoCalendar>>(url, ct);
+        if (rows is null) return [];
+
+        return rows
+            .Where(r => !string.IsNullOrWhiteSpace(r.Symbol) && DateTime.TryParse(r.Date, out _))
+            .Select(r => new IpoCalendarEntry(
+                Ticker: r.Symbol!.ToUpperInvariant(),
+                Company: r.Company ?? "",
+                Date: DateTime.Parse(r.Date!),
+                Exchange: r.Exchange,
+                Status: r.Actions,
+                Shares: r.Shares,
+                PriceRange: r.PriceRange,
+                MarketCap: r.MarketCap
+            ))
+            .OrderByDescending(e => e.Date)
+            .ToList();
+    }
+
     public async Task<List<CongressTrade>> GetCongressTradesAsync(int limit = 50, CancellationToken ct = default)
     {
         // FMP stable: /senate-latest + /house-latest are the disclosure firehoses
@@ -538,6 +563,17 @@ file record FmpEarningCalendar(
     [property: JsonPropertyName("symbol")] string? Symbol,
     [property: JsonPropertyName("epsEstimated")] double? EpsEstimated,
     [property: JsonPropertyName("revenueEstimated")] double? RevenueEstimated
+);
+
+file record FmpIpoCalendar(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("date")] string? Date,
+    [property: JsonPropertyName("company")] string? Company,
+    [property: JsonPropertyName("exchange")] string? Exchange,
+    [property: JsonPropertyName("actions")] string? Actions,
+    [property: JsonPropertyName("shares")] long? Shares,
+    [property: JsonPropertyName("priceRange")] string? PriceRange,
+    [property: JsonPropertyName("marketCap")] long? MarketCap
 );
 
 file record FmpConstituent(

@@ -37,6 +37,11 @@ public interface IFundamentalsProvider
     /// Used by the dashboard earnings widget so it works without per-stock ingestion.</summary>
     Task<List<EarningCalendarEntry>> GetEarningCalendarAsync(DateTime from, DateTime to, CancellationToken ct = default);
 
+    /// <summary>Global IPO calendar — upcoming + recent IPOs across US exchanges.
+    /// Used by the Markets page IPO card. FMP endpoint has no date range;
+    /// returns ~30 days forward and ~7 back.</summary>
+    Task<List<IpoCalendarEntry>> GetIpoCalendarAsync(CancellationToken ct = default);
+
     /// <summary>Analyst rating consensus — counts across 5 rating buckets + the
     /// aggregate recommendation. Used as a fallback when the primary Finnhub feed
     /// is unavailable. Returns null when FMP has no data for the ticker.
@@ -79,6 +84,17 @@ public record EarningCalendarEntry(
     DateTime Date,
     double? EpsEstimated,
     double? RevenueEstimated
+);
+
+public record IpoCalendarEntry(
+    string Ticker,
+    string Company,
+    DateTime Date,
+    string? Exchange,
+    string? Status,         // "Expected", "Priced", "Withdrawn"
+    long? Shares,
+    string? PriceRange,
+    long? MarketCap
 );
 
 public record InsiderTradeEvent(
