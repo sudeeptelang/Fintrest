@@ -351,6 +351,74 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         return Ok(new { Ticker = ticker, Status = "ingested" });
     }
 
+    /// <summary>Diagnose universe + data-freshness for a list of tickers.
+    /// Pass ?tickers=MU,AMD,INTC to see for each: presence in the Stocks
+    /// table, last-bar timestamp, latest close, and %change vs. previous
+    /// close. Lets you confirm whether a "missing" ticker is actually
+    /// absent from the universe or just stale / null-changePct.</summary>
+    [HttpGet("universe/check")]
+    public async Task<IActionResult> CheckUniverse([FromQuery] string tickers, CancellationToken ct)
+    {
+        var requested = (tickers ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(t => t.ToUpperInvariant())
+            .Distinct()
+            .ToList();
+
+        if (requested.Count == 0)
+            return BadRequest(new { message = "Pass ?tickers=MU,AMD,INTC" });
+
+        var stocks = await db.Stocks
+            .Where(s => requested.Contains(s.Ticker))
+            .Select(s => new { s.Id, s.Ticker, s.Name, s.MarketCap, s.Active })
+            .ToListAsync(ct);
+
+        var stockIds = stocks.Select(s => s.Id).ToList();
+        var cutoff = DateTime.UtcNow.AddDays(-30);
+        var recentBars = await db.MarketData
+            .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
+            .Select(m => new { m.StockId, m.Ts, m.Close })
+            .ToListAsync(ct);
+
+        var lastTwoByStock = recentBars
+            .GroupBy(m => m.StockId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(m => m.Ts).Take(2).ToList());
+
+        var result = requested.Select(t =>
+        {
+            var stock = stocks.FirstOrDefault(s => s.Ticker == t);
+            if (stock is null)
+                return new { ticker = t, inUniverse = false, active = false, marketCap = (double?)null, lastBarAt = (DateTime?)null, latestClose = (double?)null, prevClose = (double?)null, changePct = (double?)null, barCount30d = 0, note = "not in Stocks table — run /seed/preset/sp500 or similar" };
+
+            var bars = lastTwoByStock.GetValueOrDefault(stock.Id) ?? new();
+            var latest = bars.FirstOrDefault();
+            var prev = bars.Skip(1).FirstOrDefault();
+            double? chg = latest is not null && prev is not null && prev.Close > 0
+                ? Math.Round((latest.Close - prev.Close) / prev.Close * 100, 2)
+                : null;
+
+            return new
+            {
+                ticker = t,
+                inUniverse = true,
+                active = stock.Active,
+                marketCap = stock.MarketCap,
+                lastBarAt = latest?.Ts,
+                latestClose = latest?.Close,
+                prevClose = prev?.Close,
+                changePct = chg,
+                barCount30d = bars.Count,
+                note = stock.Active == false ? "inactive — set active=true or re-seed"
+                    : latest is null ? "no bars in last 30d — run /admin/ingest/{ticker}"
+                    : bars.Count < 2 ? "only 1 bar — need 2 to compute changePct"
+                    : chg is null ? "changePct is null (prev close is 0/null)"
+                    : "ok",
+            };
+        }).ToList();
+
+        return Ok(new { asOf = DateTime.UtcNow, tickers = result });
+    }
+
     /// <summary>Add tickers to the stock universe.</summary>
     [HttpPost("universe/sync")]
     public async Task<IActionResult> SyncUniverse([FromBody] SyncUniverseRequest request, CancellationToken ct)
