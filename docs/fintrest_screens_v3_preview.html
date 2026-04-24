@@ -14,11 +14,15 @@
   --ink-300:#D0D5DD; --ink-400:#98A2B3; --ink-500:#667085; --ink-600:#475467;
   --ink-700:#344054; --ink-800:#1D2939; --ink-900:#101828; --ink-950:#060C1A;
 
-  /* Brand (forest) — unchanged, NARROWED to chrome use only */
-  --forest:#0F4F3A; --forest-lt:#E8F1EC; --forest-dk:#0A3528;
+  /* Brand — LOCKED IN to Sky Blue (2026-04-24 decision, migrated from Forest) */
+  /* Token names retained for minimal preview diff; real rename to --brand happens in the Tailwind refactor */
+  --forest:#1E63B8;   /* was #0F4F3A */
+  --forest-lt:#E7EFF9;/* was #E8F1EC */
+  --forest-dk:#154785;/* was #0A3528 */
 
-  /* NEW — Brand alt (light-blue), mocked for comparison */
+  /* Retired swatches kept for the Brand A/B scene only */
   --sky:#1E63B8; --sky-lt:#E7EFF9; --sky-dk:#154785;
+  --forest-retired:#0F4F3A; --forest-retired-lt:#E8F1EC; --forest-retired-dk:#0A3528;
 
   /* Editorial accent — unchanged */
   --rust:#B8502F; --rust-lt:#FBF0EA; --rust-dk:#8A3B1F;
@@ -324,16 +328,25 @@ section.scene.active{display:block}
      ═════════════════════════════════════════════════════════════════ -->
 <section class="scene active" id="palette">
   <h1>Palette — two-layer system</h1>
-  <p class="sub">Brand forest stays for chrome (nav, logo, primary CTA, Lens gutter).
-  Content uses a new 4-family muted palette so the 8-factor breakdown, deep-dive rows,
-  and section washes get visual hierarchy back. Performance tokens (up/down) are unchanged.</p>
+  <p class="sub">Brand sky blue (locked in 2026-04-24, migrated from forest green) sits on chrome
+  only: nav, logo, primary CTA, Lens gutter. Content uses a new 4-family muted palette so the
+  8-factor breakdown, deep-dive rows, and section washes get visual hierarchy back.
+  Performance tokens (up/down) are unchanged — the "two greens, two jobs" rule that replaces
+  "three greens" is actually cleaner: brand can't conflict with performance when they're different
+  hues.</p>
 
-  <h3>Brand — identity only</h3>
+  <div style="background:var(--sky-lt);border-left:3px solid var(--sky);padding:14px 16px;border-radius:6px;font-size:13px;color:var(--sky-dk);margin-bottom:24px">
+    <strong>Decision logged:</strong> Sky Blue replaces Forest Green as the Fintrest brand.
+    See the Brand A/B tab for the retired compare. All other scenes in this preview already
+    render with the new token values.
+  </div>
+
+  <h3>Brand — identity only (Sky Blue)</h3>
   <div class="pal-grid">
-    <div class="swatch"><div class="chip" style="background:var(--forest)"></div><div class="name">forest</div><div class="hex">#0F4F3A</div><div class="role">Nav active · logo · primary CTA · Lens gutter</div></div>
-    <div class="swatch"><div class="chip" style="background:var(--forest-dk)"></div><div class="name">forest-dark</div><div class="hex">#0A3528</div><div class="role">Hover / pressed state</div></div>
-    <div class="swatch"><div class="chip" style="background:var(--forest-lt);border:1px solid var(--ink-200)"></div><div class="name">forest-light</div><div class="hex">#E8F1EC</div><div class="role">Entry/Target wash · subtle brand bg</div></div>
-    <div class="swatch"><div class="chip" style="background:var(--rust)"></div><div class="name">rust</div><div class="hex">#B8502F</div><div class="role">Editorial accent (Lens editorial chip, board-of-day)</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--sky)"></div><div class="name">sky (was forest)</div><div class="hex">#1E63B8</div><div class="role">Nav active · logo · primary CTA · Lens gutter</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--sky-dk)"></div><div class="name">sky-dark</div><div class="hex">#154785</div><div class="role">Hover / pressed state</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--sky-lt);border:1px solid var(--ink-200)"></div><div class="name">sky-light</div><div class="hex">#E7EFF9</div><div class="role">Entry/Target wash · subtle brand bg</div></div>
+    <div class="swatch"><div class="chip" style="background:var(--rust)"></div><div class="name">rust</div><div class="hex">#B8502F</div><div class="role">Editorial accent (Lens editorial chip, board-of-day) — unchanged, pairs beautifully with sky</div></div>
   </div>
 
   <h3>Content — 4 factor families (NEW)</h3>
@@ -382,32 +395,33 @@ section.scene.active{display:block}
      BRAND A/B — forest vs. light blue
      ═════════════════════════════════════════════════════════════════ -->
 <section class="scene" id="brand">
-  <h1>Brand A/B — Forest vs. Light Blue</h1>
-  <p class="sub">The "too green" concern deserves a live test, not a vibe check.
-  Same hero, two brands. Forest = editorial/warm/differentiated.
-  Sky blue = finance-default/trust/conventional. Look at both, then decide.</p>
+  <h1>Brand A/B — Decision: Sky Blue</h1>
+  <p class="sub">Recorded 2026-04-24. Kept on this tab as a historical compare — every
+  other scene in this preview now uses Sky as the default brand. Forest is retired;
+  references to "forest" in the preview's CSS resolve to the sky hex for minimal
+  diff. The real rename (--forest → --brand or --sky) ships with the Tailwind refactor.</p>
 
   <div class="phones">
-    <!-- FOREST (current) -->
-    <div class="phone">
-      <div class="phone-chrome" style="background:var(--ink-0);border-bottom:2px solid var(--forest)">
-        <span class="logo" style="color:var(--forest)">Fintrest</span>
+    <!-- FOREST (retired) -->
+    <div class="phone" style="opacity:.7">
+      <div class="phone-chrome" style="background:var(--ink-0);border-bottom:2px solid var(--forest-retired)">
+        <span class="logo" style="color:var(--forest-retired)">Fintrest</span>
         <div class="search">/ search</div>
-        <div class="avatar" style="background:var(--forest)">ST</div>
+        <div class="avatar" style="background:var(--forest-retired)">ST</div>
       </div>
       <div class="phone-body">
         <div style="text-align:center;padding:8px 0 16px">
-          <span style="background:var(--forest-lt);color:var(--forest-dk);font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:.08em">Variant A · Forest (current)</span>
+          <span style="background:var(--ink-100);color:var(--ink-600);font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:.08em">Variant A · Forest (RETIRED)</span>
         </div>
-        <div class="hero" style="border-color:var(--forest-lt)">
+        <div class="hero" style="border-color:var(--forest-retired-lt)">
           <div class="h-top">
             <div class="h-logo lg-ally">A</div>
             <div class="h-title"><div class="tk">ALLY</div><div class="co">Ally Financial Inc.</div></div>
             <div class="h-actions">
-              <button class="prim" style="background:var(--forest);border-color:var(--forest)">＋ Pin</button>
+              <button class="prim" style="background:var(--forest-retired);border-color:var(--forest-retired)">＋ Pin</button>
             </div>
           </div>
-          <div class="h-score" style="background:var(--forest-lt)">
+          <div class="h-score" style="background:var(--forest-retired-lt)">
             <div class="h-letter" style="background:var(--up)">A</div>
             <div class="h-meta">
               <div class="n">87<span style="color:var(--ink-500);font-size:14px">/100</span></div>
@@ -416,22 +430,22 @@ section.scene.active{display:block}
             </div>
           </div>
         </div>
-        <div class="lens" style="border-left-color:var(--forest)">
-          <div class="eyb" style="color:var(--forest-dk)">Lens · thesis</div>
+        <div class="lens" style="border-left-color:var(--forest-retired)">
+          <div class="eyb" style="color:var(--forest-retired-dk)">Lens · thesis</div>
           <div class="body">News +12 on the Q1 EPS beat. Momentum cleared the 50-day.
           CFO bought $2.4M — largest disclosed purchase since 2023.</div>
           <div class="foot">Research only — your decision.</div>
         </div>
-        <button style="width:100%;background:var(--forest);color:var(--ink-0);border:none;padding:14px;border-radius:8px;font-weight:600;font-size:13px;margin-top:8px">View full analysis</button>
-        <div style="font-size:11px;color:var(--ink-600);text-align:center;margin-top:12px;padding:12px;background:var(--forest-lt);border-radius:6px;line-height:16px">
-          <strong style="color:var(--forest-dk)">Read:</strong> warm, editorial, "not another trading app."
-          Moleskine-adjacent. Differentiated but unfamiliar in the finance category.
+        <button style="width:100%;background:var(--forest-retired);color:var(--ink-0);border:none;padding:14px;border-radius:8px;font-weight:600;font-size:13px;margin-top:8px">View full analysis</button>
+        <div style="font-size:11px;color:var(--ink-600);text-align:center;margin-top:12px;padding:12px;background:var(--forest-retired-lt);border-radius:6px;line-height:16px">
+          <strong style="color:var(--forest-retired-dk)">Retired.</strong> Warm + editorial + differentiated —
+          but on the Today grid the whole screen read as one green mass and the score got drowned.
         </div>
       </div>
     </div>
 
-    <!-- SKY BLUE (alternate) -->
-    <div class="phone">
+    <!-- SKY BLUE (shipped) -->
+    <div class="phone" style="box-shadow:0 0 0 3px var(--sky), var(--e2)">
       <div class="phone-chrome" style="background:var(--ink-0);border-bottom:2px solid var(--sky)">
         <span class="logo" style="color:var(--sky)">Fintrest</span>
         <div class="search">/ search</div>
@@ -439,7 +453,7 @@ section.scene.active{display:block}
       </div>
       <div class="phone-body">
         <div style="text-align:center;padding:8px 0 16px">
-          <span style="background:var(--sky-lt);color:var(--sky-dk);font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:.08em">Variant B · Sky Blue (alt)</span>
+          <span style="background:var(--sky);color:var(--ink-0);font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;text-transform:uppercase;letter-spacing:.08em">✓ Variant B · Sky Blue (SHIPPING)</span>
         </div>
         <div class="hero" style="border-color:var(--sky-lt)">
           <div class="h-top">
@@ -466,22 +480,28 @@ section.scene.active{display:block}
         </div>
         <button style="width:100%;background:var(--sky);color:var(--ink-0);border:none;padding:14px;border-radius:8px;font-weight:600;font-size:13px;margin-top:8px">View full analysis</button>
         <div style="font-size:11px;color:var(--ink-600);text-align:center;margin-top:12px;padding:12px;background:var(--sky-lt);border-radius:6px;line-height:16px">
-          <strong style="color:var(--sky-dk)">Read:</strong> institutional, trustworthy, finance-default.
-          Schwab / Morgan Stanley / Fidelity lineage. Safer for first-time visitors;
-          blends into the category.
+          <strong style="color:var(--sky-dk)">Shipping.</strong> Institutional · trustworthy · finance-default.
+          Brand blue + performance green + rust editorial accent is a cleaner three-role palette — no
+          conflict between brand green and performance green.
         </div>
       </div>
     </div>
   </div>
 
   <div class="qa">
-    <h4>Decision framework</h4>
-    <p>① If paywall conversion matters more than category differentiation → <strong>blue</strong>.
-    Finance is blue because users decide on "can I trust this?" in 2 seconds, and blue has 40 years of trust equity.<br>
-    ② If brand / editorial voice matters more (Lens is the product) → <strong>forest</strong>.
-    Forest is what sets Fintrest apart visually; changing it means the "Moleskine of finance" framing dies.<br>
-    ③ <strong>Hybrid (my recommendation):</strong> keep forest as brand, adopt the 4-family content palette from the Palette tab.
-    Visual gravity returns without burning differentiation. Re-test after shipping the palette expansion — if "too green" persists, revisit the rebrand.</p>
+    <h4>What changes downstream (real refactor, not preview)</h4>
+    <p>① <strong>Tailwind config</strong> — rename brand tokens (<code>forest</code> → <code>sky</code> or <code>brand</code>),
+    update <code>forest-dark</code>, <code>forest-light</code>.<br>
+    ② <strong>CLAUDE.md + web/CLAUDE.md</strong> — "three greens, three jobs" simplifies to "two greens"
+    (up + down only); brand section rewritten to Sky Blue.<br>
+    ③ <strong>DESIGN_LANGUAGE_V2.md</strong> — becomes DESIGN_LANGUAGE_V3.md or gets a major-version bump.
+    Hex swap + rationale.<br>
+    ④ <strong>Logo</strong> — if the logo uses the forest hex, re-export in sky.<br>
+    ⑤ <strong>All components</strong> — <code>bg-forest</code>, <code>text-forest</code>, <code>border-forest</code>
+    grep sweep + replace. ~2–3 hours at the Tailwind class layer since the tokens are centralized.<br>
+    ⑥ <strong>COMPETITORS.md</strong> — the "forest differentiates" paragraph flips; we now sit in the
+    blue camp like Schwab/Fidelity, so the wedge becomes "explainable + track record + Lens voice"
+    not "distinctive color."</p>
   </div>
 </section>
 
