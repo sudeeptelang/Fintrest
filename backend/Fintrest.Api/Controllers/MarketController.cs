@@ -2287,25 +2287,63 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         var stockIds = signals.Select(s => s.StockId).Distinct().ToList();
         if (stockIds.Count == 0) return new();
 
+        // Latest close from market_data — fine to use as a fallback
+        // price (last known close), but NOT for "today's % change".
         var cutoff = DateTime.UtcNow.AddDays(-14);
         var recentBars = await db.MarketData
             .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
             .Select(m => new { m.StockId, m.Ts, m.Close })
             .ToListAsync();
 
-        return recentBars
+        var latestCloseByStock = recentBars
             .GroupBy(m => m.StockId)
             .ToDictionary(
                 g => g.Key,
-                g =>
-                {
-                    var sorted = g.OrderByDescending(m => m.Ts).Take(2).ToList();
-                    var latest = sorted[0].Close;
-                    double? changePct = sorted.Count > 1 && sorted[1].Close > 0
-                        ? Math.Round((latest - sorted[1].Close) / sorted[1].Close * 100, 2)
-                        : null;
-                    return (latest, changePct);
-                });
+                g => g.OrderByDescending(m => m.Ts).First().Close);
+
+        // Overlay live_quotes for both price and changePct. Same rule
+        // as the screener: changePct comes ONLY from a fresh live_quote.
+        // The previous bar-based fallback (sorted[0] vs sorted[1]) was
+        // the same bug pattern that gave INTC +23.64% on the markets
+        // page — different surface, same gappy-bars failure mode.
+        var stocks = await db.Stocks
+            .Where(s => stockIds.Contains(s.Id))
+            .Select(s => new { s.Id, s.Ticker })
+            .ToListAsync();
+        var idToTicker = stocks.ToDictionary(s => s.Id, s => s.Ticker);
+        var tickers = stocks.Select(s => s.Ticker).ToList();
+
+        Dictionary<string, Models.LiveQuote> liveQuotes = new();
+        try
+        {
+            liveQuotes = await db.LiveQuotes
+                .AsNoTracking()
+                .Where(l => tickers.Contains(l.Ticker))
+                .ToDictionaryAsync(l => l.Ticker);
+        }
+        catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
+        {
+            // live_quotes table missing (migration 027 pending) —
+            // continue with EOD close + null changePct.
+        }
+
+        var result = new Dictionary<long, (double Close, double? ChangePct)>();
+        foreach (var stockId in stockIds)
+        {
+            double close = latestCloseByStock.GetValueOrDefault(stockId, 0);
+            double? changePct = null;
+
+            if (idToTicker.TryGetValue(stockId, out var ticker)
+                && liveQuotes.TryGetValue(ticker, out var lq)
+                && IsLiveQuoteFresh(lq))
+            {
+                if (lq.Price.HasValue) close = (double)lq.Price.Value;
+                if (lq.ChangePct.HasValue) changePct = Math.Round((double)lq.ChangePct.Value, 2);
+            }
+
+            result[stockId] = (close, changePct);
+        }
+        return result;
     }
 
     private async Task<SignalListResponse> ToSignalList(List<Signal> signals)
