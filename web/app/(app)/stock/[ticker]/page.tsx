@@ -78,6 +78,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const ticker = rawTicker.toUpperCase();
   const [chartRange, setChartRange] = useState("3m");
   const [smartMoneyOpen, setSmartMoneyOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "smart_money" | "news">("chart");
   const smartMoneyRef = useRef<HTMLDivElement | null>(null);
   // Per-sub-signal anchors so the Smart Money breakdown can scroll the
   // user to the matching Deep Dive row when they tap a sub-signal.
@@ -85,10 +86,15 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const congressDeepDiveRef = useRef<HTMLDivElement | null>(null);
 
   function scrollToSubSignal(key: SmartMoneySubSignal["key"]) {
-    const target = key === "insider" ? insiderDeepDiveRef.current
-      : key === "congressional" ? congressDeepDiveRef.current
-      : null;
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (key === "insider" || key === "congressional") {
+      // Both sub-signals live in the Smart Money tab — switch first,
+      // then scroll once the row has rendered.
+      setActiveTab("smart_money");
+      const ref = key === "insider" ? insiderDeepDiveRef : congressDeepDiveRef;
+      requestAnimationFrame(() => {
+        ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
   }
 
   const { data: stock } = useStock(ticker);
@@ -266,8 +272,38 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
       {/* 5. Key takeaways — in plain English */}
       {takeaways.length > 0 && <PlainEnglishTakeaways items={takeaways} />}
 
-      {/* 6. Deep Dive accordion — 7 rows, collapsed by default */}
+      {/* 6. Tabbed Deep Dive — replaces the linear stack of 10 cards.
+          Hero / Lens / Trade Plan / Smart Money summary stay above the
+          fold; everything else lives behind a tab so the page isn't
+          a 12-section scroll. */}
+      <div className="border-b border-ink-200 sticky top-14 z-10 bg-ink-50 -mx-4 sm:-mx-6 lg:-mx-10 px-4 sm:px-6 lg:px-10">
+        <nav className="flex gap-1 overflow-x-auto" aria-label="Stock detail sections">
+          {(["chart", "fundamentals", "smart_money", "news"] as const).map((t) => {
+            const label =
+              t === "chart" ? "Chart" :
+              t === "fundamentals" ? "Fundamentals" :
+              t === "smart_money" ? "Smart Money" : "News & Macro";
+            const active = activeTab === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setActiveTab(t)}
+                className={cn(
+                  "shrink-0 px-4 py-3 text-[13px] font-semibold tracking-[-0.005em] border-b-2 -mb-[1px] transition-colors",
+                  active
+                    ? "border-forest text-forest"
+                    : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-300",
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
       <DeepDiveAccordion>
+        {activeTab === "chart" && (
         <DeepDiveRow
           title="Price chart"
           summary="1D · 5D · 3M · 1Y · volume profile · Polygon real-time"
@@ -296,14 +332,18 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
             <PriceChart data={chartData ?? []} height={320} />
           </div>
         </DeepDiveRow>
+        )}
 
+        {activeTab === "smart_money" && (
         <DeepDiveRow
           title="Options flow detail"
           summary="Chain · unusual activity · skew · IV rank"
           emptyMessage="Options flow feed ships with Smart Money phase 3 — targeted for Q3 2026."
           family="smart"
         />
+        )}
 
+        {activeTab === "fundamentals" && (
         <DeepDiveRow
           title="Fundamentals"
           summary={fundamentalsSummary(snapshot, fundDecomp)}
@@ -353,7 +393,9 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
             )}
           </div>
         </DeepDiveRow>
+        )}
 
+        {activeTab === "fundamentals" && (
         <DeepDiveRow
           title="Valuation & sensitivity"
           summary="Fair value · 5-scenario multiple analysis"
@@ -363,7 +405,9 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
             <ValuationSection ticker={ticker} signal={signal} snapshot={snapshot} earnings={earnings} />
           )}
         </DeepDiveRow>
+        )}
 
+        {activeTab === "news" && (
         <DeepDiveRow
           title="Related news"
           summary={relatedNewsSummary(news)}
@@ -377,14 +421,18 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
             )}
           </div>
         </DeepDiveRow>
+        )}
 
+        {activeTab === "news" && (
         <DeepDiveRow
           title="Macro & regime context"
           summary="Risk-on · VIX · 10Y · DXY · FRED + Cboe"
           emptyMessage="Macro regime classifier coming with the FMP economic-calendar wire-up — targeted for next sprint."
           family="technical"
         />
+        )}
 
+        {activeTab === "fundamentals" && (
         <DeepDiveRow
           title="Peer comparison"
           summary="Sector peers from FMP · scored against our composite · click to compare"
@@ -392,7 +440,9 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         >
           <PeersCard ticker={ticker} />
         </DeepDiveRow>
+        )}
 
+        {activeTab === "smart_money" && (
         <div ref={insiderDeepDiveRef}>
           <DeepDiveRow
             title="Insider activity"
@@ -402,7 +452,9 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
             <InsiderActivityCard ticker={ticker} />
           </DeepDiveRow>
         </div>
+        )}
 
+        {activeTab === "smart_money" && (
         <div ref={congressDeepDiveRef}>
           <DeepDiveRow
             title="Congressional trades"
@@ -412,8 +464,9 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
             <CongressActivityCard ticker={ticker} />
           </DeepDiveRow>
         </div>
+        )}
 
-        {ownership && (
+        {activeTab === "smart_money" && ownership && (
           <DeepDiveRow
             title="Ownership strip"
             summary="Insider + institutional + transaction history"
