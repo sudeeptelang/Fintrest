@@ -125,7 +125,16 @@ export function MoversGrid({
 
 function GridRow({ row }: { row: ScreenerRow }) {
   const up = (row.changePct ?? 0) >= 0;
-  const chgChange = (row.price ?? 0) * ((row.changePct ?? 0) / 100);
+  // %change is relative to prev_close, so back-solve the dollar change
+  // from current and pct: change = price - prev_close, where
+  // prev_close = price / (1 + pct/100). The previous code used
+  // price * pct / 100, which uses the *current* price as the
+  // denominator and overstates the move on big % days (e.g. INTC at
+  // $82.57 +23.64% showed $19.52 instead of the correct $15.79).
+  const pct = row.changePct ?? 0;
+  const chgChange = row.price != null && pct !== 0
+    ? row.price - (row.price / (1 + pct / 100))
+    : 0;
 
   return (
     <div className="px-4 md:px-6 py-3 border-b border-ink-100 last:border-b-0 hover:bg-ink-50 transition-colors">

@@ -98,7 +98,10 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 var sorted = g.OrderByDescending(m => m.Ts).Take(2).ToList();
                 var latest = sorted[0];
                 var prev = sorted.Count > 1 ? sorted[1] : null;
+                // Same gappy-ingest guard as the screener — only trust
+                // changePct when prev is within ~5 days of latest.
                 double? changePct = prev is not null && prev.Close > 0
+                        && (latest.Ts - prev.Ts).TotalDays <= 5
                     ? (latest.Close - prev.Close) / prev.Close * 100
                     : null;
 
@@ -514,7 +517,15 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             var prev = bars.Count > 1 ? bars[1] : null;
 
             double? price = latest?.Close;
-            double? changePct = latest is not null && prev is not null && prev.Close > 0
+            // Guard against gappy market_data ingest. If the second-most-
+            // recent bar is more than ~5 calendar days behind the latest
+            // bar (covers weekends + holidays), prev is from a prior week
+            // and the "% change" would actually be a multi-week move —
+            // e.g. INTC at $82.57 was showing +23.64% because the prev
+            // bar in the table was from 2 weeks ago, not yesterday.
+            double? changePct = latest is not null && prev is not null
+                    && prev.Close > 0
+                    && (latest.Ts - prev.Ts).TotalDays <= 5
                 ? Math.Round((latest.Close - prev.Close) / prev.Close * 100, 2)
                 : null;
 
