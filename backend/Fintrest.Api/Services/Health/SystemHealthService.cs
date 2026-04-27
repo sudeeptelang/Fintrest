@@ -52,6 +52,15 @@ public class SystemHealthService(AppDbContext db, ILogger<SystemHealthService> l
             .Select(s => (DateTime?)s.CapturedAt)
             .FirstOrDefaultAsync(ct);
 
+        // Live-quote freshness — should refresh every 15 min during
+        // market hours (9:45 AM – 4:15 PM ET). When this stalls, every
+        // displayed price across /markets, /research, /stock/* goes
+        // stale by hours/days. Alert below catches it.
+        var lastLiveQuoteUpdate = await db.LiveQuotes
+            .OrderByDescending(q => q.UpdatedAt)
+            .Select(q => (DateTime?)q.UpdatedAt)
+            .FirstOrDefaultAsync(ct);
+
         var lastIngestion = await db.AdminAuditLogs
             .Where(a => a.Action == "trigger_ingestion" || a.Action == "trigger_scan")
             .OrderByDescending(a => a.CreatedAt)
@@ -109,6 +118,22 @@ public class SystemHealthService(AppDbContext db, ILogger<SystemHealthService> l
         // resolves itself the first time FirehoseIngestJob succeeds.
         if (lastFirehoseCapture is not null && utcNow - lastFirehoseCapture.Value > TimeSpan.FromHours(26))
             alerts.Add($"Firehose cache (insiders + congress) is stale — last capture {FormatAgo(lastFirehoseCapture, utcNow)}");
+
+        // Live-quote staleness during market hours — fires when the
+        // 15-min refresh job is silently failing (e.g. FMP schema drift
+        // breaks JSON parse). Tolerate up to 25 min lag so a delayed
+        // slot doesn't false-alarm. Only checks during market hours
+        // (9:45 AM – 4:15 PM ET, weekdays); after-hours staleness is
+        // expected and we badge the UI as "Markets closed" instead.
+        var marketHours = isWeekday
+            && (etNow.Hour > 9 || (etNow.Hour == 9 && etNow.Minute >= 45))
+            && (etNow.Hour < 16 || (etNow.Hour == 16 && etNow.Minute <= 15));
+        if (marketHours
+            && lastLiveQuoteUpdate is not null
+            && utcNow - lastLiveQuoteUpdate.Value > TimeSpan.FromMinutes(25))
+        {
+            alerts.Add($"Live quotes are stale during market hours — last refresh {FormatAgo(lastLiveQuoteUpdate, utcNow)}");
+        }
 
         var overallStatus = alerts.Count == 0 ? "ok" : "alert";
 

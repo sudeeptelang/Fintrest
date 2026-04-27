@@ -544,7 +544,10 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
                     ChangePct: r.ChangePercentage,
                     DayHigh: r.DayHigh,
                     DayLow: r.DayLow,
-                    Volume: r.Volume,
+                    // FMP ships fractional volume; LiveQuoteDto.Volume is
+                    // long for legacy callers, so we floor here. Acceptable
+                    // for display — sub-share counts aren't meaningful.
+                    Volume: r.Volume.HasValue ? (long)r.Volume.Value : null,
                     AsOf: asOf
                 ));
             }
@@ -857,7 +860,12 @@ file record FmpQuote(
     [property: JsonPropertyName("previousClose")] decimal? PreviousClose,
     [property: JsonPropertyName("change")] decimal? Change,
     [property: JsonPropertyName("changePercentage")] decimal? ChangePercentage,
-    [property: JsonPropertyName("volume")] long? Volume,
+    // FMP's batch-quote shipped fractional volume values around April 2026
+    // ("volume": 16268247.95707 — average over a tick window?). long
+    // deserialization throws on a decimal payload and System.Text.Json
+    // fails the whole batch silently, leaving live_quotes 14 h stale.
+    // Decimal accepts both integer and fractional payloads.
+    [property: JsonPropertyName("volume")] decimal? Volume,
     [property: JsonPropertyName("dayLow")] decimal? DayLow,
     [property: JsonPropertyName("dayHigh")] decimal? DayHigh,
     [property: JsonPropertyName("timestamp")] long? Timestamp
