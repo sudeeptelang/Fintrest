@@ -55,6 +55,9 @@ export interface Signal {
   // (which is the Quality/Profitability/Growth fundamentals sub-score).
   compositeScore: number | null;
   lensQualityScore: number | null;
+  // ISO timestamp of the underlying live_quote that we used to overlay
+  // currentPrice / changePct. Null when no fresh live_quote was available.
+  quoteAsOf: string | null;
 }
 
 export interface SignalBreakdown {
@@ -217,6 +220,7 @@ export interface MoverRow {
   changePct: number | null;
   marketCap: number | null;
   signalScore: number | null;
+  quoteAsOf: string | null;
 }
 
 export type MoversCategory = "gainers" | "losers" | "actives";
@@ -265,6 +269,7 @@ export interface ScreenerRow {
   riskReward: number | null;
   horizonDays: number | null;
   verdict: string | null;
+  quoteAsOf: string | null;
 }
 
 export interface AthenaTradePlan {

@@ -129,7 +129,8 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 Change: m.Change,
                 ChangePct: m.ChangePct,
                 MarketCap: stock?.MarketCap,
-                SignalScore: score == 0 ? null : (double?)score
+                SignalScore: score == 0 ? null : (double?)score,
+                QuoteAsOf: m.AsOf
             ));
         }
 
@@ -613,13 +614,6 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             var latest = bars.Count > 0 ? bars[0] : null;
 
             double? price = latest?.Close;
-            // Day-over-day % change comes from live_quotes ONLY. We used
-            // to fall back to (latest.Close - prev.Close) / prev.Close
-            // from market_data bars, but gappy ingest produced wildly
-            // wrong values — e.g. INTC at $82.57 was showing +23.64%
-            // because the prev bar in the table was from 2 weeks ago,
-            // not yesterday (real intraday move was ~1.3%). Better to
-            // show "—" than mislead.
             //
             // Stale-quote guard: during market hours the
             // LiveQuoteRefreshJob runs every 15 min, so a quote older
@@ -723,7 +717,8 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 TargetHigh: signal?.TargetHigh,
                 RiskReward: riskReward,
                 HorizonDays: signal?.HorizonDays,
-                Verdict: ClassifyVerdictLight(stock, fund, bars, signal?.SignalType.ToString(), changePct, PerfN(5), relVol, w52RangePct)
+                Verdict: ClassifyVerdictLight(stock, fund, bars, signal?.SignalType.ToString(), changePct, PerfN(5), relVol, w52RangePct),
+                QuoteAsOf: lqFresh ? lq?.UpdatedAt : null
             );
             rows.Add(row);
         }
@@ -2291,7 +2286,7 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     }
 
     /// <summary>Batch-load latest 2 bars per signal stock for price + change %.</summary>
-    private async Task<Dictionary<long, (double Close, double? ChangePct)>> GetLatestPricesAsync(IEnumerable<Signal> signals)
+    private async Task<Dictionary<long, (double Close, double? ChangePct, DateTime? AsOf)>> GetLatestPricesAsync(IEnumerable<Signal> signals)
     {
         var stockIds = signals.Select(s => s.StockId).Distinct().ToList();
         if (stockIds.Count == 0) return new();
@@ -2336,11 +2331,12 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             // continue with EOD close + null changePct.
         }
 
-        var result = new Dictionary<long, (double Close, double? ChangePct)>();
+        var result = new Dictionary<long, (double Close, double? ChangePct, DateTime? AsOf)>();
         foreach (var stockId in stockIds)
         {
             double close = latestCloseByStock.GetValueOrDefault(stockId, 0);
             double? changePct = null;
+            DateTime? asOf = null;
 
             if (idToTicker.TryGetValue(stockId, out var ticker)
                 && liveQuotes.TryGetValue(ticker, out var lq)
@@ -2348,9 +2344,10 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             {
                 if (lq.Price.HasValue) close = (double)lq.Price.Value;
                 if (lq.ChangePct.HasValue) changePct = Math.Round((double)lq.ChangePct.Value, 2);
+                asOf = lq.UpdatedAt;
             }
 
-            result[stockId] = (close, changePct);
+            result[stockId] = (close, changePct, asOf);
         }
         return result;
     }
@@ -2363,10 +2360,10 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         return new SignalListResponse(
             signals.Select(s =>
             {
-                var (close, changePct) = prices.GetValueOrDefault(s.StockId);
+                var (close, changePct, asOf) = prices.GetValueOrDefault(s.StockId);
                 subscores.TryGetValue(s.Stock.Ticker, out var sub);
                 lenses.TryGetValue(s.Stock.Ticker, out var lens);
-                return ToDto(s, close > 0 ? close : null, changePct, sub, lens);
+                return ToDto(s, close > 0 ? close : null, changePct, sub, lens, asOf);
             }).ToList(),
             signals.Count);
     }
@@ -2446,7 +2443,8 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         double? currentPrice = null,
         double? changePct = null,
         (double? Quality, double? Profitability, double? Growth) sub = default,
-        (double? Composite, double? Quality) lens = default) => new(
+        (double? Composite, double? Quality) lens = default,
+        DateTime? quoteAsOf = null) => new(
         s.Id, s.Stock.Ticker, s.Stock.Name, s.SignalType.ToString(), s.ScoreTotal,
         currentPrice, changePct,
         s.EntryLow, s.EntryHigh, s.StopLoss, s.TargetLow, s.TargetHigh,
@@ -2462,6 +2460,7 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         ) : null,
         s.CreatedAt,
         CompositeScore: lens.Composite,
-        LensQualityScore: lens.Quality
+        LensQualityScore: lens.Quality,
+        QuoteAsOf: quoteAsOf
     );
 }

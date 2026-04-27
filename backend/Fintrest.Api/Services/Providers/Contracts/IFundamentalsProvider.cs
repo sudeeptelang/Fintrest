@@ -227,7 +227,11 @@ public record MarketMover(
     double? Price,
     double? Change,
     double? ChangePct,
-    string? Exchange
+    string? Exchange,
+    // FMP returns a unix timestamp on each row in the movers feed —
+    // we forward it so the screener / movers frontend renders an honest
+    // "As of HH:MM" instead of the client clock at page load.
+    DateTime? AsOf
 );
 
 public record IpoCalendarEntry(

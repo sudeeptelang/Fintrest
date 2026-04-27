@@ -128,8 +128,10 @@ export function SignalDetailHero({
               </div>
             )}
             {/* "As of HH:MM EDT · Market open" badge — sits directly
-                under the price so users never wonder how fresh it is. */}
-            {signal.currentPrice != null && <PriceFreshness />}
+                under the price so users never wonder how fresh it is.
+                asOf comes from the underlying live_quote.UpdatedAt so
+                the timestamp is honest even when the page sat open. */}
+            {signal.currentPrice != null && <PriceFreshness asOf={signal.quoteAsOf} />}
             {(marketCap || volume) && (
               <div className="font-[var(--font-mono)] text-[11px] text-ink-500">
                 {marketCap && `Market cap ${marketCap}`}

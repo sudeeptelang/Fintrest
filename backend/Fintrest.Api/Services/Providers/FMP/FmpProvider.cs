@@ -505,6 +505,11 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
         {
             var rows = await TryFetch<List<FmpMover>>(url, ct);
             if (rows is null) return new();
+            // FMP's movers endpoints don't ship a per-row timestamp —
+            // they're returned by the call as "current state of the
+            // universe". Stamp the rows with UtcNow at fetch time so
+            // the frontend has a real "as of" to render.
+            var fetchedAt = DateTime.UtcNow;
             return rows
                 .Where(r => !string.IsNullOrEmpty(r.Symbol))
                 .Select(r => new MarketMover(
@@ -513,7 +518,8 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
                     Price: r.Price.HasValue ? (double?)r.Price.Value : null,
                     Change: r.Change.HasValue ? (double?)r.Change.Value : null,
                     ChangePct: r.ChangesPercentage.HasValue ? (double?)r.ChangesPercentage.Value : null,
-                    Exchange: r.Exchange))
+                    Exchange: r.Exchange,
+                    AsOf: fetchedAt))
                 .ToList();
         }
         catch (Exception ex)

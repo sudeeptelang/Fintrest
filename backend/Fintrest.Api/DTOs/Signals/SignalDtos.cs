@@ -26,7 +26,12 @@ public record SignalResponse(
     // Note: distinct from Breakdown.QualityScore which is the fundamentals
     // sub-score decomposition (quality / profitability / growth).
     double? CompositeScore = null,
-    double? LensQualityScore = null
+    double? LensQualityScore = null,
+    // Live-quote freshness — `live_quotes.UpdatedAt` of the row whose
+    // CurrentPrice/ChangePct we overlaid. Frontend renders this in
+    // PriceFreshness so users see a real "as of HH:MM" instead of the
+    // page-load time. Null when the live quote was missing or stale.
+    DateTime? QuoteAsOf = null
 );
 
 public record SignalBreakdownDto(

@@ -66,7 +66,7 @@ export function FeaturedSignalCard({
               {up ? "▲" : "▼"} {up ? "+" : ""}{signal.changePct.toFixed(1)}%
             </div>
           )}
-          {signal.currentPrice != null && <PriceFreshness className="mt-2" />}
+          {signal.currentPrice != null && <PriceFreshness asOf={signal.quoteAsOf} className="mt-2" />}
         </div>
         <div className="ml-auto flex items-baseline gap-0.5 font-[var(--font-mono)] text-[12px] text-ink-500">
           <span className="text-[16px] font-medium text-ink-900">{Math.round(signal.scoreTotal)}</span>

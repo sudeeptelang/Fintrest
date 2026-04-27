@@ -75,7 +75,10 @@ public record MoverRowResponse(
     double? Change,
     double? ChangePct,
     double? MarketCap,
-    double? SignalScore
+    double? SignalScore,
+    // FMP returns a unix timestamp on each quote — surface it so the
+    // frontend's PriceFreshness can show a real "as of HH:MM".
+    DateTime? QuoteAsOf
 );
 
 /// <summary>Combined row for the screener/dashboard table: snapshot + signal data.</summary>
@@ -133,7 +136,12 @@ public record ScreenerRowResponse(
     double? TargetHigh,
     double? RiskReward,
     int? HorizonDays,
-    string? Verdict
+    string? Verdict,
+    // Quote freshness — wall-clock time of the underlying live_quote
+    // row's UpdatedAt. Frontend renders this in PriceFreshness so users
+    // see a real "as of HH:MM" instead of the page-load time. Null
+    // when no live_quote exists (frontend falls back to client time).
+    DateTime? QuoteAsOf
 );
 
 public record TrendingStockResponse(
