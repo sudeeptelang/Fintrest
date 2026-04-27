@@ -79,6 +79,17 @@ export function useMarketScreener(limit = 50) {
   return useQuery({ queryKey: ["market-screener", limit], queryFn: () => api.marketScreener(limit), staleTime: TWO_MIN });
 }
 
+// Direct movers feed — wraps FMP's /biggest-gainers / /biggest-losers /
+// /most-actives endpoints via our /market/movers passthrough. Reliable
+// "today's % change" without computing from gappy market_data bars.
+export function useMarketMovers(category: import("@/lib/api").MoversCategory, limit = 20) {
+  return useQuery({
+    queryKey: ["market-movers", category, limit],
+    queryFn: () => api.marketMovers(category, limit),
+    staleTime: TWO_MIN,
+  });
+}
+
 export function useTopPicks(limit = 12) {
   return useQuery({ queryKey: ["top-picks", limit], queryFn: () => api.topPicks(limit), staleTime: TWO_MIN });
 }

@@ -63,6 +63,21 @@ public record EarningsHistoryItem(
     double? OperatingMargin
 );
 
+/// <summary>Compact row for /market/movers — just the fields the
+/// MoversGrid renders. Sourced from FMP's biggest-gainers / -losers /
+/// most-actives endpoints (authoritative for "today's % change") with
+/// our internal sector / marketCap / signalScore enrichment glued on.</summary>
+public record MoverRowResponse(
+    string Ticker,
+    string Name,
+    string? Sector,
+    double? Price,
+    double? Change,
+    double? ChangePct,
+    double? MarketCap,
+    double? SignalScore
+);
+
 /// <summary>Combined row for the screener/dashboard table: snapshot + signal data.</summary>
 public record ScreenerRowResponse(
     string Ticker,

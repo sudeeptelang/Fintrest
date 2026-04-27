@@ -58,6 +58,78 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         return Ok(trending);
     }
 
+    /// <summary>Market movers — gainers, losers, most-actives. Pulls
+    /// directly from FMP's authoritative endpoints (/biggest-gainers,
+    /// /biggest-losers, /most-actives) rather than computing from our
+    /// market_data bars. Bar-based computation was the source of the
+    /// INTC +23.64% bug — gappy ingest meant the prev bar was 2 weeks
+    /// old, so a multi-week move surfaced as today's change. FMP rows
+    /// are filtered to symbols in our Stocks table so the row enrichment
+    /// (sector, marketCap, signal score) lights up; symbols outside our
+    /// universe are dropped rather than shown without context.</summary>
+    [HttpGet("market/movers")]
+    public async Task<ActionResult<List<MoverRowResponse>>> Movers(
+        [FromQuery] string category = "gainers",
+        [FromQuery] int limit = 20,
+        CancellationToken ct = default)
+    {
+        if (category is not ("gainers" or "losers" or "actives" or "active"))
+            return BadRequest(new { error = "category must be one of: gainers, losers, actives" });
+
+        limit = Math.Clamp(limit, 1, 100);
+        var movers = await fundamentalsProvider.GetMoversAsync(category, ct);
+        if (movers.Count == 0) return Ok(new List<MoverRowResponse>());
+
+        // Pull a wider candidate set from FMP and filter down to our
+        // universe — FMP returns full-market movers, but anything outside
+        // our Stocks table can't be enriched (no sector, no signal score)
+        // and the "Lens" CTA on the row would 404.
+        var candidateTickers = movers
+            .Select(m => m.Ticker)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(limit * 3)
+            .ToList();
+
+        var stocks = await db.Stocks
+            .Where(s => candidateTickers.Contains(s.Ticker))
+            .ToDictionaryAsync(s => s.Ticker, s => s, StringComparer.OrdinalIgnoreCase, ct);
+
+        // Score history (signal-score-history is the per-day score table —
+        // every active ticker has a row, not just signal-bearing ones).
+        var historyCutoff = DateTime.UtcNow.Date.AddDays(-3);
+        var historyRows = await db.SignalScoreHistory
+            .AsNoTracking()
+            .Where(h => candidateTickers.Contains(h.Ticker) && h.AsOfDate >= historyCutoff)
+            .OrderByDescending(h => h.AsOfDate)
+            .Select(h => new { h.Ticker, h.ScoreTotal })
+            .ToListAsync(ct);
+        var scoreByTicker = historyRows
+            .GroupBy(r => r.Ticker, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().ScoreTotal, StringComparer.OrdinalIgnoreCase);
+
+        var rows = new List<MoverRowResponse>(limit);
+        foreach (var m in movers)
+        {
+            if (rows.Count >= limit) break;
+            if (!stocks.TryGetValue(m.Ticker, out var stock)) continue;
+
+            scoreByTicker.TryGetValue(m.Ticker, out var score);
+
+            rows.Add(new MoverRowResponse(
+                Ticker: m.Ticker,
+                Name: stock.Name ?? m.Name,
+                Sector: stock.Sector,
+                Price: m.Price,
+                Change: m.Change,
+                ChangePct: m.ChangePct,
+                MarketCap: stock.MarketCap,
+                SignalScore: score == 0 ? null : (double?)score
+            ));
+        }
+
+        return Ok(rows);
+    }
+
     /// <summary>Highest volume stocks today — the "Most Active" widget.</summary>
     [HttpGet("market/most-active")]
     public async Task<ActionResult<List<TrendingStockResponse>>> MostActive([FromQuery] int limit = 10)
@@ -514,26 +586,18 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             barsByStock.TryGetValue(stock.Id, out var bars);
             bars ??= new();
             var latest = bars.Count > 0 ? bars[0] : null;
-            var prev = bars.Count > 1 ? bars[1] : null;
 
             double? price = latest?.Close;
-            // Guard against gappy market_data ingest. If the second-most-
-            // recent bar is more than ~5 calendar days behind the latest
-            // bar (covers weekends + holidays), prev is from a prior week
-            // and the "% change" would actually be a multi-week move —
-            // e.g. INTC at $82.57 was showing +23.64% because the prev
-            // bar in the table was from 2 weeks ago, not yesterday.
-            double? changePct = latest is not null && prev is not null
-                    && prev.Close > 0
-                    && (latest.Ts - prev.Ts).TotalDays <= 5
-                ? Math.Round((latest.Close - prev.Close) / prev.Close * 100, 2)
-                : null;
-
-            // Intraday overlay — if live_quotes has a fresh snapshot for
-            // this ticker, prefer its price + changePct so the screener
-            // reflects today's move rather than yesterday's close. We
-            // don't mess with the historical bars; this is a per-row
-            // surface-level swap.
+            // Day-over-day % change comes from live_quotes ONLY. We used
+            // to fall back to (latest.Close - prev.Close) / prev.Close
+            // from market_data bars, but gappy ingest produced wildly
+            // wrong values — e.g. INTC at $82.57 was showing +23.64%
+            // because the prev bar in the table was from 2 weeks ago,
+            // not yesterday (real intraday move was ~1.3%). Better to
+            // show "—" than mislead. live_quotes is refreshed every
+            // 15 min during market hours by LiveQuoteRefreshJob and is
+            // the authoritative source for "today's change".
+            double? changePct = null;
             if (liveQuotes.TryGetValue(stock.Ticker, out var lq))
             {
                 if (lq.Price.HasValue) price = (double)lq.Price.Value;

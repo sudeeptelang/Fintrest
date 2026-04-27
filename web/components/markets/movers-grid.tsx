@@ -3,11 +3,19 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, ArrowUpRight } from "lucide-react";
-import { useMarketScreener } from "@/lib/hooks";
-import type { ScreenerRow } from "@/lib/api";
+import { useMarketScreener, useMarketMovers } from "@/lib/hooks";
+import type { ScreenerRow, MoverRow } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { StockLogo } from "@/components/ui/stock-logo";
 import { ScoreGradeChip } from "@/components/ui/score-grade-chip";
+
+// Tabs gainers / losers / active are sourced from FMP's authoritative
+// /biggest-gainers / /biggest-losers / /most-actives endpoints (via our
+// /market/movers passthrough). The other three tabs — unusual / 52w high
+// / 52w low — still derive from the screener feed because FMP doesn't
+// expose them as direct endpoints. The screener's changePct now comes
+// only from live_quotes (15-min refresh), so it shows "—" rather than
+// stale bar-derived numbers when live data is missing.
 
 /**
  * Consolidated Market Movers grid — the "one grid" replacement for the
@@ -44,13 +52,24 @@ export function MoversGrid({
   /** Hide the "Full screener →" link when already on the full page */
   showFullScreenerLink?: boolean;
 } = {}) {
-  const { data: screener, isLoading } = useMarketScreener(2000);
   const [tab, setTab] = useState<TabKey>(initialTab);
+  const useDirectMovers = tab === "gainers" || tab === "losers" || tab === "active";
+  const moversCategory = tab === "active" ? "actives" : tab === "gainers" ? "gainers" : "losers";
 
-  // Sector + cap-band filters used to live inline with the tabs;
-  // they've moved up to the MarketOverviewStrip (page-level filters).
-  // MoversGrid stays focused on its primary pivot: tabs only.
-  const rows = useMemo(() => applyFilters(screener ?? [], { tab, sector: "all", capBand: "all" }), [screener, tab]);
+  // Direct-from-FMP feed for gainers/losers/active. Screener feed for the
+  // other tabs — those derive from our DB.
+  const { data: directMovers, isLoading: moversLoading } = useMarketMovers(moversCategory, maxRows);
+  const { data: screener, isLoading: screenerLoading } = useMarketScreener(2000);
+
+  const rows = useMemo<DisplayRow[]>(() => {
+    if (useDirectMovers) {
+      return (directMovers ?? []).map(moverToDisplay);
+    }
+    return applyFilters(screener ?? [], { tab, sector: "all", capBand: "all" })
+      .map(screenerToDisplay);
+  }, [useDirectMovers, directMovers, screener, tab]);
+
+  const isLoading = useDirectMovers ? moversLoading : screenerLoading;
 
   return (
     <section className="rounded-[12px] border border-ink-200 bg-ink-0 overflow-hidden">
@@ -123,18 +142,55 @@ export function MoversGrid({
   );
 }
 
-function GridRow({ row }: { row: ScreenerRow }) {
+// Unified shape the grid renders. Both feeds (screener + direct movers)
+// adapt into this so GridRow doesn't have to know the source.
+interface DisplayRow {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  price: number | null;
+  change: number | null;
+  changePct: number | null;
+  marketCap: number | null;
+  signalScore: number | null;
+}
+
+function moverToDisplay(m: MoverRow): DisplayRow {
+  return {
+    ticker: m.ticker,
+    name: m.name,
+    sector: m.sector,
+    price: m.price,
+    change: m.change,
+    changePct: m.changePct,
+    marketCap: m.marketCap,
+    signalScore: m.signalScore,
+  };
+}
+
+function screenerToDisplay(r: ScreenerRow): DisplayRow {
+  // FMP only returns absolute `change` on the direct movers endpoints;
+  // for the screener we back-solve from price + pct so the dollar
+  // change line stays consistent: change = price - price/(1+pct/100).
+  const pct = r.changePct ?? 0;
+  const change = r.price != null && pct !== 0
+    ? r.price - (r.price / (1 + pct / 100))
+    : null;
+  return {
+    ticker: r.ticker,
+    name: r.name,
+    sector: r.sector,
+    price: r.price,
+    change,
+    changePct: r.changePct,
+    marketCap: r.marketCap,
+    signalScore: r.signalScore,
+  };
+}
+
+function GridRow({ row }: { row: DisplayRow }) {
   const up = (row.changePct ?? 0) >= 0;
-  // %change is relative to prev_close, so back-solve the dollar change
-  // from current and pct: change = price - prev_close, where
-  // prev_close = price / (1 + pct/100). The previous code used
-  // price * pct / 100, which uses the *current* price as the
-  // denominator and overstates the move on big % days (e.g. INTC at
-  // $82.57 +23.64% showed $19.52 instead of the correct $15.79).
-  const pct = row.changePct ?? 0;
-  const chgChange = row.price != null && pct !== 0
-    ? row.price - (row.price / (1 + pct / 100))
-    : 0;
+  const chgChange = row.change ?? 0;
 
   return (
     <div className="px-4 md:px-6 py-3 border-b border-ink-100 last:border-b-0 hover:bg-ink-50 transition-colors">

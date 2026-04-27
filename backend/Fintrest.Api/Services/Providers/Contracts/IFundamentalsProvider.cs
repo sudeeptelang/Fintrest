@@ -92,6 +92,12 @@ public interface IFundamentalsProvider
     /// detail. Returns the peer list as plain ticker symbols; enrichment
     /// (price, score, letter grade) happens downstream.</summary>
     Task<List<string>> GetPeersAsync(string ticker, CancellationToken ct = default);
+
+    /// <summary>Top movers (gainers / losers / most-actives) from FMP's
+    /// authoritative endpoints. Preferred over computing from market_data
+    /// bars — gappy ingest produces wildly wrong "today's change" values.
+    /// Category: "gainers" | "losers" | "actives".</summary>
+    Task<List<MarketMover>> GetMoversAsync(string category, CancellationToken ct = default);
 }
 
 /// <summary>Intraday quote from FMP /quote. Contains today's price,
@@ -188,6 +194,18 @@ public record EarningCalendarEntry(
     DateTime Date,
     double? EpsEstimated,
     double? RevenueEstimated
+);
+
+/// <summary>One row from FMP's biggest-gainers/biggest-losers/most-actives
+/// endpoints. Authoritative for "today's % change" — preferred over
+/// computing from market_data bars (gappy ingest produces wrong values).</summary>
+public record MarketMover(
+    string Ticker,
+    string Name,
+    double? Price,
+    double? Change,
+    double? ChangePct,
+    string? Exchange
 );
 
 public record IpoCalendarEntry(

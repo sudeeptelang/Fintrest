@@ -444,6 +444,46 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
             .ToList();
     }
 
+    /// <summary>Top market movers from FMP's authoritative endpoints.
+    /// Category maps to: gainers → /biggest-gainers, losers → /biggest-losers,
+    /// actives → /most-actives. We pass these through directly rather than
+    /// computing from our market_data bars (which has gappy ingest and was
+    /// the source of the INTC +23.64% bug — a 2-week move mislabeled as
+    /// today's change). FMP returns full-market top movers; the controller
+    /// filters to symbols in our universe so the row enrichment lights up.
+    /// </summary>
+    public async Task<List<MarketMover>> GetMoversAsync(string category, CancellationToken ct = default)
+    {
+        var path = category switch
+        {
+            "gainers" => "biggest-gainers",
+            "losers" => "biggest-losers",
+            "actives" or "active" => "most-actives",
+            _ => throw new ArgumentException($"Unknown movers category: {category}")
+        };
+        var url = $"{_baseUrl}/{path}?apikey={_apiKey}";
+        try
+        {
+            var rows = await TryFetch<List<FmpMover>>(url, ct);
+            if (rows is null) return new();
+            return rows
+                .Where(r => !string.IsNullOrEmpty(r.Symbol))
+                .Select(r => new MarketMover(
+                    Ticker: r.Symbol!,
+                    Name: r.Name ?? r.Symbol!,
+                    Price: r.Price.HasValue ? (double?)r.Price.Value : null,
+                    Change: r.Change.HasValue ? (double?)r.Change.Value : null,
+                    ChangePct: r.ChangesPercentage.HasValue ? (double?)r.ChangesPercentage.Value : null,
+                    Exchange: r.Exchange))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "FMP movers fetch failed for category={Category}", category);
+            return new();
+        }
+    }
+
     public async Task<List<CongressTrade>> GetCongressTradesAsync(int limit = 50, CancellationToken ct = default)
     {
         // FMP stable: /senate-latest + /house-latest are the disclosure firehoses
@@ -911,6 +951,18 @@ file record FmpFinancialScores(
     [property: JsonPropertyName("marketCap")] decimal? MarketCap,
     [property: JsonPropertyName("totalLiabilities")] decimal? TotalLiabilities,
     [property: JsonPropertyName("revenue")] decimal? Revenue
+);
+
+/// <summary>FMP /stable/biggest-gainers, /biggest-losers, /most-actives
+/// row. All three endpoints share the same JSON shape — symbol, name,
+/// price, change, changesPercentage, exchange.</summary>
+file record FmpMover(
+    [property: JsonPropertyName("symbol")] string? Symbol,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("price")] decimal? Price,
+    [property: JsonPropertyName("change")] decimal? Change,
+    [property: JsonPropertyName("changesPercentage")] decimal? ChangesPercentage,
+    [property: JsonPropertyName("exchange")] string? Exchange
 );
 
 /// <summary>FMP /stable/short-interest row. Field names are best-guess

@@ -203,6 +203,24 @@ export interface SectorPerformance {
   signalCount: number;
 }
 
+// Slim row from /market/movers — sourced from FMP's biggest-gainers /
+// biggest-losers / most-actives endpoints (authoritative for "today's
+// % change") with our internal sector / marketCap / signal score
+// enrichment. Fewer fields than ScreenerRow because the movers grid
+// only needs the headline columns.
+export interface MoverRow {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  price: number | null;
+  change: number | null;
+  changePct: number | null;
+  marketCap: number | null;
+  signalScore: number | null;
+}
+
+export type MoversCategory = "gainers" | "losers" | "actives";
+
 export interface ScreenerRow {
   ticker: string;
   name: string;
@@ -752,6 +770,8 @@ export const api = {
   marketIposCalendar: (limit = 20) => fetchApi<IpoCalendarItem[]>(`/market/ipos-calendar?limit=${limit}`),
   marketNews: (limit = 10) => fetchApi<NewsItem[]>(`/market/news?limit=${limit}`),
   marketScreener: (limit = 50) => fetchApi<ScreenerRow[]>(`/market/screener?limit=${limit}`),
+  marketMovers: (category: MoversCategory, limit = 20) =>
+    fetchApi<MoverRow[]>(`/market/movers?category=${category}&limit=${limit}`),
   marketInsidersLatest: (limit = 50) => authFetchApi<InsiderActivity[]>(`/market/insiders/latest?limit=${limit}`),
   marketInsidersByTicker: (ticker: string, limit = 10) =>
     authFetchApi<InsiderActivity[]>(`/market/insiders/${ticker}?limit=${limit}`),
