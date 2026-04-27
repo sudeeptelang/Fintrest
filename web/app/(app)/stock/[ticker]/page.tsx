@@ -34,7 +34,6 @@ import { AnalystRatingCard } from "@/components/signals/analyst-rating-card";
 import { RelatedNews } from "@/components/signals/related-news";
 import { StockSnapshot as StockSnapshotSection } from "@/components/stock/stock-snapshot";
 import { PriceChart } from "@/components/charts/price-chart";
-import { AthenaSnowflake } from "@/components/stock/athena-snowflake";
 import { TechnicalAnalysis } from "@/components/stock/technical-analysis";
 import { ValuationSection } from "@/components/stock/valuation-section";
 import { PerformanceChart } from "@/components/charts/performance-chart";
@@ -78,7 +77,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const ticker = rawTicker.toUpperCase();
   const [chartRange, setChartRange] = useState("3m");
   const [smartMoneyOpen, setSmartMoneyOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<"signal" | "chart" | "fundamentals" | "smart_money" | "news">("signal");
+  const [activeTab, setActiveTab] = useState<"signal" | "chart" | "fundamentals" | "smart_money" | "analysts" | "news">("signal");
   const smartMoneyRef = useRef<HTMLDivElement | null>(null);
   // Per-sub-signal anchors so the Smart Money breakdown can scroll the
   // user to the matching Deep Dive row when they tap a sub-signal.
@@ -236,12 +235,13 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           with an Overview tab before the chart. */}
       <div className="border-b border-ink-200 sticky top-14 z-10 bg-ink-50 -mx-4 sm:-mx-6 lg:-mx-10 px-4 sm:px-6 lg:px-10">
         <nav className="flex gap-1 overflow-x-auto" aria-label="Stock detail sections">
-          {(["signal", "chart", "smart_money", "fundamentals", "news"] as const).map((t) => {
+          {(["signal", "chart", "smart_money", "fundamentals", "analysts", "news"] as const).map((t) => {
             const label =
               t === "signal" ? "Signal" :
               t === "chart" ? "Chart" :
               t === "smart_money" ? "Smart Money" :
-              t === "fundamentals" ? "Fundamentals" : "News & Macro";
+              t === "fundamentals" ? "Fundamentals" :
+              t === "analysts" ? "Analysts" : "News & Macro";
             const active = activeTab === t;
             return (
               <button
@@ -303,14 +303,12 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           />
         </div>
       )}
-      <DeepDiveAccordion>
-        {activeTab === "chart" && (
-        <DeepDiveRow
-          title="Price chart"
-          summary="1D · 5D · 3M · 1Y · volume profile · Polygon real-time"
-          family="technical"
-        >
-          <div>
+      {/* Chart tab — price chart with technical/performance summaries below.
+          Pulled out of the inner accordion: once the user has opted into
+          a tab, hiding content behind another click is just friction. */}
+      {activeTab === "chart" && (
+        <div className="space-y-4">
+          <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
             <div className="flex items-center justify-end mb-4">
               <div className="inline-flex gap-0.5 bg-ink-50 border border-ink-200 rounded-md p-0.5">
                 {["1m", "3m", "6m", "1y"].map((range) => (
@@ -332,9 +330,83 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
             </div>
             <PriceChart data={chartData ?? []} height={320} />
           </div>
-        </DeepDiveRow>
-        )}
+          {snapshot && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <TechnicalAnalysis snapshot={snapshot} />
+              <PerformanceChart snapshot={snapshot} />
+            </div>
+          )}
+        </div>
+      )}
 
+      {/* Fundamentals tab — raw data first (Snapshot), then models on top
+          of it (Quality → Valuation → Earnings → Peers). */}
+      {activeTab === "fundamentals" && (
+        <div className="space-y-8">
+          {snapshot && <StockSnapshotSection snapshot={snapshot} />}
+
+          {fundDecomp && (
+            <section>
+              <FundamentalsSectionHeader
+                title="Business quality"
+                subtitle="Q/P/G sub-scores plus Piotroski and Altman financial-health scores. Q/P/G is sector-normalized — ranked against peers in the same GICS sector."
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <FundamentalSubscoreCard label="Quality" score={fundDecomp.quality} hint="gross margin + leverage discipline" />
+                <FundamentalSubscoreCard label="Profitability" score={fundDecomp.profitability} hint="ROE + op margin + net margin" />
+                <FundamentalSubscoreCard label="Growth" score={fundDecomp.growth} hint="revenue + EPS year-over-year" />
+              </div>
+              <FinancialScoresCard ticker={ticker} />
+            </section>
+          )}
+
+          <section>
+            <FundamentalsSectionHeader
+              title="Valuation"
+              subtitle="Discounted-cash-flow fair value and a 5-scenario multiple sensitivity grid."
+            />
+            <div className="space-y-4">
+              <DcfCard ticker={ticker} />
+              {snapshot && signal && (
+                <ValuationSection ticker={ticker} signal={signal} snapshot={snapshot} earnings={earnings} />
+              )}
+            </div>
+          </section>
+
+          <section>
+            <FundamentalsSectionHeader
+              title="Earnings track record"
+              subtitle="Beat/miss history and the EPS trend over the last several quarters."
+            />
+            <div className="space-y-4">
+              <EarningsSurprisesCard ticker={ticker} />
+              {earnings && earnings.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <EarningsHistory earnings={earnings} />
+                  <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
+                      Earnings trend
+                    </div>
+                    <EarningsChart earnings={earnings} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section>
+            <FundamentalsSectionHeader
+              title="Peers"
+              subtitle="Sector peers from FMP, scored against our composite. Click any peer to compare."
+            />
+            <PeersCard ticker={ticker} />
+          </section>
+        </div>
+      )}
+
+      {/* Smart Money + News still use the accordion since their rows have
+          empty-state messaging (e.g. "Options flow ships Q3 2026"). */}
+      <DeepDiveAccordion>
         {activeTab === "smart_money" && (
         <DeepDiveRow
           title="Options flow detail"
@@ -344,67 +416,18 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         />
         )}
 
-        {activeTab === "fundamentals" && (
+        {activeTab === "analysts" && (
         <DeepDiveRow
-          title="Fundamentals"
-          summary={fundamentalsSummary(snapshot, fundDecomp)}
-          family="fundamentals"
+          title="Wall Street consensus"
+          summary={analystSummary(analyst)}
+          family="sentiment"
         >
-          <div className="space-y-6">
-            {fundDecomp && (
-              <div>
-                <div className="font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.14em] text-forest-dark mb-3">
-                  Fundamentals decomposition
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <FundamentalSubscoreCard label="Quality" score={fundDecomp.quality} hint="gross margin + leverage discipline" />
-                  <FundamentalSubscoreCard label="Profitability" score={fundDecomp.profitability} hint="ROE + op margin + net margin" />
-                  <FundamentalSubscoreCard label="Growth" score={fundDecomp.growth} hint="revenue + EPS year-over-year" />
-                </div>
-                <p className="mt-3 text-[11px] text-ink-500 italic">
-                  Each sub-score is sector-normalized — ranked against peers in the same GICS sector.
-                </p>
-              </div>
+          <div className="space-y-4">
+            {analyst && (
+              <AnalystRatingCard data={analyst} currentPrice={signal?.currentPrice ?? snapshot?.price} />
             )}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <FinancialScoresCard ticker={ticker} />
-              <DcfCard ticker={ticker} />
-            </div>
-            <EarningsSurprisesCard ticker={ticker} />
-            {snapshot && (
-              <AthenaSnowflake snapshot={snapshot} breakdown={breakdown} dividendYield={null} />
-            )}
-            {snapshot && <StockSnapshotSection snapshot={snapshot} />}
-            {snapshot && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <TechnicalAnalysis snapshot={snapshot} />
-                <PerformanceChart snapshot={snapshot} />
-              </div>
-            )}
-            {earnings && earnings.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <EarningsHistory earnings={earnings} />
-                <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-6">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-3">
-                    Earnings trend
-                  </div>
-                  <EarningsChart earnings={earnings} />
-                </div>
-              </div>
-            )}
+            <AnalystRevisionsCard ticker={ticker} />
           </div>
-        </DeepDiveRow>
-        )}
-
-        {activeTab === "fundamentals" && (
-        <DeepDiveRow
-          title="Valuation & sensitivity"
-          summary="Fair value · 5-scenario multiple analysis"
-          family="fundamentals"
-        >
-          {snapshot && signal && (
-            <ValuationSection ticker={ticker} signal={signal} snapshot={snapshot} earnings={earnings} />
-          )}
         </DeepDiveRow>
         )}
 
@@ -416,10 +439,6 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         >
           <div className="space-y-6">
             {news && news.length > 0 && <RelatedNews items={news} limit={6} />}
-            <AnalystRevisionsCard ticker={ticker} />
-            {analyst && (
-              <AnalystRatingCard data={analyst} currentPrice={signal?.currentPrice ?? snapshot?.price} />
-            )}
           </div>
         </DeepDiveRow>
         )}
@@ -431,16 +450,6 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           emptyMessage="Macro regime classifier coming with the FMP economic-calendar wire-up — targeted for next sprint."
           family="technical"
         />
-        )}
-
-        {activeTab === "fundamentals" && (
-        <DeepDiveRow
-          title="Peer comparison"
-          summary="Sector peers from FMP · scored against our composite · click to compare"
-          family="fundamentals"
-        >
-          <PeersCard ticker={ticker} />
-        </DeepDiveRow>
         )}
 
         {activeTab === "smart_money" && (
@@ -508,21 +517,37 @@ function lensEyebrow(signal: { signalType?: string } | null | undefined): string
   return "Lens thesis";
 }
 
-// Deep Dive summaries — specific beats generic.
-function fundamentalsSummary(
-  snapshot: { price?: number | null } | null | undefined,
-  fundDecomp: { quality: number | null; profitability: number | null; growth: number | null } | null,
+// Page-level section header — matches the "MARKET OVERVIEW / US EQUITIES"
+// pattern used across the rest of the app. Light uppercase, tracked-out,
+// subtle ink-500 gray. The bold/heavy variant we tried first was too
+// shouty for a dense scanning page.
+function FundamentalsSectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="mb-4">
+      <h2 className="font-[var(--font-sans)] text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-2">
+        {title}
+      </h2>
+      <p className="text-[12px] text-ink-500 max-w-[640px] leading-[1.45]">{subtitle}</p>
+    </div>
+  );
+}
+
+// Analyst tab summary — keep the row's "summary" line informative even
+// when collapsed: rating label + analyst count + target consensus.
+function analystSummary(
+  analyst:
+    | { rating: number; totalAnalysts: number; targetConsensus?: number | null }
+    | null
+    | undefined,
 ): string {
-  if (!snapshot) return "Fundamentals data not yet loaded.";
-  if (!fundDecomp) return "Financial health · scorecard pending Q/P/G population";
-  const populated = [fundDecomp.quality, fundDecomp.profitability, fundDecomp.growth].filter((v) => v != null).length;
-  const prefix =
-    fundDecomp.profitability != null && fundDecomp.profitability >= 75
-      ? "Financial health strong"
-      : fundDecomp.profitability != null && fundDecomp.profitability >= 50
-      ? "Financial health solid"
-      : "Financial health mixed";
-  return `${prefix} · ${populated} of 3 sub-scores populated`;
+  if (!analyst || analyst.totalAnalysts === 0) return "No analyst coverage.";
+  const label =
+    analyst.rating >= 4.5 ? "Strong Buy" :
+    analyst.rating >= 3.5 ? "Buy" :
+    analyst.rating >= 2.5 ? "Hold" :
+    analyst.rating >= 1.5 ? "Sell" : "Strong Sell";
+  const target = analyst.targetConsensus != null ? ` · target $${analyst.targetConsensus.toFixed(0)}` : "";
+  return `${label} (${analyst.rating.toFixed(1)}) · ${analyst.totalAnalysts} analysts${target}`;
 }
 
 function relatedNewsSummary(

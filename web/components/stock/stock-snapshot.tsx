@@ -1,272 +1,234 @@
 "use client";
 
-import { motion } from "framer-motion";
-import type { StockSnapshot } from "@/lib/api";
+import type { StockSnapshot as StockSnapshotData } from "@/lib/api";
+import { cn } from "@/lib/utils";
+
+// Yahoo Finance-style fundamentals view — adopted because nobody else hits
+// that information density without sacrificing scannability. Two surfaces:
+//   1. Key statistics strip (Yahoo's Summary tab) — 11-row 2-col grid for
+//      the at-a-glance read.
+//   2. Statistics tables (Yahoo's Statistics tab) — accounting-domain
+//      groups (Valuation Measures, Profitability, Management
+//      Effectiveness, Income Statement, Balance Sheet, Stock Price
+//      History, Share Statistics) rendered as stacked dense tables.
 
 interface Props {
-  snapshot: StockSnapshot;
+  snapshot: StockSnapshotData;
 }
 
-function fmtNum(n: number | null | undefined, digits = 2): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
-  return n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
-}
+type Item = { label: string; value: string; valueClass?: string };
 
 function fmtPct(n: number | null | undefined, digits = 2): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  if (n == null || Number.isNaN(n)) return "—";
   const sign = n > 0 ? "+" : "";
   return `${sign}${n.toFixed(digits)}%`;
 }
-
 function fmtPrice(n: number | null | undefined): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  if (n == null || Number.isNaN(n)) return "—";
   return `$${n.toFixed(2)}`;
 }
-
 function fmtMarketCap(n: number | null | undefined): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  if (n == null || Number.isNaN(n)) return "—";
   if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
   if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
   return `$${n.toFixed(0)}`;
 }
-
 function fmtVolume(n: number | null | undefined): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  if (n == null || Number.isNaN(n)) return "—";
   if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
   if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
   if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
   return `${n.toFixed(0)}`;
 }
-
 function fmtRatio(n: number | null | undefined): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  if (n == null || Number.isNaN(n)) return "—";
   return n.toFixed(2);
 }
-
-function pctClass(n: number | null | undefined): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "text-muted-foreground";
-  if (n > 0) return "text-emerald-500";
-  if (n < 0) return "text-red-500";
-  return "text-muted-foreground";
+// Backend stores margins/growth as decimals (0.42 = 42%); render as percent.
+function fmtPercentRaw(n: number | null | undefined, digits = 1): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  return `${(n * 100).toFixed(digits)}%`;
+}
+function pctToneClass(n: number | null | undefined): string {
+  if (n == null) return "";
+  return n >= 0 ? "text-up" : "text-down";
+}
+function density(items: Item[]): number {
+  if (items.length === 0) return 0;
+  return items.filter((i) => i.value !== "—").length / items.length;
 }
 
-interface DataItem {
-  label: string;
-  value: string;
-  valueClass?: string;
-}
-
-function Cell({ label, value, valueClass }: DataItem) {
+function Row({ item }: { item: Item }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-1.5 border-b border-border/40 last:border-b-0">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground shrink-0">
-        {label}
-      </span>
+    <div className="flex items-baseline justify-between gap-3 py-2 border-b border-ink-100 last:border-b-0">
+      <span className="text-[12px] text-ink-600 shrink-0">{item.label}</span>
       <span
-        className={`font-[var(--font-mono)] text-sm font-semibold text-right truncate ${
-          valueClass ?? ""
-        }`}
+        className={cn(
+          "font-[var(--font-mono)] text-[13px] font-medium text-ink-900 text-right tabular-nums",
+          item.valueClass,
+        )}
       >
-        {value}
+        {item.value}
       </span>
     </div>
   );
 }
 
-function Section({ title, items }: { title: string; items: DataItem[] }) {
+function Table({ title, items }: { title: string; items: Item[] }) {
+  // Honest empty-state per QA-P0-3 — hide a table when more than half the
+  // cells are em dashes. Avoids shipping cards that look like data but
+  // carry no information.
+  if (density(items) < 0.5) return null;
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+    <div>
+      <h3 className="font-[var(--font-sans)] text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-2 pb-2 border-b border-ink-100">
         {title}
       </h3>
-      <div className="space-y-0">
-        {items.map((item) => (
-          <Cell key={item.label} {...item} />
+      <div>
+        {items.map((it) => (
+          <Row key={it.label} item={it} />
         ))}
       </div>
     </div>
   );
 }
 
-// Honest empty-state per QA-P0-3: hide a section when more than half the
-// cells are `—`. Without this filter we ship cards that look like data but
-// carry no information, which is the main complaint from the MSFT review.
-function density(items: DataItem[]): number {
-  if (items.length === 0) return 0;
-  const filled = items.filter((i) => i.value !== "—").length;
-  return filled / items.length;
-}
-
 export function StockSnapshot({ snapshot: s }: Props) {
-  const valuation: DataItem[] = [
-    { label: "Market Cap", value: fmtMarketCap(s.marketCap) },
-    { label: "Float", value: s.floatShares ? `${(s.floatShares / 1e6).toFixed(0)}M` : "—" },
-    { label: "P/E", value: fmtRatio(s.peRatio) },
-    { label: "Forward P/E", value: fmtRatio(s.forwardPe) },
-    { label: "PEG", value: fmtRatio(s.pegRatio) },
-    { label: "P/S", value: fmtRatio(s.psRatio) },
-    { label: "P/B", value: fmtRatio(s.priceToBook) },
-    { label: "Debt/Eq", value: fmtRatio(s.debtToEquity) },
-    { label: "Beta", value: fmtRatio(s.beta) },
-  ];
+  const dayRange =
+    s.dayLow != null && s.dayHigh != null ? `${fmtPrice(s.dayLow)} – ${fmtPrice(s.dayHigh)}` : "—";
+  const week52Range =
+    s.week52Low != null && s.week52High != null ? `${fmtPrice(s.week52Low)} – ${fmtPrice(s.week52High)}` : "—";
+  const targetUpside =
+    s.analystTargetPrice != null && s.price != null && s.price > 0
+      ? ((s.analystTargetPrice - s.price) / s.price) * 100
+      : null;
 
-  const margins: DataItem[] = [
+  // Key statistics strip — Yahoo Summary-tab style.
+  const keyStats: Item[] = [
+    { label: "Previous Close", value: fmtPrice(s.prevClose) },
+    { label: "Open", value: fmtPrice(s.dayOpen) },
+    { label: "Day's Range", value: dayRange },
+    { label: "52 Week Range", value: week52Range },
+    { label: "Volume", value: fmtVolume(s.volume) },
+    { label: "Avg Volume", value: fmtVolume(s.avgVolume) },
+    { label: "Market Cap", value: fmtMarketCap(s.marketCap) },
+    { label: "Beta (5Y Monthly)", value: fmtRatio(s.beta) },
+    { label: "PE Ratio (TTM)", value: fmtRatio(s.peRatio) },
     {
-      label: "Gross Margin",
-      value: s.grossMargin !== null ? `${(s.grossMargin * 100).toFixed(1)}%` : "—",
-    },
-    {
-      label: "Op Margin",
-      value: s.operatingMargin !== null ? `${(s.operatingMargin * 100).toFixed(1)}%` : "—",
-    },
-    {
-      label: "Net Margin",
-      value: s.netMargin !== null ? `${(s.netMargin * 100).toFixed(1)}%` : "—",
-    },
-    {
-      label: "ROE",
-      value: s.returnOnEquity !== null ? `${(s.returnOnEquity * 100).toFixed(1)}%` : "—",
-      valueClass: pctClass(s.returnOnEquity),
-    },
-    {
-      label: "ROA",
-      value: s.returnOnAssets !== null ? `${(s.returnOnAssets * 100).toFixed(1)}%` : "—",
-      valueClass: pctClass(s.returnOnAssets),
-    },
-    {
-      label: "Rev Growth",
-      value: fmtPct(s.revenueGrowth !== null ? s.revenueGrowth * 100 : null),
-      valueClass: pctClass(s.revenueGrowth),
-    },
-    {
-      label: "EPS Growth",
-      value: fmtPct(s.epsGrowth !== null ? s.epsGrowth * 100 : null),
-      valueClass: pctClass(s.epsGrowth),
-    },
-    {
-      label: "Analyst Target",
-      value: fmtPrice(s.analystTargetPrice),
-      valueClass:
-        s.analystTargetPrice !== null && s.price !== null
-          ? s.analystTargetPrice > s.price
-            ? "text-emerald-500"
-            : "text-red-500"
-          : undefined,
-    },
-    {
-      label: "Next Earnings",
+      label: "Earnings Date",
       value: s.nextEarningsDate
         ? new Date(s.nextEarningsDate).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
+            year: "numeric",
           })
         : "—",
     },
-  ];
-
-  const performance: DataItem[] = [
-    { label: "Perf Week", value: fmtPct(s.perfWeek), valueClass: pctClass(s.perfWeek) },
-    { label: "Perf Month", value: fmtPct(s.perfMonth), valueClass: pctClass(s.perfMonth) },
     {
-      label: "Perf Quarter",
-      value: fmtPct(s.perfQuarter),
-      valueClass: pctClass(s.perfQuarter),
-    },
-    { label: "Perf YTD", value: fmtPct(s.perfYtd), valueClass: pctClass(s.perfYtd) },
-    { label: "Perf Year", value: fmtPct(s.perfYear), valueClass: pctClass(s.perfYear) },
-    { label: "52W High", value: fmtPrice(s.week52High) },
-    { label: "52W Low", value: fmtPrice(s.week52Low) },
-    {
-      label: "52W Range",
-      value: s.week52RangePct !== null ? `${s.week52RangePct.toFixed(0)}%` : "—",
+      label: "1y Target Est",
+      value: fmtPrice(s.analystTargetPrice),
+      valueClass: targetUpside != null ? (targetUpside > 0 ? "text-up" : "text-down") : undefined,
     },
   ];
 
-  const volume: DataItem[] = [
-    { label: "Price", value: fmtPrice(s.price) },
-    { label: "Prev Close", value: fmtPrice(s.prevClose) },
-    {
-      label: "Day Change",
-      value: s.change !== null && s.changePct !== null
-        ? `${s.change >= 0 ? "+" : ""}${s.change.toFixed(2)} (${fmtPct(s.changePct)})`
-        : "—",
-      valueClass: pctClass(s.changePct),
-    },
-    { label: "Day Open", value: fmtPrice(s.dayOpen) },
-    { label: "Day High", value: fmtPrice(s.dayHigh) },
-    { label: "Day Low", value: fmtPrice(s.dayLow) },
-    { label: "Volume", value: fmtVolume(s.volume) },
-    { label: "Avg Volume", value: fmtVolume(s.avgVolume) },
-    {
-      label: "Rel Volume",
-      value: s.relVolume !== null ? `${s.relVolume.toFixed(2)}x` : "—",
-      valueClass:
-        s.relVolume !== null && s.relVolume >= 1.5
-          ? "text-emerald-500"
-          : "text-foreground",
-    },
+  // Statistics tables — accounting-domain groups, Yahoo's exact mental
+  // model. Full names ("Return on Equity", not "ROE") so the page reads
+  // like a financial report, not a dashboard.
+  const valuationMeasures: Item[] = [
+    { label: "Market Cap", value: fmtMarketCap(s.marketCap) },
+    { label: "Trailing P/E", value: fmtRatio(s.peRatio) },
+    { label: "Forward P/E", value: fmtRatio(s.forwardPe) },
+    { label: "PEG Ratio (5 yr expected)", value: fmtRatio(s.pegRatio) },
+    { label: "Price / Sales (TTM)", value: fmtRatio(s.psRatio) },
+    { label: "Price / Book", value: fmtRatio(s.priceToBook) },
   ];
 
-  const technicals: DataItem[] = [
-    {
-      label: "RSI (14)",
-      value: fmtNum(s.rsi, 1),
-      valueClass:
-        s.rsi !== null && s.rsi >= 70
-          ? "text-red-500"
-          : s.rsi !== null && s.rsi <= 30
-            ? "text-emerald-500"
-            : "text-foreground",
-    },
-    { label: "ATR", value: fmtNum(s.atr, 2) },
-    {
-      label: "ATR %",
-      value: s.atrPct !== null ? `${s.atrPct.toFixed(2)}%` : "—",
-    },
-    { label: "SMA 20", value: fmtPrice(s.ma20) },
-    {
-      label: "vs SMA 20",
-      value: fmtPct(s.pctFromMa20),
-      valueClass: pctClass(s.pctFromMa20),
-    },
-    { label: "SMA 50", value: fmtPrice(s.ma50) },
-    {
-      label: "vs SMA 50",
-      value: fmtPct(s.pctFromMa50),
-      valueClass: pctClass(s.pctFromMa50),
-    },
-    { label: "SMA 200", value: fmtPrice(s.ma200) },
-    {
-      label: "vs SMA 200",
-      value: fmtPct(s.pctFromMa200),
-      valueClass: pctClass(s.pctFromMa200),
-    },
+  const profitability: Item[] = [
+    { label: "Profit Margin", value: fmtPercentRaw(s.netMargin), valueClass: pctToneClass(s.netMargin) },
+    { label: "Operating Margin (TTM)", value: fmtPercentRaw(s.operatingMargin), valueClass: pctToneClass(s.operatingMargin) },
+    { label: "Gross Margin", value: fmtPercentRaw(s.grossMargin), valueClass: pctToneClass(s.grossMargin) },
   ];
 
-  const sections: { title: string; items: DataItem[] }[] = [
-    { title: "Valuation", items: valuation },
-    { title: "Margins · Estimates", items: margins },
-    { title: "Performance", items: performance },
-    { title: "Quote · Volume", items: volume },
-    { title: "Technicals", items: technicals },
-  ].filter((s) => density(s.items) >= 0.5);
+  const managementEffectiveness: Item[] = [
+    { label: "Return on Assets (TTM)", value: fmtPercentRaw(s.returnOnAssets), valueClass: pctToneClass(s.returnOnAssets) },
+    { label: "Return on Equity (TTM)", value: fmtPercentRaw(s.returnOnEquity), valueClass: pctToneClass(s.returnOnEquity) },
+  ];
 
-  if (sections.length < 2) return null;
+  const incomeStatement: Item[] = [
+    { label: "Quarterly Revenue Growth (YoY)", value: fmtPercentRaw(s.revenueGrowth), valueClass: pctToneClass(s.revenueGrowth) },
+    { label: "Quarterly Earnings Growth (YoY)", value: fmtPercentRaw(s.epsGrowth), valueClass: pctToneClass(s.epsGrowth) },
+  ];
+
+  const balanceSheet: Item[] = [
+    { label: "Total Debt / Equity", value: fmtRatio(s.debtToEquity) },
+  ];
+
+  const stockPriceHistory: Item[] = [
+    { label: "Beta (5Y Monthly)", value: fmtRatio(s.beta) },
+    { label: "52-Week Change", value: fmtPct(s.perfYear), valueClass: pctToneClass(s.perfYear) },
+    { label: "52 Week High", value: fmtPrice(s.week52High) },
+    { label: "52 Week Low", value: fmtPrice(s.week52Low) },
+    { label: "50-Day Moving Average", value: fmtPrice(s.ma50) },
+    { label: "200-Day Moving Average", value: fmtPrice(s.ma200) },
+  ];
+
+  const shareStatistics: Item[] = [
+    { label: "Avg Vol (3 month)", value: fmtVolume(s.avgVolume) },
+    { label: "Float", value: s.floatShares != null ? fmtVolume(s.floatShares) : "—" },
+  ];
+
+  const subTables: { title: string; items: Item[] }[] = [
+    { title: "Profitability", items: profitability },
+    { title: "Management Effectiveness", items: managementEffectiveness },
+    { title: "Income Statement", items: incomeStatement },
+    { title: "Balance Sheet", items: balanceSheet },
+    { title: "Stock Price History", items: stockPriceHistory },
+    { title: "Share Statistics", items: shareStatistics },
+  ];
+
+  // Bail out entirely if the snapshot is too sparse to render anything
+  // useful — avoids a card stack of "—" rows.
+  const anyDense =
+    density(keyStats) >= 0.5 || density(valuationMeasures) >= 0.5 || subTables.some((t) => density(t.items) >= 0.5);
+  if (!anyDense) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="space-y-4"
-    >
-      <h2 className="font-[var(--font-heading)] text-lg font-semibold">Snapshot</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {sections.map((s) => (
-          <Section key={s.title} title={s.title} items={s.items} />
-        ))}
-      </div>
-    </motion.div>
+    <div className="space-y-4">
+      {/* Key statistics strip — Yahoo Summary-tab style at-a-glance read. */}
+      {density(keyStats) >= 0.5 && (
+        <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-5">
+          <h2 className="font-[var(--font-sans)] text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-3">
+            Key statistics
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-0">
+            {keyStats.map((it) => (
+              <Row key={it.label} item={it} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Statistics tables — Yahoo Statistics-tab grouping. Valuation
+          Measures rendered full-width (Yahoo puts it on top with the
+          most weight); the rest stack into a 2-col responsive grid. */}
+      {(density(valuationMeasures) >= 0.5 || subTables.some((t) => density(t.items) >= 0.5)) && (
+        <div className="rounded-[10px] border border-ink-200 bg-ink-0 p-5">
+          <h2 className="font-[var(--font-sans)] text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500 mb-4">
+            Statistics
+          </h2>
+          <div className="space-y-6">
+            {density(valuationMeasures) >= 0.5 && (
+              <Table title="Valuation Measures" items={valuationMeasures} />
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
+              {subTables.map((t) => (
+                <Table key={t.title} title={t.title} items={t.items} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
