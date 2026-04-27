@@ -8,7 +8,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 1 — build + publish
 # ─────────────────────────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# SDK + runtime both pinned to 9.0 to match the csproj <TargetFramework>net9.0
+# binary; .NET 10 runtime can't load a net9.0 assembly so a 10.0 base image
+# crashed the container on startup ("You must install or update .NET").
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Restore first — lets Docker cache the NuGet layer when only source changes.
@@ -24,7 +27,7 @@ RUN dotnet publish -c Release -o /app --no-restore
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2 — runtime
 # ─────────────────────────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 COPY --from=build /app ./
 
