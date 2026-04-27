@@ -79,6 +79,17 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const [chartRange, setChartRange] = useState("3m");
   const [smartMoneyOpen, setSmartMoneyOpen] = useState(true);
   const smartMoneyRef = useRef<HTMLDivElement | null>(null);
+  // Per-sub-signal anchors so the Smart Money breakdown can scroll the
+  // user to the matching Deep Dive row when they tap a sub-signal.
+  const insiderDeepDiveRef = useRef<HTMLDivElement | null>(null);
+  const congressDeepDiveRef = useRef<HTMLDivElement | null>(null);
+
+  function scrollToSubSignal(key: SmartMoneySubSignal["key"]) {
+    const target = key === "insider" ? insiderDeepDiveRef.current
+      : key === "congressional" ? congressDeepDiveRef.current
+      : null;
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   const { data: stock } = useStock(ticker);
   const { data: signalsData } = useStockSignals(ticker);
@@ -247,6 +258,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
             subSignals={smartMoneySignals}
             collapsible
             onCollapse={() => setSmartMoneyOpen(false)}
+            onSubSignalClick={scrollToSubSignal}
           />
         </div>
       )}
@@ -381,21 +393,25 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           <PeersCard ticker={ticker} />
         </DeepDiveRow>
 
-        <DeepDiveRow
-          title="Insider activity"
-          summary="Recent Form 4 filings · cash buys, option exercises, dispositions"
-          family="smart"
-        >
-          <InsiderActivityCard ticker={ticker} />
-        </DeepDiveRow>
+        <div ref={insiderDeepDiveRef}>
+          <DeepDiveRow
+            title="Insider activity"
+            summary="Recent Form 4 filings · cash buys, option exercises, dispositions"
+            family="smart"
+          >
+            <InsiderActivityCard ticker={ticker} />
+          </DeepDiveRow>
+        </div>
 
-        <DeepDiveRow
-          title="Congressional trades"
-          summary="Senate + House disclosures · STOCK Act filings"
-          family="sentiment"
-        >
-          <CongressActivityCard ticker={ticker} />
-        </DeepDiveRow>
+        <div ref={congressDeepDiveRef}>
+          <DeepDiveRow
+            title="Congressional trades"
+            summary="Senate + House disclosures · STOCK Act filings"
+            family="sentiment"
+          >
+            <CongressActivityCard ticker={ticker} />
+          </DeepDiveRow>
+        </div>
 
         {ownership && (
           <DeepDiveRow

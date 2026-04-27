@@ -472,6 +472,14 @@ export function useAdminShortInterestIngest() {
   });
 }
 
+export function useAdminFirehoseRefresh() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.adminFirehoseRefresh(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
+  });
+}
+
 export function useAdminRecentScans(limit: number = 10) {
   return useQuery({
     queryKey: ["admin-recent-scans", limit],

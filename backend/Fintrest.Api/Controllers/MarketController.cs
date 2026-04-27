@@ -1700,24 +1700,29 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         if (normalized.Length == 0) return BadRequest("ticker required");
         var clamped = Math.Clamp(limit, 1, 100);
 
-        var rows = await db.MarketFirehoseSnapshots
+        // Read from insider_transactions (Edgar Form 4 ingest). Older code
+        // read from market_firehose_snapshots — that's the legacy FMP path
+        // that ran nightly and went stale within days. Edgar pulls every
+        // weekday and is the canonical source now.
+        var rows = await db.InsiderTransactions
             .AsNoTracking()
-            .Where(s => s.Kind == "insider" && s.Ticker == normalized)
-            .OrderByDescending(s => s.FilingDate ?? s.TransactionDate)
-            .ThenByDescending(s => s.Id)
+            .Where(t => t.Ticker == normalized)
+            .OrderByDescending(t => t.FilingDate)
+            .ThenByDescending(t => t.TransactionDate)
+            .ThenByDescending(t => t.Id)
             .Take(clamped)
             .ToListAsync();
 
-        return Ok(rows.Select(r => new InsiderActivityItem(
-            r.Ticker ?? "",
-            r.TransactionDate?.ToDateTime(TimeOnly.MinValue),
-            r.FilingDate?.ToDateTime(TimeOnly.MinValue),
-            r.ActorName,
-            r.ActorRole,
-            r.TransactionType,
-            r.Shares,
-            r.Price,
-            r.TotalValue
+        return Ok(rows.Select(t => new InsiderActivityItem(
+            t.Ticker,
+            t.TransactionDate,
+            t.FilingDate,
+            t.InsiderName,
+            t.InsiderTitle,
+            t.TransactionCode,
+            (double?)t.Shares,
+            t.PricePerShare.HasValue ? (double?)t.PricePerShare.Value : null,
+            t.TotalValue.HasValue ? (double?)t.TotalValue.Value : null
         )).ToList());
     }
 
@@ -1798,15 +1803,20 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         )).ToList());
     }
 
-    /// <summary>Manual trigger for the firehose cache — admin-only.</summary>
+    /// <summary>Manual trigger for the firehose cache — admin-only. Fire-
+    /// and-forget so the browser doesn't drop the request mid-fetch
+    /// (same pattern as Edgar / short-interest).</summary>
     [Authorize(Policy = "AdminOnly")]
     [HttpPost("admin/firehose/refresh")]
-    public async Task<IActionResult> TriggerFirehoseRefresh(
+    public IActionResult TriggerFirehoseRefresh(
         [FromServices] Fintrest.Api.Services.Ingestion.FirehoseIngestJob job,
-        CancellationToken ct)
+        [FromServices] IHostApplicationLifetime lifetime)
     {
-        var summary = await job.RunOnceAsync(ct);
-        return Ok(summary);
+        _ = Task.Run(() => job.RunOnceAsync(lifetime.ApplicationStopping));
+        return Accepted(new
+        {
+            message = "Firehose ingest started — pulls FMP insider + congress feeds, ~30-60s. Check logs.",
+        });
     }
 
     [HttpGet("stocks/{ticker}/ownership")]

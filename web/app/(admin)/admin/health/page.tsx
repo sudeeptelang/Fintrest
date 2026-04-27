@@ -12,6 +12,7 @@ import {
   useAdminEdgarIngest,
   useAdminInsiderScoreRecompute,
   useAdminShortInterestIngest,
+  useAdminFirehoseRefresh,
 } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import type { SystemHealthResponse } from "@/lib/api";
@@ -26,7 +27,8 @@ export default function AdminHealthPage() {
   const edgarIngest = useAdminEdgarIngest();
   const insiderScoreRecompute = useAdminInsiderScoreRecompute();
   const shortInterestIngest = useAdminShortInterestIngest();
-  type Trigger = "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | "edgar" | "insider" | "short";
+  const firehoseRefresh = useAdminFirehoseRefresh();
+  type Trigger = "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | "edgar" | "insider" | "short" | "firehose";
   const [confirm, setConfirm] = useState<Trigger | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
 
@@ -95,6 +97,7 @@ export default function AdminHealthPage() {
                 if (confirm === "edgar") r = await edgarIngest.mutateAsync();
                 if (confirm === "insider") r = await insiderScoreRecompute.mutateAsync();
                 if (confirm === "short") r = await shortInterestIngest.mutateAsync();
+                if (confirm === "firehose") r = await firehoseRefresh.mutateAsync();
                 setLastResult(JSON.stringify(r));
               } catch (e) {
                 setLastResult(`Error: ${String(e)}`);
@@ -305,8 +308,8 @@ function ManualTriggers({
   loading,
   lastResult,
 }: {
-  onRun: (which: "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | "edgar" | "insider" | "short") => void;
-  confirm: "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | "edgar" | "insider" | "short" | null;
+  onRun: (which: "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | "edgar" | "insider" | "short" | "firehose") => void;
+  confirm: "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | "edgar" | "insider" | "short" | "firehose" | null;
   onConfirm: () => void;
   onCancel: () => void;
   loading: boolean;
@@ -338,6 +341,7 @@ function ManualTriggers({
             <TriggerButton label="Edgar Form 4 ingest" onClick={() => onRun("edgar")} />
             <TriggerButton label="Insider score recompute" onClick={() => onRun("insider")} />
             <TriggerButton label="Short-interest snapshot" onClick={() => onRun("short")} />
+            <TriggerButton label="Firehose refresh (insiders + congress)" onClick={() => onRun("firehose")} />
           </div>
         </div>
       </div>

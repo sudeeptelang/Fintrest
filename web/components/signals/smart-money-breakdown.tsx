@@ -41,12 +41,17 @@ export function SmartMoneyBreakdown({
   subSignals,
   collapsible = false,
   onCollapse,
+  onSubSignalClick,
   className,
 }: {
   composite: number | null;
   subSignals: SmartMoneySubSignal[];
   collapsible?: boolean;
   onCollapse?: () => void;
+  // Per-sub-signal click handler. Stock detail page uses this to scroll
+  // the user to the matching Deep Dive accordion row (e.g. clicking the
+  // Insider activity sub-row scrolls to the Insider activity Form-4 list).
+  onSubSignalClick?: (key: SmartMoneySubSignal["key"]) => void;
   className?: string;
 }) {
   const populated = subSignals.filter((s) => s.score != null);
@@ -103,17 +108,22 @@ export function SmartMoneyBreakdown({
 
       <ul className="space-y-3">
         {subSignals.map((s) => (
-          <SubSignalRow key={s.key} signal={s} />
+          <SubSignalRow
+            key={s.key}
+            signal={s}
+            onClick={onSubSignalClick ? () => onSubSignalClick(s.key) : undefined}
+          />
         ))}
       </ul>
     </section>
   );
 }
 
-function SubSignalRow({ signal }: { signal: SmartMoneySubSignal }) {
+function SubSignalRow({ signal, onClick }: { signal: SmartMoneySubSignal; onClick?: () => void }) {
   const hasScore = signal.score != null;
   const score = signal.score ?? 0;
   const Icon = ICONS[signal.key];
+  const clickable = !!onClick && hasScore;
 
   const scoreTone = !hasScore
     ? "text-ink-300"
@@ -139,9 +149,16 @@ function SubSignalRow({ signal }: { signal: SmartMoneySubSignal }) {
 
   return (
     <li
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? onClick : undefined}
+      onKeyDown={clickable
+        ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick?.(); } }
+        : undefined}
       className={cn(
-        "rounded-[8px] border px-4 py-3",
+        "rounded-[8px] border px-4 py-3 transition-colors",
         hasScore ? "border-ink-200 bg-ink-0" : "border-dashed border-ink-200 bg-ink-50",
+        clickable && "cursor-pointer hover:border-ink-400 hover:bg-ink-50 focus:outline-none focus:ring-2 focus:ring-forest focus:ring-offset-1",
       )}
     >
       <div className="flex items-start gap-3">

@@ -979,6 +979,11 @@ export const api = {
     authFetchApi<unknown>("/admin/insiders/score/recompute", { method: "POST" }),
   adminShortInterestIngest: () =>
     authFetchApi<unknown>("/admin/short-interest/ingest", { method: "POST" }),
+  // Firehose refresh — pulls FMP insider + congress feeds into
+  // market_firehose_snapshots. Lights up the Congressional sub-signal
+  // on stock detail pages.
+  adminFirehoseRefresh: () =>
+    authFetchApi<unknown>("/admin/firehose/refresh", { method: "POST" }),
   adminRecentScans: (limit = 10) =>
     authFetchApi<{ scans: AdminRecentScan[] }>(`/admin/scans/recent?limit=${limit}`),
 };

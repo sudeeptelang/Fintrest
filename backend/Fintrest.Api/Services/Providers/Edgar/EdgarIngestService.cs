@@ -75,18 +75,44 @@ public class EdgarIngestService(
                     .ToListAsync(ct);
                 var seen = existingKeys.Select(k => (k.InsiderCik, k.TransactionDate, k.Shares, k.TransactionCode)).ToHashSet();
 
+                var added = new List<InsiderTransaction>();
                 foreach (var tx in transactions)
                 {
                     var key = (tx.InsiderCik, tx.TransactionDate, tx.Shares, tx.TransactionCode);
                     if (!seen.Contains(key))
                     {
                         db.InsiderTransactions.Add(tx);
+                        added.Add(tx);
                         // Mark this key seen WITHIN this batch too — without
                         // it, two rows with identical (cik, date, shares,
                         // code) from the same Form 4 both get added and
                         // collide on the unique index at SaveChanges.
                         seen.Add(key);
-                        upserted++;
+                    }
+                }
+
+                // Persist per-accession so a duplicate-key violation on one
+                // bad filing doesn't kill the whole day's batch (which then
+                // poisons EF's change tracker and aborts every subsequent
+                // accession). On 23505, detach the failed rows and continue.
+                if (added.Count > 0)
+                {
+                    try
+                    {
+                        await db.SaveChangesAsync(ct);
+                        upserted += added.Count;
+                    }
+                    catch (DbUpdateException dupEx) when (
+                        dupEx.InnerException is Npgsql.PostgresException pex && pex.SqlState == "23505")
+                    {
+                        // Same accession was already partially persisted (e.g.
+                        // a previous run got this far). Detach our additions
+                        // and move on so the rest of the day's accessions
+                        // can still land.
+                        foreach (var tx in added) db.Entry(tx).State = EntityState.Detached;
+                        logger.LogInformation(
+                            "EDGAR upsert: skipped {Acc} ({Tx} tx) — already persisted",
+                            accession, added.Count);
                     }
                 }
             }
@@ -96,8 +122,6 @@ public class EdgarIngestService(
                 logger.LogWarning(ex, "EDGAR Form 4 parse/upsert failed for {Accession}", entry.AccessionNumber);
             }
         }
-
-        if (upserted > 0) await db.SaveChangesAsync(ct);
 
         return new IngestSummary(date.Date, entries.Count, form4s.Count, upserted, parseFailures);
     }
