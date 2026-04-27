@@ -107,22 +107,28 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             .GroupBy(r => r.Ticker, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First().ScoreTotal, StringComparer.OrdinalIgnoreCase);
 
+        // Don't drop tickers that aren't in our universe — Yahoo / Seeking
+        // Alpha show full-market movers and let the user click through.
+        // For tickers we track, the row gets enriched with sector + score
+        // + our marketCap; for unknown tickers we still surface ticker /
+        // name / price / changePct so the list is complete. The Lens CTA
+        // on an untracked ticker would land on a page with limited data,
+        // but that's better than hiding real gainers/losers.
         var rows = new List<MoverRowResponse>(limit);
         foreach (var m in movers)
         {
             if (rows.Count >= limit) break;
-            if (!stocks.TryGetValue(m.Ticker, out var stock)) continue;
-
+            stocks.TryGetValue(m.Ticker, out var stock);
             scoreByTicker.TryGetValue(m.Ticker, out var score);
 
             rows.Add(new MoverRowResponse(
                 Ticker: m.Ticker,
-                Name: stock.Name ?? m.Name,
-                Sector: stock.Sector,
+                Name: stock?.Name ?? m.Name,
+                Sector: stock?.Sector,
                 Price: m.Price,
                 Change: m.Change,
                 ChangePct: m.ChangePct,
-                MarketCap: stock.MarketCap,
+                MarketCap: stock?.MarketCap,
                 SignalScore: score == 0 ? null : (double?)score
             ));
         }

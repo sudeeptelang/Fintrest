@@ -53,6 +53,11 @@ export function MoversGrid({
   showFullScreenerLink?: boolean;
 } = {}) {
   const [tab, setTab] = useState<TabKey>(initialTab);
+  // Per-tab sort override. Null = use the feed's natural order (FMP
+  // returns gainers DESC by %change, etc.). Click a column header to
+  // override; switching tabs resets back to the feed's natural order.
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" } | null>(null);
+
   const useDirectMovers = tab === "gainers" || tab === "losers" || tab === "active";
   const moversCategory = tab === "active" ? "actives" : tab === "gainers" ? "gainers" : "losers";
 
@@ -62,14 +67,31 @@ export function MoversGrid({
   const { data: screener, isLoading: screenerLoading } = useMarketScreener(2000);
 
   const rows = useMemo<DisplayRow[]>(() => {
-    if (useDirectMovers) {
-      return (directMovers ?? []).map(moverToDisplay);
-    }
-    return applyFilters(screener ?? [], { tab, sector: "all", capBand: "all" })
-      .map(screenerToDisplay);
-  }, [useDirectMovers, directMovers, screener, tab]);
+    const base = useDirectMovers
+      ? (directMovers ?? []).map(moverToDisplay)
+      : applyFilters(screener ?? [], { tab, sector: "all", capBand: "all" }).map(screenerToDisplay);
+    return sort ? sortRows(base, sort.key, sort.dir) : base;
+  }, [useDirectMovers, directMovers, screener, tab, sort]);
 
   const isLoading = useDirectMovers ? moversLoading : screenerLoading;
+
+  function handleHeaderClick(key: SortKey) {
+    setSort((prev) => {
+      if (prev?.key !== key) {
+        // First click on a column — numeric defaults to DESC (top values
+        // first), text defaults to ASC (alphabetical).
+        const isText = key === "ticker" || key === "sector";
+        return { key, dir: isText ? "asc" : "desc" };
+      }
+      // Click again — toggle direction.
+      return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
+    });
+  }
+
+  function handleTabClick(t: TabKey) {
+    setTab(t);
+    setSort(null); // back to the feed's natural order
+  }
 
   return (
     <section className="rounded-[12px] border border-ink-200 bg-ink-0 overflow-hidden">
@@ -93,7 +115,7 @@ export function MoversGrid({
             <button
               key={t.key}
               type="button"
-              onClick={() => setTab(t.key)}
+              onClick={() => handleTabClick(t.key)}
               className={cn(
                 "px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors border",
                 tab === t.key
@@ -118,18 +140,19 @@ export function MoversGrid({
         </div>
       ) : (
         <>
-          {/* Desktop column header */}
+          {/* Desktop column header — clickable to sort. Project rule:
+              any table with multiple rows must support column sorting. */}
           <div
             className="hidden lg:grid items-center gap-3 px-6 py-2.5 bg-ink-50 border-b border-ink-100 font-[var(--font-sans)] text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-500"
             style={{ gridTemplateColumns: "36px minmax(140px,1fr) minmax(80px,100px) minmax(80px,100px) minmax(90px,110px) minmax(110px,140px) 80px 120px" }}
           >
             <div />
-            <div>Symbol</div>
-            <div className="text-right">Price</div>
-            <div className="text-right">%Change</div>
-            <div className="text-right">Mkt Cap</div>
-            <div>Sector</div>
-            <div className="text-center">Score</div>
+            <SortHeader label="Symbol" sortKey="ticker" align="left" sort={sort} onClick={handleHeaderClick} />
+            <SortHeader label="Price" sortKey="price" align="right" sort={sort} onClick={handleHeaderClick} />
+            <SortHeader label="%Change" sortKey="changePct" align="right" sort={sort} onClick={handleHeaderClick} />
+            <SortHeader label="Mkt Cap" sortKey="marketCap" align="right" sort={sort} onClick={handleHeaderClick} />
+            <SortHeader label="Sector" sortKey="sector" align="left" sort={sort} onClick={handleHeaderClick} />
+            <SortHeader label="Score" sortKey="signalScore" align="center" sort={sort} onClick={handleHeaderClick} />
             <div className="text-center">Actions</div>
           </div>
 
@@ -270,6 +293,55 @@ function GridRow({ row }: { row: DisplayRow }) {
       </div>
     </div>
   );
+}
+
+type SortKey = "ticker" | "price" | "changePct" | "marketCap" | "sector" | "signalScore";
+
+function SortHeader({
+  label,
+  sortKey,
+  align,
+  sort,
+  onClick,
+}: {
+  label: string;
+  sortKey: SortKey;
+  align: "left" | "right" | "center";
+  sort: { key: SortKey; dir: "asc" | "desc" } | null;
+  onClick: (key: SortKey) => void;
+}) {
+  const active = sort?.key === sortKey;
+  const arrow = active ? (sort.dir === "asc" ? "▲" : "▼") : null;
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(sortKey)}
+      className={cn(
+        "inline-flex items-center gap-1 hover:text-ink-900 transition-colors cursor-pointer",
+        align === "right" ? "justify-end ml-auto" : align === "center" ? "justify-center mx-auto" : "justify-start",
+        active && "text-ink-900",
+      )}
+    >
+      <span>{label}</span>
+      {arrow && <span className="text-[8px] leading-none">{arrow}</span>}
+    </button>
+  );
+}
+
+function sortRows(rows: DisplayRow[], key: SortKey, dir: "asc" | "desc"): DisplayRow[] {
+  // Nulls always sort to the bottom regardless of direction — a row
+  // missing a score / sector / cap shouldn't pretend to be the smallest.
+  const mult = dir === "asc" ? 1 : -1;
+  const sorted = [...rows].sort((a, b) => {
+    const av = a[key];
+    const bv = b[key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === "number" && typeof bv === "number") return (av - bv) * mult;
+    return String(av).localeCompare(String(bv)) * mult;
+  });
+  return sorted;
 }
 
 function applyFilters(

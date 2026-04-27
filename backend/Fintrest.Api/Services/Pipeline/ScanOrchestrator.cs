@@ -782,24 +782,56 @@ public class ScanOrchestrator(
         var spy = await db.Stocks.FirstOrDefaultAsync(s => s.Ticker == "SPY", ct);
         if (spy is null) { _regime = RegimeModel.Neutral; return; }
 
-        var spyBars = await db.MarketData
+        // Pull Ts alongside Close so we can look up bars by date — the
+        // previous index-based lookup (spyBars[^21] for "20 days ago")
+        // produced wildly wrong returns when market_data had gaps. The
+        // 21st bar from the end could be from 30+ trading days ago,
+        // turning a multi-week SPY move into "today's" 20-day return —
+        // we saw spy20d=12.62% on 2026-04-27 because of exactly that.
+        var spyBarsRaw = await db.MarketData
             .Where(m => m.StockId == spy.Id)
             .OrderByDescending(m => m.Ts)
             .Take(250)
-            .Select(m => m.Close)
+            .Select(m => new { m.Ts, m.Close })
             .ToListAsync(ct);
 
-        if (spyBars.Count < 50) { _regime = RegimeModel.Neutral; return; }
+        if (spyBarsRaw.Count < 50) { _regime = RegimeModel.Neutral; return; }
 
-        spyBars.Reverse();
+        // Freshness guard — if the latest SPY bar is more than 4 calendar
+        // days old (covers a long weekend), the regime data is too stale
+        // to trust at all. Better to fall back to Neutral than tilt the
+        // scoring engine on rotten data.
+        var latestBarAge = (DateTime.UtcNow - spyBarsRaw[0].Ts).TotalDays;
+        if (latestBarAge > 4)
+        {
+            logger.LogWarning(
+                "Market regime skipped: latest SPY bar is {Age:F1} days old",
+                latestBarAge);
+            _regime = RegimeModel.Neutral;
+            return;
+        }
+
+        // Oldest→newest for MA50 / MA200.
+        var spyBars = spyBarsRaw.OrderBy(b => b.Ts).Select(b => b.Close).ToList();
         var spyMa50 = spyBars.TakeLast(50).Average();
         var spyMa200 = spyBars.Count >= 200 ? spyBars.Average() : spyMa50;
         var spyPrice = spyBars[^1];
         var spyTrend = Indicators.TechnicalIndicators.TrendDirection(spyPrice, null, spyMa50, spyMa200);
 
-        var spy1d = PctReturn(spyBars, 1) ?? 0;
-        var spy5d = PctReturn(spyBars, 5) ?? 0;
-        var spy20d = PctReturn(spyBars, 20) ?? 0;
+        // Returns by DATE rather than by index — finds the bar closest to
+        // (but not after) target_date and computes (latest - that) / that.
+        // Using calendar-day offsets that comfortably span weekends and
+        // common holidays for the corresponding trading-day windows.
+        var latestTs = spyBarsRaw[0].Ts;
+        double? PctReturnByDate(DateTime target)
+        {
+            var match = spyBarsRaw.FirstOrDefault(b => b.Ts <= target);
+            if (match is null || match.Close <= 0) return null;
+            return (spyPrice - match.Close) / match.Close * 100;
+        }
+        var spy1d = PctReturnByDate(latestTs.AddDays(-1.5)) ?? 0;   // ≈ 1 trading day
+        var spy5d = PctReturnByDate(latestTs.AddDays(-7.5)) ?? 0;   // ≈ 5
+        var spy20d = PctReturnByDate(latestTs.AddDays(-28)) ?? 0;   // ≈ 20
 
         // VIX: try common tickers if user's universe includes it.
         double? vixLevel = null, vixChange = null;
