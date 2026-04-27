@@ -146,15 +146,131 @@ public class ScanOrchestrator(
             }
 
             // ─────────────────────────────────────────────────────────────
+            // PASS 1.5 — Smart Money family rollup.
+            // Bulk-load the 5 sub-signals (Insider 35% / Institutional 25% /
+            // Short 15% / Congress 15% / Options 10%) and compute the family
+            // composite per ticker. Sub-signals with no data fall back to
+            // 50 (neutral) so partial coverage doesn't crater the score.
+            // Pass B currently wires Insider + Short — Institutional /
+            // Congress / Options remain neutral until their bulk feeds ship.
+            // ─────────────────────────────────────────────────────────────
+            // Track which tickers have ANY real smart-money sub-signal so the
+            // composite formula can re-normalize for tickers without data
+            // (otherwise neutral-50 SmartMoney compresses the no-data majority
+            // ~10 points). Filled inside the rollup block below; consumed in
+            // Pass 3 Finalize.
+            var hasSmartMoneyData = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var pendingTickers = pending.Select(p => p.Snap.Ticker).Distinct().ToList();
+                // EF Core's GroupBy().Select(g => g.OrderByDescending(...).First()) does
+                // NOT translate to PG SQL and throws "EmptyProjectionMember not present"
+                // — same gotcha as GetFundamentalSubscoresAsync. Fetch flat then group
+                // in-memory.
+                var insiderRowsRaw = await db.InsiderScores
+                    .AsNoTracking()
+                    .Where(i => pendingTickers.Contains(i.Ticker))
+                    .Select(i => new { i.Ticker, i.AsOfDate, Score = (double)i.Score })
+                    .ToListAsync(ct);
+                var insiderLatest = insiderRowsRaw
+                    .GroupBy(r => r.Ticker)
+                    .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.AsOfDate).First().Score);
+
+                var shortRowsRaw = await db.ShortInterestSnapshots
+                    .AsNoTracking()
+                    .Where(s => pendingTickers.Contains(s.Ticker))
+                    .Select(s => new { s.Ticker, s.SettlementDate, Pct = s.ShortPctFloat })
+                    .ToListAsync(ct);
+                var shortLatest = shortRowsRaw
+                    .GroupBy(r => r.Ticker)
+                    .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.SettlementDate).First().Pct);
+
+                foreach (var t in insiderLatest.Keys) hasSmartMoneyData.Add(t);
+                foreach (var t in shortLatest.Keys) hasSmartMoneyData.Add(t);
+
+                // Short interest → 0-100 score. Lower short = better smart-money
+                // signal (institutions aren't betting against it). Linear ramp:
+                // 0% → 100, 10% → 50, 20% → 0. Clamps outside that band.
+                static double ShortPctToScore(decimal? shortPct)
+                {
+                    if (!shortPct.HasValue) return 50.0;
+                    return Math.Clamp(100.0 - (double)shortPct.Value * 5.0, 0.0, 100.0);
+                }
+
+                int hydrated = 0;
+                for (int i = 0; i < pending.Count; i++)
+                {
+                    var (snap, raw) = pending[i];
+                    var insider = insiderLatest.TryGetValue(snap.Ticker, out var ins) ? ins : 50.0;
+                    var shortScore = shortLatest.TryGetValue(snap.Ticker, out var sp) ? ShortPctToScore(sp) : 50.0;
+                    // Institutional / Congress / Options stay neutral 50 until
+                    // their bulk feeds are wired. Weights as configured: 35/25/15/15/10.
+                    var smartMoney =
+                        insider    * 0.35 +
+                        50.0       * 0.25 +  // Institutional
+                        shortScore * 0.15 +
+                        50.0       * 0.15 +  // Congressional
+                        50.0       * 0.10;   // Options
+                    if (insiderLatest.ContainsKey(snap.Ticker) || shortLatest.ContainsKey(snap.Ticker))
+                        hydrated++;
+
+                    var newBreakdown = raw.Breakdown with { SmartMoney = smartMoney };
+                    pending[i] = (snap, raw with { Breakdown = newBreakdown });
+                }
+                logger.LogInformation(
+                    "Smart Money rollup: {Hyd} of {Total} tickers had insider/short data ({Ins} insider, {Sht} short)",
+                    hydrated, pending.Count, insiderLatest.Count, shortLatest.Count);
+            }
+            catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
+            {
+                logger.LogWarning(
+                    "Smart Money rollup skipped — insider_scores or short_interest_snapshots missing (migration 024/025 pending). All tickers stay at neutral 50.");
+            }
+
+            // ─────────────────────────────────────────────────────────────
             // PASS 2 — Cross-sectional percentile ranking across universe.
             // Converts each factor score from "raw table output" to "your stock's
             // percentile within today's universe on this factor" (0-100).
+            //
+            // Magnitude blend: before ranking, amplify each stock's raw
+            // Momentum + Volume by a log(market-cap) factor so a $295B
+            // INTC moving 2% outranks a $5B small-cap moving 8% in
+            // dollar-impact terms. Without this, mega-cap rallies got
+            // buried in the percentile contest and never crossed the
+            // BUY/WATCH threshold even when billions were created.
+            // The bonus tops out at +50% so it nudges, doesn't dominate.
             // ─────────────────────────────────────────────────────────────
+            static double McapMomentumBlend(ScoringEngineV2.ScoreBreakdown b, double? mcap)
+            {
+                if (!mcap.HasValue || mcap.Value <= 0) return b.Momentum;
+                // log10(mcap / 1B) — gives 0 at $1B, 1 at $10B, 2 at $100B,
+                // 3 at $1T. Half-weight, capped at 0.5.
+                var mcapLog = Math.Log10(mcap.Value / 1e9 + 1);
+                var bonus = Math.Clamp((mcapLog - 1) * 0.25, 0, 0.5);
+                return b.Momentum * (1 + bonus);
+            }
+            static double McapVolumeBlend(ScoringEngineV2.ScoreBreakdown b, double? mcap)
+            {
+                if (!mcap.HasValue || mcap.Value <= 0) return b.Volume;
+                var mcapLog = Math.Log10(mcap.Value / 1e9 + 1);
+                var bonus = Math.Clamp((mcapLog - 1) * 0.20, 0, 0.4);
+                return b.Volume * (1 + bonus);
+            }
+
             ScoringEngineV2.ScoreBreakdown[] ranked;
             if (_options.UsePercentileRanking && pending.Count >= _options.MinUniverseForRanking)
             {
-                ranked = PercentileRanker.RankBreakdowns(pending.Select(p => p.Raw.Breakdown).ToList());
-                logger.LogInformation("Percentile-ranked {N} stocks across 7 factors", ranked.Length);
+                var blended = pending.Select(p =>
+                    p.Raw.Breakdown with
+                    {
+                        Momentum = McapMomentumBlend(p.Raw.Breakdown, p.Snap.MarketCap),
+                        Volume = McapVolumeBlend(p.Raw.Breakdown, p.Snap.MarketCap),
+                    }).ToList();
+                ranked = PercentileRanker.RankBreakdowns(blended);
+                logger.LogInformation(
+                    "Percentile-ranked {N} stocks across 7 factors (Momentum/Volume mcap-blended)",
+                    ranked.Length);
             }
             else
             {
@@ -172,7 +288,9 @@ public class ScanOrchestrator(
             {
                 var (snap, raw) = pending[i];
                 var tilted = ApplyRegimeTilt(ranked[i], snap.Sector, snap.StockReturn5d);
-                var final = StockScorer.Finalize(snap, tilted, raw.Provenance, _options, _regime);
+                var final = StockScorer.Finalize(
+                    snap, tilted, raw.Provenance, _options, _regime,
+                    hasSmartMoneyData: hasSmartMoneyData.Contains(snap.Ticker));
                 scoredSignals.Add(final);
             }
 
@@ -195,10 +313,24 @@ public class ScanOrchestrator(
             // WATCH, not a BUY. Prevents the "everything is a BUY"
             // compression when the scored universe is pre-filtered for
             // quality.
+            // Market-cap floor for publishing. The product is for the common
+            // public — Featured signals must be names like Apple, Tesla,
+            // Disney, not $5B homebuilders or institutional banks. Tickers
+            // below the floor still got scored above (so any /stock/X page
+            // works), they just don't enter the daily-drop pool.
+            var minPublishMcap = _options.Thresholds.MinPublishMarketCap;
+            var mcapByStockId = pending.ToDictionary(
+                p => p.Snap.StockId,
+                p => p.Snap.MarketCap ?? 0);
+            bool ClearsMcapFloor(ScoredSignal s) =>
+                minPublishMcap <= 0
+                || (mcapByStockId.TryGetValue(s.StockId, out var m) && m >= minPublishMcap);
+
             var buyCandidates = scoredSignals
                 .Where(s => s.SignalType == "BUY_TODAY"
                          && s.RiskRewardRatio.HasValue
-                         && s.RiskRewardRatio.Value >= _options.Thresholds.MinRiskReward)
+                         && s.RiskRewardRatio.Value >= _options.Thresholds.MinRiskReward
+                         && ClearsMcapFloor(s))
                 .ToList();
 
             var buySignals = new List<ScoredSignal>();
@@ -218,9 +350,24 @@ public class ScanOrchestrator(
                         demoteReasons[reason] = demoteReasons.GetValueOrDefault(reason) + 1;
                 }
             }
+            // Cap BUY_TODAY at the top N by score. The threshold + per-factor
+            // floors already filter quality; this ensures we publish a tight
+            // daily list (target ~7) instead of every name that cleared the
+            // bar. Overflow demotes to WATCH so it can still surface there
+            // if it beats the WATCH cohort.
+            if (buySignals.Count > _options.Thresholds.MaxBuySignals)
+            {
+                var sorted = buySignals.OrderByDescending(s => s.ScoreTotal).ToList();
+                buySignals = sorted.Take(_options.Thresholds.MaxBuySignals).ToList();
+                demotedToWatch.AddRange(sorted.Skip(_options.Thresholds.MaxBuySignals));
+            }
 
+            // Same mcap floor as BUY — WATCH signals on /research are
+            // also "for the common public", so $5B homebuilders shouldn't
+            // appear here either. Demoted BUY candidates already cleared
+            // the floor before being demoted, so they keep their slot.
             var watchSignals = scoredSignals
-                .Where(s => s.SignalType == "WATCH" && s.EntryLow.HasValue)
+                .Where(s => s.SignalType == "WATCH" && s.EntryLow.HasValue && ClearsMcapFloor(s))
                 .Concat(demotedToWatch) // demoted BUY_TODAY rows without confirmation
                 .Take(_options.Thresholds.MaxWatchSignals)
                 .ToList();
@@ -267,6 +414,7 @@ public class ScanOrchestrator(
                     SentimentScore = scored.Breakdown.Sentiment,
                     TrendScore = scored.Breakdown.Trend,
                     RiskScore = scored.Breakdown.Risk,
+                    SmartMoneyScore = scored.Breakdown.SmartMoney,
                     ExplanationJson = JsonSerializer.Serialize(scored.Explanation),
                     WhyNowSummary = scored.Explanation.Summary,
                 };
@@ -292,26 +440,63 @@ public class ScanOrchestrator(
             // existing rows for these tickers today, then insert fresh.
             // Guarded against missing migration 026 so a fresh DB doesn't
             // fail the scan — just logs and skips.
+            // Phase 1 of multi-lens scoring: write a history row for EVERY
+            // scored ticker, not just publishable signals. This decouples
+            // "score" from "signal" — AMD, AAPL, NVDA all get a daily score
+            // even when the swing-setup classifier doesn't fire BUY_TODAY.
+            // The screener and stock detail page read scores for the entire
+            // universe from this table, so big caps stop showing up at 0.
+            // SignalType is null for non-publishable rows; the column is
+            // used by Today/Boards UI to skip rows without a published call.
             var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
-            if (publishable.Count > 0)
+            if (scoredSignals.Count > 0)
             {
                 try
                 {
-                    var tickerList = publishable.Select(p => p.Ticker).Distinct().ToList();
+                    // Replace any existing rows for today; one upsert pass.
                     await db.SignalScoreHistory
-                        .Where(h => h.AsOfDate == today && tickerList.Contains(h.Ticker))
+                        .Where(h => h.AsOfDate == today)
                         .ExecuteDeleteAsync(ct);
-                    foreach (var p in publishable)
+
+                    var publishableTickers = publishable
+                        .Select(p => p.Ticker)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var publishableTypeByTicker = publishable
+                        .ToDictionary(p => p.Ticker, p => p.SignalType, StringComparer.OrdinalIgnoreCase);
+
+                    // Phase 2 of multi-lens scoring: re-weight the same 7
+                    // factors with the Composite (balanced) and Quality
+                    // (fundamentals-led) lens weights. Both come from
+                    // FactorWeights.Composite()/Quality() — see
+                    // ScoringOptions.cs for rationale.
+                    var compositeWeights = Fintrest.Api.Services.Scoring.FactorWeights.Composite();
+                    var qualityWeights = Fintrest.Api.Services.Scoring.FactorWeights.Quality();
+
+                    foreach (var scored in scoredSignals)
                     {
+                        var b = scored.Breakdown;
+                        var composite = compositeWeights.Apply(b);
+                        var quality = qualityWeights.Apply(b);
+
                         db.SignalScoreHistory.Add(new Models.SignalScoreHistory
                         {
-                            Ticker = p.Ticker,
+                            Ticker = scored.Ticker,
                             AsOfDate = today,
-                            ScoreTotal = (decimal)p.ScoreTotal,
-                            SignalType = p.SignalType,
+                            ScoreTotal = (decimal)scored.ScoreTotal,
+                            CompositeScore = (decimal)Math.Round(composite, 2),
+                            QualityScore = (decimal)Math.Round(quality, 2),
+                            // Only carry SignalType when the row was published.
+                            // Non-publishable rows get null so consumers can
+                            // tell "score exists but no call was made".
+                            SignalType = publishableTickers.Contains(scored.Ticker)
+                                ? publishableTypeByTicker[scored.Ticker]
+                                : null,
                             ScanRunId = scanRun.Id,
                         });
                     }
+                    logger.LogInformation(
+                        "signal_score_history: persisted {Total} ticker scores ({Pub} with published signal) — Setup + Composite + Quality lenses",
+                        scoredSignals.Count, publishable.Count);
                 }
                 catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
                 {

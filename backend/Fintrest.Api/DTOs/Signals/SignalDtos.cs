@@ -5,6 +5,7 @@ public record SignalResponse(
     string Ticker,
     string StockName,
     string SignalType,
+    // ScoreTotal carries the Setup lens (current swing-trade formula).
     double ScoreTotal,
     double? CurrentPrice,
     double? ChangePct,
@@ -16,7 +17,16 @@ public record SignalResponse(
     string? RiskLevel,
     int? HorizonDays,
     SignalBreakdownDto? Breakdown,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    // Phase 2 multi-lens scoring: alternative composites surfaced from
+    // signal_score_history. CompositeScore is the balanced "good investment
+    // overall" lens; QualityScore is the fundamentals-led "would I hold
+    // long-term" lens. Same 7 factors, different weights — see
+    // ScoringOptions.cs FactorWeights.Composite()/Quality().
+    // Note: distinct from Breakdown.QualityScore which is the fundamentals
+    // sub-score decomposition (quality / profitability / growth).
+    double? CompositeScore = null,
+    double? LensQualityScore = null
 );
 
 public record SignalBreakdownDto(
@@ -33,7 +43,10 @@ public record SignalBreakdownDto(
     // signals scored before the sub-score table was populated have no backing row.
     double? QualityScore = null,
     double? ProfitabilityScore = null,
-    double? GrowthScore = null
+    double? GrowthScore = null,
+    // 8th factor — Smart Money family (25% of composite).
+    // 50 = neutral default when sub-signals haven't landed yet.
+    double SmartMoneyScore = 50.0
 );
 
 public record SignalListResponse(List<SignalResponse> Signals, int Count);

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Fintrest.Api.Data;
 using Fintrest.Api.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -30,10 +31,40 @@ public static class AuthExtensions
     }
 
     /// <summary>Check if the JWT has admin role.</summary>
+    // Supabase JWTs nest custom roles inside `app_metadata` rather than emitting
+    // them as top-level claims, so HasClaim("user_role", "admin") never matches
+    // even when the user's app_metadata is `{"user_role":"admin"}`. Parse the
+    // app_metadata JSON blob and check the nested user_role/role fields too.
     public static bool IsAdmin(this ClaimsPrincipal principal)
     {
-        return principal.IsInRole("Admin")
-               || principal.HasClaim("user_role", "admin")
-               || principal.HasClaim("role", "admin");
+        if (principal.IsInRole("Admin")
+            || principal.HasClaim("user_role", "admin")
+            || principal.HasClaim("role", "admin"))
+        {
+            return true;
+        }
+
+        var appMeta = principal.FindFirstValue("app_metadata");
+        if (string.IsNullOrEmpty(appMeta)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(appMeta);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return false;
+            foreach (var key in new[] { "user_role", "role" })
+            {
+                if (root.TryGetProperty(key, out var v)
+                    && v.ValueKind == JsonValueKind.String
+                    && string.Equals(v.GetString(), "admin", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Malformed app_metadata claim — treat as non-admin.
+        }
+        return false;
     }
 }

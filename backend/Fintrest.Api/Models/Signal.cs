@@ -100,7 +100,7 @@ public class SignalBreakdown
 
     public long SignalId { get; set; }
 
-    // 7 factor scores (0-100)
+    // 8 factor scores (0-100)
     public double MomentumScore { get; set; }
     public double RelVolumeScore { get; set; }
     public double NewsScore { get; set; }
@@ -108,6 +108,12 @@ public class SignalBreakdown
     public double SentimentScore { get; set; }
     public double TrendScore { get; set; }
     public double RiskScore { get; set; }
+    // Smart Money family — 25% of composite (matches TipRanks Smart Score
+    // ceiling). Composed of Insider 35% / Institutional 25% / Short 15%
+    // / Congressional 15% / Options 10%. Defaults to 50 (neutral) when
+    // sub-signals are missing so tickers without smart-money data don't
+    // crater. Persisted per signal for explainability.
+    public double SmartMoneyScore { get; set; } = 50.0;
 
     // JSON explanation
     [Column(TypeName = "jsonb")]

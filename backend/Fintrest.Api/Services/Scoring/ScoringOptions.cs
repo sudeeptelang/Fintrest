@@ -60,6 +60,11 @@ public class FactorWeights
     public double Sentiment { get; set; }
     public double Trend { get; set; }
     public double Risk { get; set; }
+    // 8th factor — Smart Money composite (Insider 35% / Institutional 25% /
+    // Short 15% / Congress 15% / Options 10% within the family). 25%
+    // matches TipRanks Smart Score ceiling — the most aggressive
+    // mainstream consumer comp for smart-money weighting.
+    public double SmartMoney { get; set; }
 
     public double Apply(ScoringEngineV2.ScoreBreakdown b) =>
         b.Momentum * Momentum +
@@ -68,17 +73,57 @@ public class FactorWeights
         b.Fundamental * Fundamental +
         b.Sentiment * Sentiment +
         b.Trend * Trend +
-        b.Risk * Risk;
+        b.Risk * Risk +
+        b.SmartMoney * SmartMoney;
 
     public static FactorWeights Default() => new()
     {
-        Momentum = 0.22,
-        Volume = 0.12,
-        Catalyst = 0.15,
-        Fundamental = 0.18,
-        Sentiment = 0.10,
+        // 18% Smart Money — splits TipRanks ceiling (25%) and IBD floor (15%),
+        // matches academic alpha-parity (Cohen/Malloy/Pomorski insider 6-10%
+        // alpha, comparable to value/momentum). Other 7 factors scaled
+        // proportionally from the original 7-factor weights.
+        Momentum = 0.18,
+        Volume = 0.10,
+        Catalyst = 0.12,
+        Fundamental = 0.15,
+        Sentiment = 0.08,
+        Trend = 0.11,
+        Risk = 0.08,
+        SmartMoney = 0.18,
+    };
+
+    /// <summary>
+    /// Composite lens — the balanced "is this a good investment overall"
+    /// score. Fundamentals anchor; Smart Money 18% peer; momentum dampened
+    /// so AAPL/MSFT/JPM bubble up on quality.
+    /// </summary>
+    public static FactorWeights Composite() => new()
+    {
+        Momentum = 0.11,
+        Volume = 0.06,
+        Catalyst = 0.05,
+        Fundamental = 0.27,
+        Sentiment = 0.09,
+        Trend = 0.11,
+        Risk = 0.13,
+        SmartMoney = 0.18,
+    };
+
+    /// <summary>
+    /// Quality lens — fundamentals-led, low-risk-aware. Smart Money 18%
+    /// still meaningful for insider conviction on durable franchises, but
+    /// fundamentals dominate.
+    /// </summary>
+    public static FactorWeights Quality() => new()
+    {
+        Momentum = 0.05,
+        Volume = 0.03,
+        Catalyst = 0.05,
+        Fundamental = 0.33,
+        Sentiment = 0.08,
         Trend = 0.13,
-        Risk = 0.10,
+        Risk = 0.15,
+        SmartMoney = 0.18,
     };
 }
 
@@ -128,7 +173,22 @@ public class SignalThresholds
     public double MinRiskScoreForBuy { get; set; } = 45;  // score, not "risk level"
     public double MaxBearishSentiment { get; set; } = -0.1;
 
+    // Daily signal-pool caps. After scoring + filtering, keep only the top N
+    // by score for each tier. The product is broad stock-signalling (not
+    // a 50-name terminal), so signals must be FEW and STRONG. Defaults
+    // target ~7 BUY + ~5 WATCH = ~12 daily signals, every one above the
+    // raised thresholds.
+    public int MaxBuySignals { get; set; } = 7;
     public int MaxWatchSignals { get; set; } = 25;
+
+    // Market-cap floor for *published* signals. The product is for the
+    // common public, not finance professionals — daily signals must be
+    // names people recognize (Apple, Tesla, Disney). Below the floor,
+    // tickers still get scored (so /stock/{anything} works) but they
+    // don't show up in /research featured signals. $50B cuts the
+    // universe to roughly the Russell-200 tier (top ~250 names).
+    // Set to 0 to disable the filter.
+    public double MinPublishMarketCap { get; set; } = 50_000_000_000;
 
     public string Classify(double total) => total switch
     {

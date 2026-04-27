@@ -32,6 +32,17 @@ public class SignalScoreHistory
     [Column(TypeName = "numeric(5,2)")]
     public decimal ScoreTotal { get; set; }
 
+    // Phase 2 of multi-lens scoring (migration 029).
+    // ScoreTotal carries the Setup lens (current swing-trade formula).
+    // CompositeScore is the balanced "good investment overall" lens.
+    // QualityScore is the fundamentals-led "would I hold long-term" lens.
+    // Nullable so pre-Phase-2 rows stay valid without a backfill.
+    [Column(TypeName = "numeric(5,2)")]
+    public decimal? CompositeScore { get; set; }
+
+    [Column(TypeName = "numeric(5,2)")]
+    public decimal? QualityScore { get; set; }
+
     [MaxLength(20)]
     public string? SignalType { get; set; }
 

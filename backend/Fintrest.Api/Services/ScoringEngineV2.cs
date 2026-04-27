@@ -36,7 +36,13 @@ public static class ScoringEngineV2
         double Fundamental,
         double Sentiment,
         double Trend,
-        double Risk
+        double Risk,
+        // 8th factor — Smart Money family (25% of composite, matches TipRanks
+        // Smart Score ceiling). Composed of 5 sub-signals: Insider activity,
+        // Institutional flow (13F), Short dynamics, Congressional trades,
+        // Options positioning. Default 50 (neutral) when sub-signals haven't
+        // been wired yet so tickers without smart-money data don't crater.
+        double SmartMoney = 50.0
     )
     {
         public double Total { get; init; }

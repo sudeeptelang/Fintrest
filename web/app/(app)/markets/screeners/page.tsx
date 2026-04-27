@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -9,6 +9,26 @@ import type { ScreenerRow } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { StockLogo } from "@/components/ui/stock-logo";
 import { ScoreGradeChip } from "@/components/ui/score-grade-chip";
+
+// Phase 2 multi-lens scoring: each ticker has three composite scores —
+// Setup (current swing-trade formula, gates published signals),
+// Composite (balanced, "good investment overall"), and Quality
+// (fundamentals-led, "would I hold long-term"). The lens picker swaps
+// which score drives ranking + display; all three are still on every
+// row so users can see the differential.
+type Lens = "setup" | "composite" | "quality";
+
+function lensScore(row: ScreenerRow, lens: Lens): number | null {
+  if (lens === "composite") return row.compositeScore;
+  if (lens === "quality") return row.qualityScore;
+  return row.signalScore;
+}
+
+const LENS_LABEL: Record<Lens, { label: string; sub: string }> = {
+  setup:     { label: "Setup",     sub: "swing-trade formula" },
+  composite: { label: "Composite", sub: "balanced overall" },
+  quality:   { label: "Quality",   sub: "fundamentals-led" },
+};
 
 /**
  * Curated screener presets — the v3 replacement for the old 6-card
@@ -24,15 +44,6 @@ import { ScoreGradeChip } from "@/components/ui/score-grade-chip";
 
 type Family = "technical" | "fundamentals" | "sentiment" | "smart";
 
-type Preset = {
-  slug: string;
-  name: string;
-  description: string;
-  family: Family;
-  read: string;
-  filter: (rows: ScreenerRow[]) => ScreenerRow[];
-};
-
 const FAMILY_STYLE: Record<Family, { accent: string; bg: string; pill: string; pillText: string; dot: string }> = {
   technical:    { accent: "border-l-navy",  bg: "bg-navy/5",   pill: "bg-navy/10",  pillText: "text-navy",  dot: "bg-navy" },
   fundamentals: { accent: "border-l-amber", bg: "bg-amber/5",  pill: "bg-amber/10", pillText: "text-amber", dot: "bg-amber" },
@@ -40,16 +51,25 @@ const FAMILY_STYLE: Record<Family, { accent: string; bg: string; pill: string; p
   smart:        { accent: "border-l-teal",  bg: "bg-teal/5",   pill: "bg-teal/10",  pillText: "text-teal",  dot: "bg-teal" },
 };
 
-const PRESETS: Preset[] = [
+type Preset = {
+  slug: string;
+  name: string;
+  description: string;
+  family: Family;
+  read: string;
+  filter: (rows: ScreenerRow[], lens: Lens) => ScreenerRow[];
+};
+
+const buildPresets = (): Preset[] => [
   {
     slug: "high-conviction",
     name: "High Conviction",
-    description: "A-grade composite · rising trend",
+    description: "Top of selected lens · healthy trend",
     family: "smart",
-    read: "What we'd buy if the compliance rules let us — score ≥ 85 and a healthy trend.",
-    filter: (rows) => rows
-      .filter((r) => (r.signalScore ?? 0) >= 85 && (r.changePct ?? 0) >= -2)
-      .sort((a, b) => (b.signalScore ?? 0) - (a.signalScore ?? 0)),
+    read: "Top tier on the active lens — Setup picks swing setups, Composite picks balanced winners, Quality picks long-term holds.",
+    filter: (rows, lens) => rows
+      .filter((r) => (lensScore(r, lens) ?? 0) >= 75 && (r.changePct ?? 0) >= -2)
+      .sort((a, b) => (lensScore(b, lens) ?? 0) - (lensScore(a, lens) ?? 0)),
   },
   {
     slug: "quality-growth",
@@ -74,11 +94,11 @@ const PRESETS: Preset[] = [
   {
     slug: "oversold-reversal",
     name: "Oversold Reversal",
-    description: "RSI < 30 · Score ≥ 60",
+    description: "RSI < 30 · Lens score ≥ 60",
     family: "technical",
     read: "Capitulation + a composite that hasn't broken — the bounce setups we look for.",
-    filter: (rows) => rows
-      .filter((r) => (r.rsi ?? 100) < 30 && (r.signalScore ?? 0) >= 60)
+    filter: (rows, lens) => rows
+      .filter((r) => (r.rsi ?? 100) < 30 && (lensScore(r, lens) ?? 0) >= 60)
       .sort((a, b) => (a.rsi ?? 100) - (b.rsi ?? 100)),
   },
   {
@@ -97,8 +117,10 @@ const PRESETS: Preset[] = [
     description: "Within 5% of 52w high · Rel Vol ≥ 1.3",
     family: "technical",
     read: "Price pressing the ceiling with volume confirming — classic continuation.",
+    // week52RangePct is 0-100 across the codebase (athena-board, movers-table,
+    // screener-table all use the 0-100 form). 95 = within 5% of the 52-week high.
     filter: (rows) => rows
-      .filter((r) => (r.week52RangePct ?? 0) >= 0.95 && (r.relVolume ?? 0) >= 1.3)
+      .filter((r) => (r.week52RangePct ?? 0) >= 95 && (r.relVolume ?? 0) >= 1.3)
       .sort((a, b) => (b.week52RangePct ?? 0) - (a.week52RangePct ?? 0)),
   },
 ];
@@ -106,10 +128,11 @@ const PRESETS: Preset[] = [
 export default function MarketsScreenersPage() {
   const { data: screener } = useMarketScreener(500);
   const rows = screener ?? [];
+  const [lens, setLens] = useState<Lens>("composite");
 
   const computed = useMemo(
-    () => PRESETS.map((p) => ({ preset: p, matches: p.filter(rows) })),
-    [rows],
+    () => buildPresets().map((p) => ({ preset: p, matches: p.filter(rows, lens) })),
+    [rows, lens],
   );
 
   return (
@@ -130,6 +153,33 @@ export default function MarketsScreenersPage() {
         </p>
       </header>
 
+      {/* Phase 2 multi-lens scoring picker — swaps which composite drives
+          ranking + the score chip on each preset row. Setup is the swing-
+          trade formula; Composite is balanced; Quality is fundamentals-led. */}
+      <div className="mb-5 inline-flex rounded-[8px] border border-ink-200 bg-ink-0 p-0.5">
+        {(["setup", "composite", "quality"] as Lens[]).map((l) => {
+          const active = l === lens;
+          return (
+            <button
+              key={l}
+              type="button"
+              onClick={() => setLens(l)}
+              className={cn(
+                "px-3.5 py-1.5 text-[12px] font-semibold rounded-[6px] transition-colors",
+                active
+                  ? "bg-forest text-ink-0"
+                  : "text-ink-600 hover:text-ink-900 hover:bg-ink-50",
+              )}
+            >
+              <span>{LENS_LABEL[l].label}</span>
+              <span className={cn("ml-2 text-[10px] font-normal", active ? "opacity-80" : "opacity-60")}>
+                {LENS_LABEL[l].sub}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {rows.length === 0 ? (
         <div className="rounded-[10px] border border-ink-200 bg-ink-0 px-6 py-10 text-center text-[13px] text-ink-500">
           No screener data yet. Check back after the next market-data ingest.
@@ -137,7 +187,7 @@ export default function MarketsScreenersPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {computed.map(({ preset, matches }) => (
-            <PresetCard key={preset.slug} preset={preset} matches={matches} />
+            <PresetCard key={preset.slug} preset={preset} matches={matches} lens={lens} />
           ))}
         </div>
       )}
@@ -145,7 +195,7 @@ export default function MarketsScreenersPage() {
   );
 }
 
-function PresetCard({ preset, matches }: { preset: Preset; matches: ScreenerRow[] }) {
+function PresetCard({ preset, matches, lens }: { preset: Preset; matches: ScreenerRow[]; lens: Lens }) {
   const fs = FAMILY_STYLE[preset.family];
   const topMatches = matches.slice(0, 5);
 
@@ -198,7 +248,7 @@ function PresetCard({ preset, matches }: { preset: Preset; matches: ScreenerRow[
                     {r.name}
                   </div>
                 </div>
-                <ScoreGradeChip score={r.signalScore ?? null} size="sm" showNum={false} showDelta={false} />
+                <ScoreGradeChip score={lensScore(r, lens)} size="sm" showNum={false} showDelta={false} />
                 <PresetMetric row={r} family={preset.family} />
               </Link>
             </li>
@@ -242,7 +292,7 @@ function PresetMetric({ row, family }: { row: ScreenerRow; family: Family }) {
       value = row.rsi.toFixed(0);
     } else if (row.week52RangePct != null) {
       label = "52w";
-      value = `${(row.week52RangePct * 100).toFixed(0)}%`;
+      value = `${row.week52RangePct.toFixed(0)}%`;
     }
   }
 

@@ -99,9 +99,17 @@ public record ScreenerRowResponse(
     double? Rsi,
     double? AnalystTargetPrice,
     DateTime? NextEarningsDate,
-    // Signal (from latest scan)
+    // Signal (from latest scan) — Setup lens (current swing-trade formula).
+    // SignalScore is the legacy field; falls back to setup_score from
+    // signal_score_history when no published signal exists for this ticker.
     double? SignalScore,
     string? SignalType,
+    // Phase 2 multi-lens scoring: Composite (balanced) + Quality
+    // (fundamentals-led) computed for every active ticker, not just
+    // signal-bearing rows. Sourced from signal_score_history; null until
+    // the first post-Phase-2 scan completes.
+    double? CompositeScore,
+    double? QualityScore,
     // Trade zone + thesis verdict (from latest scan)
     double? EntryLow,
     double? EntryHigh,

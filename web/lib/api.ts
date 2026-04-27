@@ -36,6 +36,7 @@ export interface Signal {
   ticker: string;
   stockName: string;
   signalType: string;
+  // scoreTotal carries the Setup lens (current swing-trade formula).
   scoreTotal: number;
   currentPrice: number | null;
   changePct: number | null;
@@ -48,6 +49,12 @@ export interface Signal {
   horizonDays: number | null;
   breakdown: SignalBreakdown | null;
   createdAt: string;
+  // Phase 2 multi-lens scoring. compositeScore is the balanced "good
+  // investment overall" lens; lensQualityScore is the fundamentals-led
+  // "would I hold long-term" lens. Distinct from breakdown.qualityScore
+  // (which is the Quality/Profitability/Growth fundamentals sub-score).
+  compositeScore: number | null;
+  lensQualityScore: number | null;
 }
 
 export interface SignalBreakdown {
@@ -65,6 +72,10 @@ export interface SignalBreakdown {
   qualityScore: number | null;
   profitabilityScore: number | null;
   growthScore: number | null;
+  // 8th factor — Smart Money family (Insider 35% / Institutional 25% /
+  // Short 15% / Congressional 15% / Options 10%). 25% weight in composite.
+  // Defaults to 50 (neutral) until Pass B wires the real rollup.
+  smartMoneyScore: number;
 }
 
 export interface SignalListResponse {
@@ -224,6 +235,10 @@ export interface ScreenerRow {
   nextEarningsDate: string | null;
   signalScore: number | null;
   signalType: string | null;
+  // Phase 2 multi-lens scoring: balanced "good investment" lens.
+  compositeScore: number | null;
+  // Phase 2: fundamentals-led "would I hold long-term" lens.
+  qualityScore: number | null;
   entryLow: number | null;
   entryHigh: number | null;
   stopLoss: number | null;

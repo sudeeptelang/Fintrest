@@ -58,6 +58,7 @@ public static class PercentileRanker
         var sen = Rank(raw.Select(b => b.Sentiment).ToList());
         var trd = Rank(raw.Select(b => b.Trend).ToList());
         var rsk = Rank(raw.Select(b => b.Risk).ToList());
+        var smt = Rank(raw.Select(b => b.SmartMoney).ToList());
 
         var output = new ScoringEngineV2.ScoreBreakdown[n];
         for (int i = 0; i < n; i++)
@@ -69,7 +70,8 @@ public static class PercentileRanker
                 Fundamental: fun[i],
                 Sentiment: sen[i],
                 Trend: trd[i],
-                Risk: rsk[i]);
+                Risk: rsk[i],
+                SmartMoney: smt[i]);
         }
         return output;
     }

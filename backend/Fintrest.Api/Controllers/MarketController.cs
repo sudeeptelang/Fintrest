@@ -417,6 +417,46 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             .Where(s => stockIds.Contains(s.Id))
             .ToListAsync();
 
+        // Phase 1 of multi-lens scoring: every ticker has a daily score now,
+        // not just signal-bearing ones. Pull the most recent
+        // signal_score_history row per ticker so AMD/AAPL/MSFT show real
+        // composite scores even when the swing classifier didn't fire a
+        // BUY_TODAY/WATCH for them. Falls back silently when the table
+        // doesn't exist (migration 026 pending) — screener still works
+        // with publishable-only scores from the signals table.
+        var screenerTickers = stocks.Select(s => s.Ticker).ToList();
+        Dictionary<string, decimal> historicalScores = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, decimal> compositeScores = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, decimal> qualityScores = new(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var historyCutoff = DateTime.UtcNow.Date.AddDays(-3);
+            var historyRows = await db.SignalScoreHistory
+                .AsNoTracking()
+                .Where(h => screenerTickers.Contains(h.Ticker) && h.AsOfDate >= historyCutoff)
+                .OrderByDescending(h => h.AsOfDate)
+                .Select(h => new { h.Ticker, h.ScoreTotal, h.CompositeScore, h.QualityScore, h.AsOfDate })
+                .ToListAsync();
+            // Most-recent row per ticker; ToDictionary picks the first
+            // occurrence which is the newest after OrderByDescending.
+            var latestByTicker = historyRows
+                .GroupBy(r => r.Ticker, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+            historicalScores = latestByTicker
+                .ToDictionary(kv => kv.Key, kv => kv.Value.ScoreTotal, StringComparer.OrdinalIgnoreCase);
+            compositeScores = latestByTicker
+                .Where(kv => kv.Value.CompositeScore.HasValue)
+                .ToDictionary(kv => kv.Key, kv => kv.Value.CompositeScore!.Value, StringComparer.OrdinalIgnoreCase);
+            qualityScores = latestByTicker
+                .Where(kv => kv.Value.QualityScore.HasValue)
+                .ToDictionary(kv => kv.Key, kv => kv.Value.QualityScore!.Value, StringComparer.OrdinalIgnoreCase);
+        }
+        catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
+        {
+            // signal_score_history table missing — migration 026 not applied yet.
+            // Fall back to publishable-only scoring.
+        }
+
         // Load latest fundamental per stock (has EPS growth, revenue growth, gross/net margin)
         var funds = await db.Fundamentals
             .Where(f => stockIds.Contains(f.StockId))
@@ -429,7 +469,7 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         var cutoff = DateTime.UtcNow.AddDays(-400);
         var allBars = await db.MarketData
             .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
-            .Select(m => new { m.StockId, m.Ts, m.Close, m.High, m.Low, m.Volume })
+            .Select(m => new { m.StockId, m.Ts, m.Close, m.High, m.Low, m.Volume, m.Rsi })
             .ToListAsync();
         var barsByStock = allBars
             .GroupBy(m => m.StockId)
@@ -550,11 +590,19 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 Week52High: w52High is not null ? Math.Round(w52High.Value, 2) : null,
                 Week52Low: w52Low is not null ? Math.Round(w52Low.Value, 2) : null,
                 Week52RangePct: w52RangePct,
-                Rsi: null, // RSI not stored per bar, computed at scan time
+                Rsi: latest?.Rsi is double r ? Math.Round(r, 1) : null,
                 AnalystTargetPrice: stock.AnalystTargetPrice,
                 NextEarningsDate: stock.NextEarningsDate,
-                SignalScore: signal?.ScoreTotal,
+                // Score precedence: today's published signal first (full
+                // breakdown available), else the most recent
+                // signal_score_history row (Phase 1 multi-lens — every
+                // active ticker now carries a daily score). Coerce decimal
+                // history scores to double for the DTO.
+                SignalScore: signal?.ScoreTotal
+                    ?? (historicalScores.TryGetValue(stock.Ticker, out var hs) ? (double)hs : null),
                 SignalType: signal?.SignalType.ToString(),
+                CompositeScore: compositeScores.TryGetValue(stock.Ticker, out var cs) ? (double)cs : null,
+                QualityScore: qualityScores.TryGetValue(stock.Ticker, out var qs) ? (double)qs : null,
                 EntryLow: signal?.EntryLow,
                 EntryHigh: signal?.EntryHigh,
                 StopLoss: signal?.StopLoss,
@@ -2155,14 +2203,52 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     {
         var prices = await GetLatestPricesAsync(signals);
         var subscores = await GetFundamentalSubscoresAsync(signals);
+        var lenses = await GetLensScoresAsync(signals);
         return new SignalListResponse(
             signals.Select(s =>
             {
                 var (close, changePct) = prices.GetValueOrDefault(s.StockId);
                 subscores.TryGetValue(s.Stock.Ticker, out var sub);
-                return ToDto(s, close > 0 ? close : null, changePct, sub);
+                lenses.TryGetValue(s.Stock.Ticker, out var lens);
+                return ToDto(s, close > 0 ? close : null, changePct, sub, lens);
             }).ToList(),
             signals.Count);
+    }
+
+    /// <summary>
+    /// Phase 2 multi-lens scoring: load Composite + Quality lens scores
+    /// from the latest signal_score_history row per ticker. Falls back
+    /// to empty when the table doesn't exist (migration 026/029 pending)
+    /// so the picks endpoint stays alive even without lens data.
+    /// </summary>
+    private async Task<Dictionary<string, (double? Composite, double? Quality)>> GetLensScoresAsync(List<Signal> signals)
+    {
+        if (signals.Count == 0) return new();
+        var tickers = signals.Select(s => s.Stock.Ticker).Distinct().ToList();
+        try
+        {
+            var cutoff = DateTime.UtcNow.Date.AddDays(-3);
+            var rows = await db.SignalScoreHistory
+                .AsNoTracking()
+                .Where(h => tickers.Contains(h.Ticker) && h.AsOfDate >= cutoff)
+                .Select(h => new { h.Ticker, h.AsOfDate, h.CompositeScore, h.QualityScore })
+                .ToListAsync();
+            return rows
+                .GroupBy(r => r.Ticker)
+                .ToDictionary(
+                    g => g.Key,
+                    g =>
+                    {
+                        var latest = g.OrderByDescending(r => r.AsOfDate).First();
+                        return (
+                            (double?)(latest.CompositeScore.HasValue ? (double)latest.CompositeScore.Value : null),
+                            (double?)(latest.QualityScore.HasValue ? (double)latest.QualityScore.Value : null));
+                    });
+        }
+        catch (Npgsql.PostgresException pex) when (pex.SqlState == "42P01")
+        {
+            return new();
+        }
     }
 
     /// <summary>
@@ -2203,7 +2289,8 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
         Signal s,
         double? currentPrice = null,
         double? changePct = null,
-        (double? Quality, double? Profitability, double? Growth) sub = default) => new(
+        (double? Quality, double? Profitability, double? Growth) sub = default,
+        (double? Composite, double? Quality) lens = default) => new(
         s.Id, s.Stock.Ticker, s.Stock.Name, s.SignalType.ToString(), s.ScoreTotal,
         currentPrice, changePct,
         s.EntryLow, s.EntryHigh, s.StopLoss, s.TargetLow, s.TargetHigh,
@@ -2214,8 +2301,11 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             s.Breakdown.RiskScore, s.Breakdown.ExplanationJson, s.Breakdown.WhyNowSummary,
             QualityScore: sub.Quality,
             ProfitabilityScore: sub.Profitability,
-            GrowthScore: sub.Growth
+            GrowthScore: sub.Growth,
+            SmartMoneyScore: s.Breakdown.SmartMoneyScore
         ) : null,
-        s.CreatedAt
+        s.CreatedAt,
+        CompositeScore: lens.Composite,
+        LensQualityScore: lens.Quality
     );
 }

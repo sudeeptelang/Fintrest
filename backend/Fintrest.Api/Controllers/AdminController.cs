@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Fintrest.Api.Core;
 using Fintrest.Api.Data;
 using Fintrest.Api.Models;
 using Fintrest.Api.Services.Ingestion;
@@ -14,7 +15,17 @@ namespace Fintrest.Api.Controllers;
 [Route("api/v1/admin")]
 public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataIngestionService ingestion) : ControllerBase
 {
-    private long AdminUserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    // The JWT "sub" claim is the Supabase UUID, not the local bigint user
+    // Id. Resolve it via the users table mapping. Throws if the principal
+    // can't be matched — admin endpoints are protected so this should
+    // only fire for malformed JWTs.
+    private async Task<long> GetAdminUserIdAsync(CancellationToken ct = default)
+    {
+        var id = await User.ResolveUserId(db);
+        if (id is null) throw new InvalidOperationException(
+            "Admin user could not be resolved from JWT — the Supabase UUID has no row in the users table.");
+        return id.Value;
+    }
 
     [HttpPost("scan/run")]
     public async Task<IActionResult> TriggerScan(CancellationToken ct)
@@ -22,7 +33,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         // Audit log
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "trigger_scan",
             EntityType = "scan_run",
         });
@@ -79,7 +90,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
 
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "recompute_signal",
             EntityType = "signal",
             EntityId = signalId,
@@ -119,7 +130,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "recompute_fundamental_subscores",
             EntityType = "fundamental_subscore",
         });
@@ -146,7 +157,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "ingest_edgar_form4",
             EntityType = "insider_transactions",
             MetadataJson = System.Text.Json.JsonSerializer.Serialize(new { daysBack }),
@@ -173,7 +184,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "recompute_insider_scores",
             EntityType = "insider_scores",
         });
@@ -196,7 +207,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "recompute_signal_outcomes",
             EntityType = "performance_tracking",
         });
@@ -219,7 +230,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "evaluate_user_alerts",
             EntityType = "alerts",
         });
@@ -254,7 +265,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
 
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "set_user_plan",
             EntityType = "users",
             EntityId = user.Id,
@@ -274,7 +285,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "trigger_health_email",
             EntityType = "health",
         });
@@ -325,7 +336,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "trigger_ingestion",
         });
         await db.SaveChangesAsync(ct);
@@ -358,7 +369,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
 
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "ingest_short_interest",
             EntityType = "short_interest_snapshots",
         });
@@ -420,7 +431,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
 
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "refresh_live_quotes",
             EntityType = "live_quotes",
         });
@@ -446,7 +457,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
 
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "ingest_top_caps",
             EntityType = "market_data",
         });
@@ -660,7 +671,7 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
-            ActorUserId = AdminUserId,
+            ActorUserId = await GetAdminUserIdAsync(ct),
             Action = "run_full_pipeline",
         });
         await db.SaveChangesAsync(ct);

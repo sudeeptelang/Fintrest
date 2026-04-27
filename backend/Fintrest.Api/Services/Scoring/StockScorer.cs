@@ -123,10 +123,35 @@ public static class StockScorer
         ScoringEngineV2.ScoreBreakdown finalBreakdown,
         Dictionary<string, object?> provenance,
         ScoringOptions options,
-        MarketRegime regime)
+        MarketRegime regime,
+        bool hasSmartMoneyData = true)
     {
         var weights = options.RegimeWeights.Pick(regime, options.Weights);
-        var total = weights.Apply(finalBreakdown);
+        // When the ticker has no real smart-money sub-signals (no insider
+        // transactions on file, no short-interest snapshot), the SmartMoney
+        // factor was filled with neutral 50 → percentile-ranked to ~50 →
+        // would contribute weight×50 to the composite. That systematically
+        // compressed scores for the no-data majority. Solution: drop
+        // SmartMoney from the weighted sum AND re-normalize the other 7
+        // factors to sum to 100% so the composite stays on the same 0-100
+        // scale as tickers that do have data. Tickers WITH real data get
+        // the full 8-factor formula unchanged.
+        double total;
+        if (hasSmartMoneyData)
+        {
+            total = weights.Apply(finalBreakdown);
+        }
+        else
+        {
+            var smContribution = finalBreakdown.SmartMoney * weights.SmartMoney;
+            var totalWithSm = weights.Apply(finalBreakdown);
+            var remainingWeight = 1.0 - weights.SmartMoney;
+            // Guard against degenerate config where SmartMoney = 100% would
+            // leave nothing to renormalize against. Falls back to neutral 50.
+            total = remainingWeight > 0.01
+                ? (totalWithSm - smContribution) / remainingWeight
+                : 50.0;
+        }
         var signalType = options.Thresholds.Classify(total);
 
         var classified = finalBreakdown with { Total = total, SignalType = signalType };

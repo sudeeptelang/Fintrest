@@ -514,16 +514,19 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
     {
         if (tickers.Count == 0) return [];
 
-        // FMP /stable/quote accepts a single symbol OR a comma-separated
-        // list on certain plans. To be safe and stay inside URL-length
-        // limits, we batch at 100 per request and stitch the results.
+        // FMP renamed the batch quote endpoint when they migrated to the
+        // /stable namespace. The old singular form (/stable/quote?symbol=A,B,C)
+        // silently returns [] — confirmed via API test 2026-04-26 — which
+        // is what made "Refresh live quotes" return 0 fetched. The current
+        // batch endpoint is /stable/batch-quote with plural ?symbols=.
+        // Single-ticker /stable/quote still works for one-off lookups.
         var results = new List<LiveQuoteDto>();
         var batchSize = 100;
         for (int i = 0; i < tickers.Count; i += batchSize)
         {
             var batch = tickers.Skip(i).Take(batchSize);
             var symbols = string.Join(",", batch);
-            var url = $"{_baseUrl}/quote?symbol={symbols}&apikey={_apiKey}";
+            var url = $"{_baseUrl}/batch-quote?symbols={symbols}&apikey={_apiKey}";
             var rows = await TryFetch<List<FmpQuote>>(url, ct);
             if (rows is null) continue;
 
