@@ -78,7 +78,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const ticker = rawTicker.toUpperCase();
   const [chartRange, setChartRange] = useState("3m");
   const [smartMoneyOpen, setSmartMoneyOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "smart_money" | "news">("chart");
+  const [activeTab, setActiveTab] = useState<"signal" | "chart" | "fundamentals" | "smart_money" | "news">("signal");
   const smartMoneyRef = useRef<HTMLDivElement | null>(null);
   // Per-sub-signal anchors so the Smart Money breakdown can scroll the
   // user to the matching Deep Dive row when they tap a sub-signal.
@@ -146,6 +146,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
 
   function scrollToSmartMoney() {
     setSmartMoneyOpen(true);
+    setActiveTab("smart_money");
     requestAnimationFrame(() => {
       smartMoneyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -229,60 +230,18 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         )}
       </LensCardGated>
 
-      {/* 2. Trade plan */}
-      {hasLevels && (
-        <TradePlan
-          entry={entry}
-          stop={stop}
-          target={target}
-          now={signal?.currentPrice ?? snapshot?.price ?? null}
-          bullets={tradePlanBullets}
-          note={tradePlanNote}
-        />
-      )}
-
-      {/* 3a. What's driving today — per-factor contribution chips vs. baseline */}
-      {breakdown && signal && (
-        <DrivingToday breakdown={breakdown} composite={signal.scoreTotal} />
-      )}
-
-      {/* 3b. 8-factor breakdown */}
-      {breakdown && signal && (
-        <FactorBreakdownPanel
-          breakdown={breakdown}
-          composite={signal.scoreTotal}
-          smartMoneyScore={smartMoneyComposite}
-          onSmartMoneyClick={scrollToSmartMoney}
-        />
-      )}
-
-      {/* 4. Smart Money breakdown — indented drill-down of the 8th factor */}
-      {smartMoneyOpen && (
-        <div ref={smartMoneyRef}>
-          <SmartMoneyBreakdown
-            composite={smartMoneyComposite}
-            subSignals={smartMoneySignals}
-            collapsible
-            onCollapse={() => setSmartMoneyOpen(false)}
-            onSubSignalClick={scrollToSubSignal}
-          />
-        </div>
-      )}
-
-      {/* 5. Key takeaways — in plain English */}
-      {takeaways.length > 0 && <PlainEnglishTakeaways items={takeaways} />}
-
-      {/* 6. Tabbed Deep Dive — replaces the linear stack of 10 cards.
-          Hero / Lens / Trade Plan / Smart Money summary stay above the
-          fold; everything else lives behind a tab so the page isn't
-          a 12-section scroll. */}
+      {/* Tabbed sections — Hero + Lens stay above, everything else lives
+          behind a tab. Default lands on Signal so the trade plan +
+          driving-today read first, matching how TradingView/Yahoo lead
+          with an Overview tab before the chart. */}
       <div className="border-b border-ink-200 sticky top-14 z-10 bg-ink-50 -mx-4 sm:-mx-6 lg:-mx-10 px-4 sm:px-6 lg:px-10">
         <nav className="flex gap-1 overflow-x-auto" aria-label="Stock detail sections">
-          {(["chart", "fundamentals", "smart_money", "news"] as const).map((t) => {
+          {(["signal", "chart", "smart_money", "fundamentals", "news"] as const).map((t) => {
             const label =
+              t === "signal" ? "Signal" :
               t === "chart" ? "Chart" :
-              t === "fundamentals" ? "Fundamentals" :
-              t === "smart_money" ? "Smart Money" : "News & Macro";
+              t === "smart_money" ? "Smart Money" :
+              t === "fundamentals" ? "Fundamentals" : "News & Macro";
             const active = activeTab === t;
             return (
               <button
@@ -302,6 +261,48 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           })}
         </nav>
       </div>
+
+      {/* Signal tab — trade plan, factor drivers, and the plain-English summary. */}
+      {activeTab === "signal" && (
+        <div className="space-y-6">
+          {hasLevels && (
+            <TradePlan
+              entry={entry}
+              stop={stop}
+              target={target}
+              now={signal?.currentPrice ?? snapshot?.price ?? null}
+              bullets={tradePlanBullets}
+              note={tradePlanNote}
+            />
+          )}
+          {breakdown && signal && (
+            <DrivingToday breakdown={breakdown} composite={signal.scoreTotal} />
+          )}
+          {breakdown && signal && (
+            <FactorBreakdownPanel
+              breakdown={breakdown}
+              composite={signal.scoreTotal}
+              smartMoneyScore={smartMoneyComposite}
+              onSmartMoneyClick={scrollToSmartMoney}
+            />
+          )}
+          {takeaways.length > 0 && <PlainEnglishTakeaways items={takeaways} />}
+        </div>
+      )}
+
+      {/* Smart Money tab — composite breakdown sits at the top, then the
+          per-source Deep Dive rows render below via the accordion. */}
+      {activeTab === "smart_money" && smartMoneyOpen && (
+        <div ref={smartMoneyRef}>
+          <SmartMoneyBreakdown
+            composite={smartMoneyComposite}
+            subSignals={smartMoneySignals}
+            collapsible
+            onCollapse={() => setSmartMoneyOpen(false)}
+            onSubSignalClick={scrollToSubSignal}
+          />
+        </div>
+      )}
       <DeepDiveAccordion>
         {activeTab === "chart" && (
         <DeepDiveRow
