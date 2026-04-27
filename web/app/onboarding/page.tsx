@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { LogoMark } from "@/components/layout/logo";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5185/api/v
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const [step, setStep] = useState(1);
   const [sectors, setSectors] = useState<string[]>([]);
   const [duration, setDuration] = useState<string>("swing");
@@ -78,6 +80,12 @@ export default function OnboardingPage() {
   async function skip() {
     setSaving(true);
     await patchOnboarding({ skipped: true });
+    // Refetch /me before navigating — the (app) layout's onboarding
+    // guard reads from the React Query cache and would otherwise
+    // see the stale "onboardingSkipped: false" and bounce back to
+    // /onboarding (the loop the user kept hitting).
+    await qc.invalidateQueries({ queryKey: ["current-user"] });
+    await qc.refetchQueries({ queryKey: ["current-user"] });
     router.push("/markets");
   }
 
@@ -99,6 +107,10 @@ export default function OnboardingPage() {
         receiveWeeklyNewsletter: weeklyNewsletter,
         completed: true,
       });
+      // Same fix as skip() — bust the cached /me so the layout
+      // guard sees onboardingCompleted=true and lets us through.
+      await qc.invalidateQueries({ queryKey: ["current-user"] });
+      await qc.refetchQueries({ queryKey: ["current-user"] });
       router.push("/research");
       return;
     }
