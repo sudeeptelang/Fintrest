@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { Signal } from "@/lib/api";
 import { SignalBadge, signalTypeToVariant } from "@/components/signals/signal-badge";
 import { LensMark } from "@/components/lens/lens-card";
+import { PriceFreshness } from "@/components/ui/price-freshness";
 
 /**
  * Featured signal card — magazine-style top-3 layout on Today.
@@ -65,6 +66,7 @@ export function FeaturedSignalCard({
               {up ? "▲" : "▼"} {up ? "+" : ""}{signal.changePct.toFixed(1)}%
             </div>
           )}
+          {signal.currentPrice != null && <PriceFreshness className="mt-2" />}
         </div>
         <div className="ml-auto flex items-baseline gap-0.5 font-[var(--font-mono)] text-[12px] text-ink-500">
           <span className="text-[16px] font-medium text-ink-900">{Math.round(signal.scoreTotal)}</span>

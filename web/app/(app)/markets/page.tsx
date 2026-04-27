@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Treemap, ResponsiveContainer, Tooltip } from "recharts";
 import { Loader2, TrendingUp, TrendingDown, Calendar } from "lucide-react";
+import { PriceFreshness } from "@/components/ui/price-freshness";
 import {
   useMarketSummary,
   useMarketIndices,
@@ -82,9 +83,11 @@ export default function MarketsPage() {
         <div>
           <h1 className="font-[var(--font-heading)] text-2xl font-semibold text-ink-900">Markets</h1>
           <p className="text-sm text-ink-600 mt-1">
-            {market?.marketStatus === "open" ? "Market Open" : "Pre-Market"} ·{" "}
             {market?.signalsToday || 0} signals · {stocks.length} stocks tracked
           </p>
+          {/* Single header badge replaces the hard-coded "Market Open / Pre-
+              Market" label that ignored after-hours + weekend states. */}
+          <PriceFreshness className="mt-1.5" />
         </div>
         <span className="px-3 py-1 rounded-full bg-forest-light text-forest-dark text-xs font-semibold flex items-center gap-1.5 border border-forest">
           <span className="relative flex h-2 w-2">

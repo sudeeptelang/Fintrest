@@ -9,6 +9,7 @@ import type { ScreenerRow } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { StockLogo } from "@/components/ui/stock-logo";
 import { ScoreGradeChip } from "@/components/ui/score-grade-chip";
+import { PriceFreshness } from "@/components/ui/price-freshness";
 
 // Phase 2 multi-lens scoring: each ticker has three composite scores —
 // Setup (current swing-trade formula, gates published signals),
@@ -151,6 +152,7 @@ export default function MarketsScreenersPage() {
           universe. Price-action screens live on <Link href="/markets" className="text-forest hover:underline">Markets</Link> —
           these are the fundamentals-first and setup-driven ones.
         </p>
+        <PriceFreshness className="mt-3" />
       </header>
 
       {/* Phase 2 multi-lens scoring picker — swaps which composite drives

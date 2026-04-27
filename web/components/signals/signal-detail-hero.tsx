@@ -6,6 +6,7 @@ import { useScoreHistory } from "@/lib/hooks";
 import { StockLogo } from "@/components/ui/stock-logo";
 import { ScoreGradeChip } from "@/components/ui/score-grade-chip";
 import { SparklineMini } from "@/components/ui/sparkline-mini";
+import { PriceFreshness } from "@/components/ui/price-freshness";
 
 // Signal horizon is a single int on the wire today; the UI presents it as a
 // range because the scoring engine writes the center of a window. Soft range
@@ -126,6 +127,9 @@ export function SignalDetailHero({
                 )}
               </div>
             )}
+            {/* "As of HH:MM EDT · Market open" badge — sits directly
+                under the price so users never wonder how fresh it is. */}
+            {signal.currentPrice != null && <PriceFreshness />}
             {(marketCap || volume) && (
               <div className="font-[var(--font-mono)] text-[11px] text-ink-500">
                 {marketCap && `Market cap ${marketCap}`}
