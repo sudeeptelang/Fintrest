@@ -154,6 +154,25 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     }
 
     /// <summary>Load latest 2 bars per active stock to compute day change %.</summary>
+    /// <summary>Freshness guard for live_quotes overlay. During market
+    /// hours (9:30–16:00 ET, Mon–Fri) the LiveQuoteRefreshJob runs every
+    /// 15 min, so a quote older than 60 min means the job died or fell
+    /// behind — don't trust it. Outside market hours the last refresh is
+    /// usually around the close and can legitimately be hours old, so we
+    /// skip the staleness check.</summary>
+    private static bool IsLiveQuoteFresh(LiveQuote lq)
+    {
+        TimeZoneInfo et;
+        try { et = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
+        catch (TimeZoneNotFoundException) { et = TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); }
+        var nowEt = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, et);
+        var inMarketHours = nowEt.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday)
+            && (nowEt.Hour * 60 + nowEt.Minute) is >= 570 and < 960; // 9:30–16:00
+        if (!inMarketHours) return true;
+        var ageMinutes = (DateTime.UtcNow - lq.UpdatedAt).TotalMinutes;
+        return ageMinutes <= 60;
+    }
+
     private async Task<List<StockBarPair>> GetLatestTwoBarsPerStock()
     {
         var cutoff = DateTime.UtcNow.AddDays(-14);
@@ -594,11 +613,15 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             // wrong values — e.g. INTC at $82.57 was showing +23.64%
             // because the prev bar in the table was from 2 weeks ago,
             // not yesterday (real intraday move was ~1.3%). Better to
-            // show "—" than mislead. live_quotes is refreshed every
-            // 15 min during market hours by LiveQuoteRefreshJob and is
-            // the authoritative source for "today's change".
+            // show "—" than mislead.
+            //
+            // Stale-quote guard: during market hours the
+            // LiveQuoteRefreshJob runs every 15 min, so a quote older
+            // than 60 min means the job died or fell behind. Outside
+            // market hours, the last refresh can legitimately be hours
+            // old (last close), so we don't gate it.
             double? changePct = null;
-            if (liveQuotes.TryGetValue(stock.Ticker, out var lq))
+            if (liveQuotes.TryGetValue(stock.Ticker, out var lq) && IsLiveQuoteFresh(lq))
             {
                 if (lq.Price.HasValue) price = (double)lq.Price.Value;
                 if (lq.ChangePct.HasValue) changePct = Math.Round((double)lq.ChangePct.Value, 2);
