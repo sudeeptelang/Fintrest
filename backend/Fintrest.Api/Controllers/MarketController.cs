@@ -772,79 +772,77 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     [HttpGet("market/sectors")]
     public async Task<ActionResult<List<SectorPerformanceResponse>>> SectorPerformance(CancellationToken ct = default)
     {
-        // Sector day-change comes from FMP's authoritative
-        // /sector-performance-snapshot endpoint rather than aggregated
-        // from our market_data bars (which used stale PrevClose values
-        // and produced wrong %s — same gappy-ingest bug as the screener).
-        // We still source StockCount + SignalCount from our DB since
-        // those reflect our universe, not FMP's.
+        // Sector heatmap uses FMP's 11 GICS sectors as the authoritative
+        // sector list (matches Yahoo / Finviz / Bloomberg). Day-change
+        // comes from /sector-performance-snapshot. Our stock + signal
+        // counts get bucketed into GICS via SicToGics keyword mapping
+        // because we store SIC industry titles ("SEMICONDUCTORS &
+        // RELATED DEVICES"), which don't line up 1:1 with GICS labels.
         var fmpSectors = await fundamentalsProvider.GetSectorPerformanceAsync(ct);
-        var sectorPctByName = fmpSectors
-            .Where(s => s.ChangePct.HasValue)
-            .ToDictionary(s => NormalizeSectorName(s.Sector), s => s.ChangePct!.Value, StringComparer.OrdinalIgnoreCase);
+        if (fmpSectors.Count == 0) return Ok(new List<SectorPerformanceResponse>());
 
-        // Stocks with a sector assigned — for the count column.
+        // Bucket our active stocks into GICS sectors via SIC keyword map.
         var stocks = await db.Stocks
             .Where(s => s.Active && s.Sector != null)
-            .Select(s => new { s.Sector })
+            .Select(s => s.Sector)
             .ToListAsync(ct);
 
-        if (stocks.Count == 0) return Ok(new List<SectorPerformanceResponse>());
+        var stockCountByGics = stocks
+            .GroupBy(s => SicToGics(s!), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
-        // Signal counts per sector — from latest completed scan.
+        // Signal counts per GICS — bucket the same way.
         var latestScan = await db.ScanRuns
             .Where(s => s.Status == "COMPLETED")
             .OrderByDescending(s => s.CompletedAt)
             .FirstOrDefaultAsync(ct);
 
-        Dictionary<string, int> sigCounts = new();
+        Dictionary<string, int> sigCountByGics = new(StringComparer.OrdinalIgnoreCase);
         if (latestScan is not null)
         {
-            var rows = await db.Signals
+            var sigSectors = await db.Signals
                 .Include(s => s.Stock)
                 .Where(s => s.ScanRunId == latestScan.Id && s.Stock.Sector != null)
-                .GroupBy(s => s.Stock.Sector!)
-                .Select(g => new { Sector = g.Key, Count = g.Count() })
+                .Select(s => s.Stock.Sector!)
                 .ToListAsync(ct);
-            sigCounts = rows.ToDictionary(r => r.Sector, r => r.Count);
+            sigCountByGics = sigSectors
+                .GroupBy(s => SicToGics(s), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
         }
 
-        var result = stocks
-            .GroupBy(s => s.Sector!)
-            .Select(g =>
-            {
-                var sector = g.Key;
-                // Match FMP's sector name to ours — they sometimes use
-                // slightly different capitalization or naming. The
-                // NormalizeSectorName helper handles common variants.
-                sectorPctByName.TryGetValue(NormalizeSectorName(sector), out var changePct);
-                return new SectorPerformanceResponse(
-                    Sector: sector,
-                    StockCount: g.Count(),
-                    ChangePct: changePct == 0 && !sectorPctByName.ContainsKey(NormalizeSectorName(sector))
-                        ? null
-                        : Math.Round(changePct, 2),
-                    SignalCount: sigCounts.GetValueOrDefault(sector, 0)
-                );
-            })
+        var result = fmpSectors
+            .Select(s => new SectorPerformanceResponse(
+                Sector: s.Sector,
+                StockCount: stockCountByGics.GetValueOrDefault(s.Sector, 0),
+                ChangePct: s.ChangePct.HasValue ? Math.Round(s.ChangePct.Value, 2) : null,
+                SignalCount: sigCountByGics.GetValueOrDefault(s.Sector, 0)
+            ))
             .OrderByDescending(r => r.ChangePct ?? -999)
             .ToList();
 
         return Ok(result);
     }
 
-    /// <summary>Normalize sector names so FMP's labels match ours.
-    /// Strip casing + common suffix/punctuation differences. We use
-    /// uppercase from the SIC tables; FMP returns title-case GICS-style.
-    /// Falls back to a clean lowercase compare if no exact match.</summary>
-    private static string NormalizeSectorName(string? name)
+    /// <summary>Map a SIC industry title (what we store in stocks.sector)
+    /// to a GICS sector (what FMP returns). Keyword-matched against the
+    /// most common SIC titles in a typical US universe. Anything that
+    /// doesn't match a keyword falls into "Industrials" as a catch-all
+    /// rather than "Other" — most unmatched SIC titles in our universe
+    /// are obscure industrial subindustries.</summary>
+    private static string SicToGics(string sicSector)
     {
-        if (string.IsNullOrWhiteSpace(name)) return "";
-        return name.Trim().ToLowerInvariant()
-            .Replace("&", "and")
-            .Replace(",", "")
-            .Replace(".", "")
-            .Replace("  ", " ");
+        var s = sicSector.ToUpperInvariant();
+        if (s.Contains("PHARMACEUTICAL") || s.Contains("MEDICAL") || s.Contains("BIOLOGICAL") || s.Contains("HEALTH") || s.Contains("HOSPITAL") || s.Contains("DRUG") || s.Contains("DENTAL") || s.Contains("ORTHOPEDIC") || s.Contains("SURGICAL")) return "Healthcare";
+        if (s.Contains("SEMICONDUCTOR") || s.Contains("COMPUTER") || s.Contains("SOFTWARE") || s.Contains("INTERNET") || s.Contains("DATA PROCESSING") || s.Contains("ELECTRONIC") || s.Contains("PREPACKAGED")) return "Technology";
+        if (s.Contains("BANK") || s.Contains("FINANCIAL") || s.Contains("INSURANCE") || s.Contains("INVESTMENT") || s.Contains("SECURITY BROKER") || s.Contains("HOLDING")) return "Financial Services";
+        if (s.Contains("CRUDE PETROLEUM") || s.Contains("OIL") || s.Contains("GAS ") || s.Contains("PETROLEUM") || s.Contains("ENERGY") || s.Contains("PIPELINE") || s.Contains("MINING-OIL")) return "Energy";
+        if (s.Contains("REAL ESTATE") || s.Contains("LESSOR")) return "Real Estate";
+        if (s.Contains("RETAIL") || s.Contains("RESTAURANT") || s.Contains("APPAREL") || s.Contains("AUTO") || s.Contains("MOTOR VEHICLE") || s.Contains("FOOTWEAR") || s.Contains("HOTEL") || s.Contains("AMUSEMENT") || s.Contains("LEISURE") || s.Contains("VIDEO TAPE")) return "Consumer Cyclical";
+        if (s.Contains("BEVERAGE") || s.Contains("FOOD") || s.Contains("HOUSEHOLD") || s.Contains("TOBACCO") || s.Contains("FATS & OILS") || s.Contains("PERSONAL CARE") || s.Contains("GROCERY")) return "Consumer Defensive";
+        if (s.Contains("ELECTRIC ") || s.Contains("UTILITY") || s.Contains("WATER SUPPLY") || s.Contains("NATURAL GAS DISTRIB") || s.Contains("GAS DISTRIBUTION")) return "Utilities";
+        if (s.Contains("MINING") || s.Contains("CHEMICAL") || s.Contains("METAL") || s.Contains("PAPER") || s.Contains("CEMENT") || s.Contains("LUMBER") || s.Contains("STEEL") || s.Contains("GOLD") || s.Contains("ROLLING") || s.Contains("PLASTIC")) return "Basic Materials";
+        if (s.Contains("MEDIA") || s.Contains("TELECOM") || s.Contains("BROADCAST") || s.Contains("PUBLISH") || s.Contains("ENTERTAINMENT") || s.Contains("ADVERTISING") || s.Contains("MOTION PICTURE")) return "Communication Services";
+        return "Industrials";
     }
 
     [HttpGet("market/indices")]
