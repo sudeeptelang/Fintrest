@@ -42,17 +42,26 @@ export function MarketOverviewStrip() {
   const pulse = useMemo(() => {
     const rows = screener ?? [];
     if (rows.length === 0) return null;
-    const up = rows.filter((s) => (s.changePct ?? 0) > 0.1).length;
-    const down = rows.filter((s) => (s.changePct ?? 0) < -0.1).length;
-    const flat = rows.length - up - down;
-    const score = Math.round((up / rows.length) * 100);
+    // Only count rows that actually have a fresh changePct. Previously
+    // (s.changePct ?? 0) collapsed nulls into "flat", so when the
+    // screener started returning null for tickers without a fresh
+    // live_quote (the recent fix), every ticker read as flat — the
+    // widget showed "0 up · 0 down · 500 flat" even on a normal day.
+    const withData = rows.filter((s) => s.changePct != null);
+    if (withData.length === 0) {
+      return { score: null, label: "No data", up: 0, down: 0, flat: 0, total: 0, missing: rows.length };
+    }
+    const up = withData.filter((s) => (s.changePct as number) > 0.1).length;
+    const down = withData.filter((s) => (s.changePct as number) < -0.1).length;
+    const flat = withData.length - up - down;
+    const score = Math.round((up / withData.length) * 100);
     let label = "Neutral";
     if (score >= 75) label = "Extreme Greed";
     else if (score >= 60) label = "Greed";
     else if (score >= 45) label = "Neutral";
     else if (score >= 25) label = "Fear";
     else label = "Extreme Fear";
-    return { score, label, up, down, flat, total: rows.length };
+    return { score, label, up, down, flat, total: withData.length, missing: rows.length - withData.length };
   }, [screener]);
 
   const grouped = useMemo(() => {
@@ -124,25 +133,36 @@ export function MarketOverviewStrip() {
             <>
               <div className="flex items-baseline gap-2.5">
                 <span className={cn("font-[var(--font-heading)] text-[36px] font-bold leading-none tracking-[-0.02em]", pulseTone(pulse.score))}>
-                  {pulse.score}
+                  {pulse.score ?? "—"}
                 </span>
                 <span className={cn("font-[var(--font-sans)] text-[12px] font-bold uppercase tracking-[0.08em]", pulseTone(pulse.score))}>
                   {pulse.label}
                 </span>
               </div>
-              <p className="mt-1.5 font-mono text-[11px] text-ink-600 leading-tight">
-                {pulse.up} up · {pulse.down} down · {pulse.flat} flat
-              </p>
-              <div className="mt-2.5 h-1.5 rounded-full bg-ink-100 overflow-hidden relative">
-                <div className="absolute inset-0 flex">
-                  <div style={{ flex: pulse.down }} className="bg-down" />
-                  <div style={{ flex: pulse.flat }} className="bg-ink-300" />
-                  <div style={{ flex: pulse.up }} className="bg-up" />
-                </div>
-              </div>
-              <p className="mt-2 font-[var(--font-sans)] text-[10px] text-ink-500 leading-tight">
-                Breadth across {pulse.total} tracked tickers
-              </p>
+              {pulse.total > 0 ? (
+                <>
+                  <p className="mt-1.5 font-mono text-[11px] text-ink-600 leading-tight">
+                    {pulse.up} up · {pulse.down} down · {pulse.flat} flat
+                  </p>
+                  <div className="mt-2.5 h-1.5 rounded-full bg-ink-100 overflow-hidden relative">
+                    <div className="absolute inset-0 flex">
+                      <div style={{ flex: pulse.down }} className="bg-down" />
+                      <div style={{ flex: pulse.flat }} className="bg-ink-300" />
+                      <div style={{ flex: pulse.up }} className="bg-up" />
+                    </div>
+                  </div>
+                  <p className="mt-2 font-[var(--font-sans)] text-[10px] text-ink-500 leading-tight">
+                    Breadth across {pulse.total} tracked tickers
+                    {pulse.missing > 0 && (
+                      <> · {pulse.missing} pending</>
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1.5 font-mono text-[11px] text-ink-500 leading-tight">
+                  Quotes refreshing — check back shortly.
+                </p>
+              )}
             </>
           ) : (
             <div className="font-mono text-[12px] text-ink-500">Loading…</div>
@@ -278,7 +298,8 @@ function fmtPrice(p: number | null | undefined): string {
   return p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function pulseTone(score: number): string {
+function pulseTone(score: number | null): string {
+  if (score == null) return "text-ink-400";
   if (score >= 60) return "text-up";
   if (score >= 40) return "text-ink-900";
   if (score >= 25) return "text-warn";

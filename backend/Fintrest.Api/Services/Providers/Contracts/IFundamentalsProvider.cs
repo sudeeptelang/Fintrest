@@ -98,6 +98,12 @@ public interface IFundamentalsProvider
     /// bars — gappy ingest produces wildly wrong "today's change" values.
     /// Category: "gainers" | "losers" | "actives".</summary>
     Task<List<MarketMover>> GetMoversAsync(string category, CancellationToken ct = default);
+
+    /// <summary>Sector performance snapshot — one row per sector with
+    /// the day's average change. Sourced from FMP's authoritative
+    /// /sector-performance-snapshot endpoint rather than aggregated
+    /// from our market_data bars (which used stale PrevClose).</summary>
+    Task<List<SectorPerformance>> GetSectorPerformanceAsync(CancellationToken ct = default);
 }
 
 /// <summary>Intraday quote from FMP /quote. Contains today's price,
@@ -194,6 +200,15 @@ public record EarningCalendarEntry(
     DateTime Date,
     double? EpsEstimated,
     double? RevenueEstimated
+);
+
+/// <summary>One sector's day-change from FMP's sector-performance-snapshot
+/// endpoint. Authoritative replacement for our bar-aggregated sector
+/// performance — bar-based was using stale PrevClose values and producing
+/// wrong %s.</summary>
+public record SectorPerformance(
+    string Sector,
+    double? ChangePct
 );
 
 /// <summary>One row from FMP's biggest-gainers/biggest-losers/most-actives

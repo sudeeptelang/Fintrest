@@ -770,34 +770,32 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
     }
 
     [HttpGet("market/sectors")]
-    public async Task<ActionResult<List<SectorPerformanceResponse>>> SectorPerformance()
+    public async Task<ActionResult<List<SectorPerformanceResponse>>> SectorPerformance(CancellationToken ct = default)
     {
-        // Stocks with a sector assigned
+        // Sector day-change comes from FMP's authoritative
+        // /sector-performance-snapshot endpoint rather than aggregated
+        // from our market_data bars (which used stale PrevClose values
+        // and produced wrong %s — same gappy-ingest bug as the screener).
+        // We still source StockCount + SignalCount from our DB since
+        // those reflect our universe, not FMP's.
+        var fmpSectors = await fundamentalsProvider.GetSectorPerformanceAsync(ct);
+        var sectorPctByName = fmpSectors
+            .Where(s => s.ChangePct.HasValue)
+            .ToDictionary(s => NormalizeSectorName(s.Sector), s => s.ChangePct!.Value, StringComparer.OrdinalIgnoreCase);
+
+        // Stocks with a sector assigned — for the count column.
         var stocks = await db.Stocks
             .Where(s => s.Active && s.Sector != null)
-            .Select(s => new { s.Id, s.Sector, s.MarketCap })
-            .ToListAsync();
+            .Select(s => new { s.Sector })
+            .ToListAsync(ct);
 
         if (stocks.Count == 0) return Ok(new List<SectorPerformanceResponse>());
 
-        var stockIds = stocks.Select(s => s.Id).ToList();
-
-        // Pull last 7 days of bars; we only need the most recent per stock to read close + prev_close
-        var cutoff = DateTime.UtcNow.AddDays(-7);
-        var recentBars = await db.MarketData
-            .Where(m => stockIds.Contains(m.StockId) && m.Ts >= cutoff)
-            .Select(m => new { m.StockId, m.Ts, m.Close, m.PrevClose })
-            .ToListAsync();
-
-        var latestPerStock = recentBars
-            .GroupBy(m => m.StockId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(m => m.Ts).First());
-
-        // Signal counts per sector — from latest completed scan
+        // Signal counts per sector — from latest completed scan.
         var latestScan = await db.ScanRuns
             .Where(s => s.Status == "COMPLETED")
             .OrderByDescending(s => s.CompletedAt)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(ct);
 
         Dictionary<string, int> sigCounts = new();
         if (latestScan is not null)
@@ -807,7 +805,7 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 .Where(s => s.ScanRunId == latestScan.Id && s.Stock.Sector != null)
                 .GroupBy(s => s.Stock.Sector!)
                 .Select(g => new { Sector = g.Key, Count = g.Count() })
-                .ToListAsync();
+                .ToListAsync(ct);
             sigCounts = rows.ToDictionary(r => r.Sector, r => r.Count);
         }
 
@@ -816,31 +814,16 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             .Select(g =>
             {
                 var sector = g.Key;
-                var members = g.ToList();
-                double totalMcap = 0;
-                double weightedChange = 0;
-                var simpleChanges = new List<double>();
-                foreach (var st in members)
-                {
-                    if (!latestPerStock.TryGetValue(st.Id, out var bar)) continue;
-                    if (!bar.PrevClose.HasValue || bar.PrevClose.Value == 0) continue;
-                    var ch = (bar.Close - bar.PrevClose.Value) / bar.PrevClose.Value * 100;
-                    simpleChanges.Add(ch);
-                    if (st.MarketCap is > 0)
-                    {
-                        totalMcap += st.MarketCap.Value;
-                        weightedChange += ch * st.MarketCap.Value;
-                    }
-                }
-
-                double? change = totalMcap > 0
-                    ? weightedChange / totalMcap
-                    : (simpleChanges.Count > 0 ? simpleChanges.Average() : null);
-
+                // Match FMP's sector name to ours — they sometimes use
+                // slightly different capitalization or naming. The
+                // NormalizeSectorName helper handles common variants.
+                sectorPctByName.TryGetValue(NormalizeSectorName(sector), out var changePct);
                 return new SectorPerformanceResponse(
                     Sector: sector,
-                    StockCount: members.Count,
-                    ChangePct: change.HasValue ? Math.Round(change.Value, 2) : null,
+                    StockCount: g.Count(),
+                    ChangePct: changePct == 0 && !sectorPctByName.ContainsKey(NormalizeSectorName(sector))
+                        ? null
+                        : Math.Round(changePct, 2),
                     SignalCount: sigCounts.GetValueOrDefault(sector, 0)
                 );
             })
@@ -848,6 +831,20 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             .ToList();
 
         return Ok(result);
+    }
+
+    /// <summary>Normalize sector names so FMP's labels match ours.
+    /// Strip casing + common suffix/punctuation differences. We use
+    /// uppercase from the SIC tables; FMP returns title-case GICS-style.
+    /// Falls back to a clean lowercase compare if no exact match.</summary>
+    private static string NormalizeSectorName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "";
+        return name.Trim().ToLowerInvariant()
+            .Replace("&", "and")
+            .Replace(",", "")
+            .Replace(".", "")
+            .Replace("  ", " ");
     }
 
     [HttpGet("market/indices")]

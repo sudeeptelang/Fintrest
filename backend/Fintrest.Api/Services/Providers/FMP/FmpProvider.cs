@@ -444,6 +444,45 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
             .ToList();
     }
 
+    /// <summary>Sector performance snapshot from FMP — one row per
+    /// sector with the day's average change. Authoritative replacement
+    /// for the bar-based aggregation that produced wrong %s when the
+    /// underlying stocks had stale or missing prev_close fields. FMP
+    /// returns one row per (sector, exchange) pair; we average across
+    /// exchanges so each sector gets a single day-change number.</summary>
+    public async Task<List<SectorPerformance>> GetSectorPerformanceAsync(CancellationToken ct = default)
+    {
+        // /stable/sector-performance-snapshot needs a date — use today
+        // in ET so the response is the most recent available snapshot.
+        // FMP returns the previous trading day's data on weekends /
+        // holidays, which is the correct fallback behavior.
+        var today = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
+        var url = $"{_baseUrl}/sector-performance-snapshot?date={today}&apikey={_apiKey}";
+        try
+        {
+            var rows = await TryFetch<List<FmpSectorPerf>>(url, ct);
+            if (rows is null || rows.Count == 0) return new();
+            // Group by sector name, average across exchanges.
+            return rows
+                .Where(r => !string.IsNullOrEmpty(r.Sector))
+                .GroupBy(r => r.Sector!, StringComparer.OrdinalIgnoreCase)
+                .Select(g => new SectorPerformance(
+                    Sector: g.Key,
+                    ChangePct: (double?)g.Where(r => r.AverageChange.HasValue)
+                        .Select(r => (double)r.AverageChange!.Value)
+                        .DefaultIfEmpty()
+                        .Average()))
+                .Where(s => s.ChangePct.HasValue)
+                .OrderByDescending(s => s.ChangePct)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "FMP sector-performance fetch failed");
+            return new();
+        }
+    }
+
     /// <summary>Top market movers from FMP's authoritative endpoints.
     /// Category maps to: gainers → /biggest-gainers, losers → /biggest-losers,
     /// actives → /most-actives. We pass these through directly rather than
@@ -951,6 +990,16 @@ file record FmpFinancialScores(
     [property: JsonPropertyName("marketCap")] decimal? MarketCap,
     [property: JsonPropertyName("totalLiabilities")] decimal? TotalLiabilities,
     [property: JsonPropertyName("revenue")] decimal? Revenue
+);
+
+/// <summary>FMP /stable/sector-performance-snapshot row. One per
+/// (sector, exchange) pair — caller groups by sector and averages
+/// the AverageChange across exchanges.</summary>
+file record FmpSectorPerf(
+    [property: JsonPropertyName("date")] string? Date,
+    [property: JsonPropertyName("sector")] string? Sector,
+    [property: JsonPropertyName("exchange")] string? Exchange,
+    [property: JsonPropertyName("averageChange")] decimal? AverageChange
 );
 
 /// <summary>FMP /stable/biggest-gainers, /biggest-losers, /most-actives
