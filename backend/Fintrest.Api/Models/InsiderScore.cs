@@ -28,9 +28,15 @@ public class InsiderScore
     [Column(TypeName = "numeric(5,2)")]
     public decimal Score { get; set; }
 
-    [Column(TypeName = "numeric(18,2)")]
+    // Explicit [Column] mapping — the snake-case naming convention
+    // turns "NetDollarFlow30d" into "net_dollar_flow30d" (no separator
+    // before the "30d"), but the DB migration uses "net_dollar_flow_30d".
+    // Same for ClusterCount30d → cluster_count_30d. Without these
+    // mappings, EF queries fail with `column does not exist`.
+    [Column("net_dollar_flow_30d", TypeName = "numeric(18,2)")]
     public decimal? NetDollarFlow30d { get; set; }
 
+    [Column("cluster_count_30d")]
     public int? ClusterCount30d { get; set; }
     public int? OfficerBuyCount { get; set; }
     public int? DirectorBuyCount { get; set; }

@@ -444,6 +444,34 @@ export function useAdminIngestTopCaps() {
   });
 }
 
+// Smart-money sub-signal hydration — wires the 8th factor's data layer.
+// Use Edgar to pull Form 4 raw rows, then Insider score to roll them up
+// per ticker. Short-interest fetches FMP's weekly FINRA snapshot.
+// Without these the smart_money factor sits at neutral 50 for everyone.
+export function useAdminEdgarIngest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.adminEdgarIngest(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
+  });
+}
+
+export function useAdminInsiderScoreRecompute() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.adminInsiderScoreRecompute(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
+  });
+}
+
+export function useAdminShortInterestIngest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.adminShortInterestIngest(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-health"] }),
+  });
+}
+
 export function useAdminRecentScans(limit: number = 10) {
   return useQuery({
     queryKey: ["admin-recent-scans", limit],

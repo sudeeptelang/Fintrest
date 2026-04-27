@@ -152,7 +152,8 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     [HttpPost("edgar/ingest")]
     public async Task<IActionResult> IngestEdgar(
         [FromServices] Fintrest.Api.Services.Providers.Edgar.EdgarIngestJob job,
-        [FromQuery] int daysBack = 0,
+        [FromServices] IHostApplicationLifetime lifetime,
+        [FromQuery] int daysBack = 7,
         CancellationToken ct = default)
     {
         db.AdminAuditLogs.Add(new AdminAuditLog
@@ -164,11 +165,27 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         });
         await db.SaveChangesAsync(ct);
 
+        // Default of 7 days back — gives a manual-trigger run something
+        // useful to ingest. Sunday's run with daysBack=0 returned empty
+        // because no Form 4 filings happen on weekends. Backfill 7d
+        // catches the recent week of weekday filings.
         daysBack = Math.Clamp(daysBack, 0, 30);
         var today = DateTime.UtcNow.Date;
         var dates = Enumerable.Range(0, daysBack + 1).Select(i => today.AddDays(-i)).ToArray();
-        var summaries = await job.RunOnceAsync(dates, ct);
-        return Ok(summaries);
+
+        // Fire-and-forget — Edgar ingest takes 4-6 minutes (per-filing HTTP
+        // calls throttled at 9 rps for SEC fair-access). Browser drops the
+        // request well before then, which used to cancel the whole job
+        // mid-fetch. Use app-lifetime token so only application shutdown
+        // stops it. Caller polls logs / re-fetches admin/system-health
+        // for completion status.
+        _ = Task.Run(() => job.RunOnceAsync(dates, lifetime.ApplicationStopping));
+        return Accepted(new
+        {
+            message = $"Edgar Form 4 ingest started for {dates.Length} day(s) — runs ~4-6 min, check logs.",
+            daysBack,
+            dates = dates.Select(d => d.ToString("yyyy-MM-dd")),
+        });
     }
 
     /// <summary>
@@ -360,12 +377,32 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
     /// settlement data. No cron wired yet; this is the manual trigger.</summary>
     [HttpPost("short-interest/ingest")]
     public async Task<IActionResult> IngestShortInterest(
-        [FromBody] SyncUniverseRequest request,
-        [FromServices] Fintrest.Api.Services.Scoring.ShortInterestService shortSvc,
-        CancellationToken ct)
+        [FromBody] SyncUniverseRequest? request,
+        [FromServices] IServiceScopeFactory scopeFactory,
+        [FromServices] IHostApplicationLifetime lifetime,
+        [FromQuery] int count = 200,
+        CancellationToken ct = default)
     {
-        if (request?.Tickers is null || request.Tickers.Count == 0)
-            return BadRequest(new { message = "Body { \"tickers\": [\"MU\",\"AMD\",...] } required" });
+        // When no body is provided, default to top-N active tickers by
+        // market cap. Lets the admin button work as a one-click "populate
+        // smart-money" trigger without requiring users to assemble a
+        // ticker list. Explicit body still wins when provided.
+        List<string> tickers;
+        if (request?.Tickers is { Count: > 0 } provided)
+        {
+            tickers = provided.Take(500).ToList();
+        }
+        else
+        {
+            count = Math.Clamp(count, 1, 500);
+            tickers = await db.Stocks
+                .AsNoTracking()
+                .Where(s => s.Active)
+                .OrderByDescending(s => s.MarketCap ?? 0)
+                .Select(s => s.Ticker)
+                .Take(count)
+                .ToListAsync(ct);
+        }
 
         db.AdminAuditLogs.Add(new AdminAuditLog
         {
@@ -375,18 +412,26 @@ public class AdminController(AppDbContext db, ScanOrchestrator scanner, DataInge
         });
         await db.SaveChangesAsync(ct);
 
-        var results = new List<object>();
-        foreach (var t in request.Tickers.Take(500))
+        // Fire-and-forget — 200 tickers × ~1s/call = several minutes,
+        // longer than the browser will wait. Same rationale as Edgar.
+        // Captures tickers + scoped service into the background task;
+        // app-lifetime token survives request cancellation.
+        var snapshot = tickers;
+        _ = Task.Run(async () =>
         {
-            var r = await shortSvc.FetchAndStoreAsync(t, ct);
-            results.Add(new { r.Ticker, r.Persisted, r.ShortPctFloat, r.Note });
-        }
-
-        return Ok(new
+            using var scope = scopeFactory.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<Fintrest.Api.Services.Scoring.ShortInterestService>();
+            foreach (var t in snapshot)
+            {
+                if (lifetime.ApplicationStopping.IsCancellationRequested) break;
+                try { await svc.FetchAndStoreAsync(t, lifetime.ApplicationStopping); }
+                catch (Exception ex) { /* swallowed — logged by service */ _ = ex; }
+            }
+        });
+        return Accepted(new
         {
-            requested = request.Tickers.Count,
-            processed = results.Count,
-            results,
+            message = $"Short-interest ingest started for {tickers.Count} ticker(s) — runs ~3-5 min, check logs.",
+            tickerCount = tickers.Count,
         });
     }
 

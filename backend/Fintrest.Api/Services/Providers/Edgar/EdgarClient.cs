@@ -27,12 +27,23 @@ public class EdgarClient
 
         // User-Agent is MANDATORY per SEC fair-access. Must include a
         // contact email the SEC can reach if our crawl misbehaves.
+        // Format must conform to RFC 7231 User-Agent — email goes in
+        // parentheses as a "comment" because bare emails fail
+        // HttpHeaders.ParseAdd validation ("ops@fintrest.ai is invalid").
         var ua = config["Edgar:UserAgent"]
-                 ?? "Fintrest.ai Research ops@fintrest.ai";
+                 ?? "Fintrest.ai/1.0 (ops@fintrest.ai)";
         _http.DefaultRequestHeaders.UserAgent.Clear();
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd(ua);
+        // TryAddWithoutValidation skips the strict RFC product/comment
+        // parsing — necessary if a future config override puts a bare
+        // email back in. SEC accepts any non-empty UA in practice.
+        _http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", ua);
         _http.DefaultRequestHeaders.Accept.ParseAdd("*/*");
-        _http.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate");
+        // Don't manually set Accept-Encoding — the HttpClientHandler in
+        // Program.cs has AutomaticDecompression=GZip|Deflate which adds
+        // the header AND transparently decompresses responses. Setting
+        // it manually here previously caused the handler to skip
+        // decompression and return raw gzipped bytes (parsed as plain
+        // text → 0 form 4s detected).
         _http.Timeout = TimeSpan.FromSeconds(30);
     }
 
@@ -42,15 +53,31 @@ public class EdgarClient
         try
         {
             var resp = await _http.GetAsync(url, ct);
-            if (resp.StatusCode == HttpStatusCode.NotFound) return null;
+            if (resp.StatusCode == HttpStatusCode.NotFound)
+            {
+                _logger.LogInformation("EDGAR 404 (weekend/holiday or not yet published): {Url}", url);
+                return null;
+            }
             if (resp.StatusCode == (HttpStatusCode)429)
             {
                 _logger.LogWarning("EDGAR 429 throttled for {Url}; backing off 5s", url);
                 await Task.Delay(5000, ct);
                 return null;
             }
-            resp.EnsureSuccessStatusCode();
-            return await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "EDGAR {Status} for {Url} — response suppressed",
+                    (int)resp.StatusCode, url);
+                return null;
+            }
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            _logger.LogInformation(
+                "EDGAR fetched {Url}: {Bytes} bytes, encoding={Enc}",
+                url, body.Length,
+                resp.Content.Headers.ContentEncoding.Count > 0
+                    ? string.Join(",", resp.Content.Headers.ContentEncoding) : "identity");
+            return body;
         }
         catch (HttpRequestException ex)
         {

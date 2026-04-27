@@ -81,6 +81,11 @@ public class EdgarIngestService(
                     if (!seen.Contains(key))
                     {
                         db.InsiderTransactions.Add(tx);
+                        // Mark this key seen WITHIN this batch too — without
+                        // it, two rows with identical (cik, date, shares,
+                        // code) from the same Form 4 both get added and
+                        // collide on the unique index at SaveChanges.
+                        seen.Add(key);
                         upserted++;
                     }
                 }
@@ -153,12 +158,19 @@ public class EdgarIngestService(
 
             var companyName = parts[1].Trim();
             var cik = parts[2].Trim();
-            if (!DateTime.TryParse(parts[3].Trim(),
+            // EDGAR ships the filing date as YYYYMMDD with no separators
+            // ("20260421"). DateTime.TryParse fails on that format
+            // unpredictably across cultures — every row was being silently
+            // dropped before we matched any Form 4. TryParseExact with
+            // the literal format string is the correct read.
+            if (!DateTime.TryParseExact(
+                parts[3].Trim(),
+                "yyyyMMdd",
                 System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
                 out var date)) continue;
             var filePath = parts[4].Trim();
-            entries.Add(new IndexEntry("4", companyName, cik, date.Date, filePath));
+            entries.Add(new IndexEntry(formType, companyName, cik, date.Date, filePath));
         }
         return entries;
     }

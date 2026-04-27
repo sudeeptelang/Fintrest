@@ -9,6 +9,9 @@ import {
   useAdminRunIngestion,
   useAdminRefreshQuotes,
   useAdminIngestTopCaps,
+  useAdminEdgarIngest,
+  useAdminInsiderScoreRecompute,
+  useAdminShortInterestIngest,
 } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import type { SystemHealthResponse } from "@/lib/api";
@@ -20,7 +23,11 @@ export default function AdminHealthPage() {
   const runIngestion = useAdminRunIngestion();
   const refreshQuotes = useAdminRefreshQuotes();
   const ingestTopCaps = useAdminIngestTopCaps();
-  const [confirm, setConfirm] = useState<"pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | null>(null);
+  const edgarIngest = useAdminEdgarIngest();
+  const insiderScoreRecompute = useAdminInsiderScoreRecompute();
+  const shortInterestIngest = useAdminShortInterestIngest();
+  type Trigger = "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | "edgar" | "insider" | "short";
+  const [confirm, setConfirm] = useState<Trigger | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
 
   return (
@@ -85,6 +92,9 @@ export default function AdminHealthPage() {
                 if (confirm === "ingestion") r = await runIngestion.mutateAsync();
                 if (confirm === "quotes") r = await refreshQuotes.mutateAsync(500);
                 if (confirm === "topcaps") r = await ingestTopCaps.mutateAsync(200);
+                if (confirm === "edgar") r = await edgarIngest.mutateAsync();
+                if (confirm === "insider") r = await insiderScoreRecompute.mutateAsync();
+                if (confirm === "short") r = await shortInterestIngest.mutateAsync();
                 setLastResult(JSON.stringify(r));
               } catch (e) {
                 setLastResult(`Error: ${String(e)}`);
@@ -295,8 +305,8 @@ function ManualTriggers({
   loading,
   lastResult,
 }: {
-  onRun: (which: "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps") => void;
-  confirm: "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | null;
+  onRun: (which: "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | "edgar" | "insider" | "short") => void;
+  confirm: "pipeline" | "scan" | "ingestion" | "quotes" | "topcaps" | "edgar" | "insider" | "short" | null;
   onConfirm: () => void;
   onCancel: () => void;
   loading: boolean;
@@ -307,12 +317,29 @@ function ManualTriggers({
       <h3 className="font-[var(--font-heading)] text-[14px] font-semibold text-ink-900 mb-4 flex items-center gap-2">
         <Activity className="h-4 w-4 text-forest" strokeWidth={1.75} /> Manual triggers
       </h3>
-      <div className="flex flex-wrap gap-2">
-        <TriggerButton label="Refresh live quotes (500)" onClick={() => onRun("quotes")} />
-        <TriggerButton label="Ingest top-caps (200)" onClick={() => onRun("topcaps")} />
-        <TriggerButton label="Full pipeline" onClick={() => onRun("pipeline")} />
-        <TriggerButton label="Scan only" onClick={() => onRun("scan")} />
-        <TriggerButton label="Ingestion only" onClick={() => onRun("ingestion")} />
+      <div className="space-y-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.1em] text-ink-500 font-semibold mb-2">
+            Pipeline · prices · scan
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <TriggerButton label="Refresh live quotes (500)" onClick={() => onRun("quotes")} />
+            <TriggerButton label="Ingest top-caps (200)" onClick={() => onRun("topcaps")} />
+            <TriggerButton label="Full pipeline" onClick={() => onRun("pipeline")} />
+            <TriggerButton label="Scan only" onClick={() => onRun("scan")} />
+            <TriggerButton label="Ingestion only" onClick={() => onRun("ingestion")} />
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.1em] text-ink-500 font-semibold mb-2">
+            Smart Money · sub-signal data
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <TriggerButton label="Edgar Form 4 ingest" onClick={() => onRun("edgar")} />
+            <TriggerButton label="Insider score recompute" onClick={() => onRun("insider")} />
+            <TriggerButton label="Short-interest snapshot" onClick={() => onRun("short")} />
+          </div>
+        </div>
       </div>
       {lastResult && (
         <div className="mt-4 rounded-[8px] border border-ink-200 bg-ink-50 px-4 py-3">

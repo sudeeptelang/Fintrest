@@ -968,6 +968,17 @@ export const api = {
     authFetchApi<unknown>(`/admin/quotes/refresh?count=${count}`, { method: "POST" }),
   adminIngestTopCaps: (count = 100) =>
     authFetchApi<unknown>(`/admin/ingest/top-caps?count=${count}`, { method: "POST" }),
+  // Smart-money sub-signal triggers — run these to populate the
+  // insider_scores + short_interest_snapshots tables that feed the 8th
+  // factor. Edgar pulls Form 4 raw rows; Insider score recompute rolls
+  // those into per-ticker scores; Short-interest hits FMP for the
+  // weekly FINRA snapshot.
+  adminEdgarIngest: () =>
+    authFetchApi<unknown>("/admin/edgar/ingest", { method: "POST" }),
+  adminInsiderScoreRecompute: () =>
+    authFetchApi<unknown>("/admin/insiders/score/recompute", { method: "POST" }),
+  adminShortInterestIngest: () =>
+    authFetchApi<unknown>("/admin/short-interest/ingest", { method: "POST" }),
   adminRecentScans: (limit = 10) =>
     authFetchApi<{ scans: AdminRecentScan[] }>(`/admin/scans/recent?limit=${limit}`),
 };

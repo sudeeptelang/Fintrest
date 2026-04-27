@@ -39,6 +39,11 @@ public class InsiderTransaction
 
     public bool IsOfficer { get; set; }
     public bool IsDirector { get; set; }
+    // Snake-case naming convention turns "Is10PctOwner" into
+    // "is10pct_owner" (no separator before "10"), but the migration
+    // creates "is_10pct_owner". Same gotcha as cluster_count_30d on
+    // InsiderScore. Explicit mapping required.
+    [Column("is_10pct_owner")]
     public bool Is10PctOwner { get; set; }
 
     [Column(TypeName = "date")]
@@ -69,6 +74,9 @@ public class InsiderTransaction
     public decimal? SharesOwnedAfter { get; set; }
 
     /// <summary>10b5-1 scheduled trades are pre-arranged, not discretionary. Excluded from scoring.</summary>
+    // Same naming gotcha — "Is10b5_1" snake-cases to "is10b5_1" but
+    // the migration creates "is_10b5_1".
+    [Column("is_10b5_1")]
     public bool Is10b5_1 { get; set; }
 
     public bool IsOpenMarket { get; set; } = true;

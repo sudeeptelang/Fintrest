@@ -64,7 +64,16 @@ builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Contracts.INewsPr
 // SEC EDGAR — free data source for Smart Money Phase 1 (Form 4 insider
 // trades). Uses a named HttpClient so the EdgarClient wrapper can apply
 // the mandatory User-Agent header + internal 10-rps throttle.
-builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Edgar.EdgarClient>();
+// EDGAR's daily index is served gzipped; without AutomaticDecompression
+// the client receives compressed bytes and parses them as plain text →
+// 0 Form 4 filings detected. Verified 2026-04-26 — plain text is 830KB
+// vs gzipped 80KB. Configure handler to decompress transparently.
+builder.Services.AddHttpClient<Fintrest.Api.Services.Providers.Edgar.EdgarClient>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        AutomaticDecompression = System.Net.DecompressionMethods.GZip
+                                | System.Net.DecompressionMethods.Deflate,
+    });
 builder.Services.AddScoped<Fintrest.Api.Services.Providers.Edgar.EdgarIngestService>();
 
 // Scoring configuration — weights, regime-conditional weight sets, thresholds.
