@@ -215,19 +215,21 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         }
       />
 
-      {/* 1. Lens thesis */}
-      <LensCardGated
-        eyebrow={lensEyebrow(signal)}
-        title={thesisTitle(thesis, signal)}
-        meta={signal ? `Signal #${String(signal.id).padStart(2, "0")}` : undefined}
-        personalizedForElite
-      >
-        {thesis?.thesis ? (
-          <>{thesis.thesis}</>
-        ) : (
-          <ThesisFallback ticker={ticker} signal={signal ?? null} />
-        )}
-      </LensCardGated>
+      {/* Lens thesis — renders only when there's both a real signal
+          AND real thesis text. The previous fallback ("ticker scored
+          X/100 with momentum at Y…") was templated prose that diluted
+          the editorial signature; better to hide the block than ship
+          a hollow version of it. Per feedback_lens_thesis_signals_only. */}
+      {signal && thesis?.thesis && (
+        <LensCardGated
+          eyebrow={lensEyebrow(signal)}
+          title={thesisTitle(thesis, signal)}
+          meta={`Signal #${String(signal.id).padStart(2, "0")}`}
+          personalizedForElite
+        >
+          {thesis.thesis}
+        </LensCardGated>
+      )}
 
       {/* Tabbed sections — Hero + Lens stay above, everything else lives
           behind a tab. Default lands on Signal so the trade plan +
@@ -728,39 +730,6 @@ function formatVolumeShort(v: number | null | undefined): string | undefined {
   if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
   if (v >= 1e3) return `${(v / 1e3).toFixed(0)}K`;
   return v.toString();
-}
-
-function ThesisFallback({
-  ticker,
-  signal,
-}: {
-  ticker: string;
-  signal: { scoreTotal: number; breakdown: { momentumScore: number; trendScore: number; riskScore: number } | null } | null;
-}) {
-  if (!signal) {
-    return <p>Loading Lens&apos;s thesis for {ticker}…</p>;
-  }
-  const b = signal.breakdown;
-  return (
-    <>
-      <p>
-        {ticker} scored <strong>{Math.round(signal.scoreTotal)}/100</strong> on today&apos;s scan
-        {b ? (
-          <>
-            {" "}— with momentum at <strong>{Math.round(b.momentumScore)}</strong>,
-            trend at <strong>{Math.round(b.trendScore)}</strong>, and risk at <strong>{Math.round(b.riskScore)}</strong>.
-          </>
-        ) : (
-          "."
-        )}
-      </p>
-      <p className="mt-3">
-        The 8-factor breakdown below shows what drove the score. Reference levels give
-        a structural view of where the setup activates, invalidates, and targets — the
-        decision to act is yours.
-      </p>
-    </>
-  );
 }
 
 function FundamentalSubscoreCard({
