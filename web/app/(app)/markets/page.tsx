@@ -20,6 +20,7 @@ import { PaywallGate } from "@/components/billing/paywall-gate";
 import { RegimeStrip } from "@/components/markets/regime-strip";
 import { MoversGrid } from "@/components/markets/movers-grid";
 import { MarketOverviewStrip } from "@/components/markets/market-overview-strip";
+import { SectorHeatmap } from "@/components/markets/sector-heatmap";
 import { IpoCalendarCard } from "@/components/markets/ipo-calendar-card";
 import { Newspaper, Sparkles } from "lucide-react";
 
@@ -105,6 +106,22 @@ export default function MarketsPage() {
       {/* Market overview — unified breadth + indices + treasury strip.
           Replaces the old MarketPulse + GlobalIndicesGrid two-card layout. */}
       <MarketOverviewStrip />
+
+      {/* Sector heatmap — compact strip for the at-a-glance "where is
+          money flowing today" read. Click any tile to drill into the
+          full /heatmap page. Per the 5-competitor audit: Yahoo / Finviz
+          lead with this on their markets pages. */}
+      <section className="rounded-[12px] border border-ink-200 bg-ink-0 p-5">
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="font-[var(--font-sans)] text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            Sector heatmap
+          </h2>
+          <Link href="/heatmap" className="font-[var(--font-sans)] text-[12px] font-medium text-forest hover:underline whitespace-nowrap">
+            Full heatmap →
+          </Link>
+        </div>
+        <SectorHeatmap variant="compact" />
+      </section>
 
       {/* Market movers — consolidated "one grid" per UX_AUDIT. Tabs for
           gainers/losers/52w/unusual, sector + cap filters, inline
