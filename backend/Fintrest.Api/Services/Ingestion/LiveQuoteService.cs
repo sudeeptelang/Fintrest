@@ -62,6 +62,12 @@ public class LiveQuoteService(
             row.ChangePct = q.ChangePct;
             row.DayHigh = q.DayHigh;
             row.DayLow = q.DayLow;
+            row.Open = q.Open;
+            row.YearHigh = q.YearHigh;
+            row.YearLow = q.YearLow;
+            row.PriceAvg50 = q.PriceAvg50;
+            row.PriceAvg200 = q.PriceAvg200;
+            row.MarketCap = q.MarketCap;
             row.Volume = q.Volume;
             row.AsOf = q.AsOf ?? nowUtc;
             row.UpdatedAt = nowUtc;

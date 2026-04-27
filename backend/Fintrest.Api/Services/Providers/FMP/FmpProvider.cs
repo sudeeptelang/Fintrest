@@ -623,6 +623,12 @@ public class FmpProvider(HttpClient http, IConfiguration config, ILogger<FmpProv
                     ChangePct: r.ChangePercentage,
                     DayHigh: r.DayHigh,
                     DayLow: r.DayLow,
+                    Open: r.Open,
+                    YearHigh: r.YearHigh,
+                    YearLow: r.YearLow,
+                    PriceAvg50: r.PriceAvg50,
+                    PriceAvg200: r.PriceAvg200,
+                    MarketCap: r.MarketCap,
                     // FMP ships fractional volume; LiveQuoteDto.Volume is
                     // long for legacy callers, so we floor here. Acceptable
                     // for display — sub-share counts aren't meaningful.
@@ -947,6 +953,12 @@ file record FmpQuote(
     [property: JsonPropertyName("volume")] decimal? Volume,
     [property: JsonPropertyName("dayLow")] decimal? DayLow,
     [property: JsonPropertyName("dayHigh")] decimal? DayHigh,
+    [property: JsonPropertyName("open")] decimal? Open,
+    [property: JsonPropertyName("yearHigh")] decimal? YearHigh,
+    [property: JsonPropertyName("yearLow")] decimal? YearLow,
+    [property: JsonPropertyName("priceAvg50")] decimal? PriceAvg50,
+    [property: JsonPropertyName("priceAvg200")] decimal? PriceAvg200,
+    [property: JsonPropertyName("marketCap")] decimal? MarketCap,
     [property: JsonPropertyName("timestamp")] long? Timestamp
 );
 

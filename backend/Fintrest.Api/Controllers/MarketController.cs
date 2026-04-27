@@ -627,10 +627,12 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             // market hours, the last refresh can legitimately be hours
             // old (last close), so we don't gate it.
             double? changePct = null;
-            if (liveQuotes.TryGetValue(stock.Ticker, out var lq) && IsLiveQuoteFresh(lq))
+            liveQuotes.TryGetValue(stock.Ticker, out var lq);
+            var lqFresh = lq is not null && IsLiveQuoteFresh(lq);
+            if (lqFresh)
             {
-                if (lq.Price.HasValue) price = (double)lq.Price.Value;
-                if (lq.ChangePct.HasValue) changePct = Math.Round((double)lq.ChangePct.Value, 2);
+                if (lq!.Price.HasValue) price = (double)lq.Price.Value;
+                if (lq!.ChangePct.HasValue) changePct = Math.Round((double)lq.ChangePct.Value, 2);
             }
 
             double? avgVol30 = bars.Count >= 30
@@ -642,10 +644,17 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
             double? PerfN(int n) => (latest is not null && bars.Count > n && bars[n].Close > 0)
                 ? Math.Round((latest.Close - bars[n].Close) / bars[n].Close * 100, 2) : null;
 
-            double? w52High = bars.Count > 0 ? bars.Max(b => b.High) : null;
-            double? w52Low = bars.Count > 0 ? bars.Min(b => b.Low) : null;
-            double? w52RangePct = (latest is not null && w52High is > 0 && w52Low is > 0 && w52High > w52Low)
-                ? Math.Round((latest.Close - w52Low.Value) / (w52High.Value - w52Low.Value) * 100, 1) : null;
+            // 52-week range: prefer FMP's authoritative yearHigh/yearLow
+            // (stored on live_quotes since migration 031). Bar-derived
+            // values from bars.Max/Min are kept as fallback only — they
+            // hit the same gappy-bars failure mode the screener was
+            // already vulnerable to. Direct-endpoints rule.
+            double? w52High = lq?.YearHigh.HasValue == true ? (double?)lq.YearHigh!.Value
+                : (bars.Count > 0 ? bars.Max(b => b.High) : null);
+            double? w52Low = lq?.YearLow.HasValue == true ? (double?)lq.YearLow!.Value
+                : (bars.Count > 0 ? bars.Min(b => b.Low) : null);
+            double? w52RangePct = (price is not null && w52High is > 0 && w52Low is > 0 && w52High > w52Low)
+                ? Math.Round((price.Value - w52Low.Value) / (w52High.Value - w52Low.Value) * 100, 1) : null;
 
             double? perfYtd = null;
             if (latest is not null)
@@ -673,7 +682,7 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 Sector: stock.Sector,
                 Price: price,
                 ChangePct: changePct,
-                Volume: latest?.Volume,
+                Volume: lq?.Volume ?? latest?.Volume,
                 RelVolume: relVol,
                 MarketCap: stock.MarketCap,
                 PeRatio: fund?.PeRatio,

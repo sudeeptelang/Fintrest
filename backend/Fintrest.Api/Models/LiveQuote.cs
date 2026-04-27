@@ -36,6 +36,30 @@ public class LiveQuote
     [Column(TypeName = "numeric(18,4)")]
     public decimal? DayLow { get; set; }
 
+    [Column(TypeName = "numeric(18,4)")]
+    public decimal? Open { get; set; }
+
+    // 52-week range — sourced from FMP /batch-quote.yearHigh/yearLow
+    // so we don't have to re-derive from 252 historical bars (which
+    // gets wrong values when ingest is gappy).
+    [Column(TypeName = "numeric(18,4)")]
+    public decimal? YearHigh { get; set; }
+
+    [Column(TypeName = "numeric(18,4)")]
+    public decimal? YearLow { get; set; }
+
+    // 50-day / 200-day moving averages — also from FMP. Replaces our
+    // bars.Take(50).Average() / bars.Average() derivation in the
+    // screener path.
+    [Column(TypeName = "numeric(18,4)")]
+    public decimal? PriceAvg50 { get; set; }
+
+    [Column(TypeName = "numeric(18,4)")]
+    public decimal? PriceAvg200 { get; set; }
+
+    [Column(TypeName = "numeric(20,2)")]
+    public decimal? MarketCap { get; set; }
+
     public long? Volume { get; set; }
 
     public DateTime AsOf { get; set; }

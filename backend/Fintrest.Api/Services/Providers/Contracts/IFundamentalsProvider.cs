@@ -107,8 +107,9 @@ public interface IFundamentalsProvider
 }
 
 /// <summary>Intraday quote from FMP /quote. Contains today's price,
-/// previousClose, changePercentage, dayHigh/Low, volume — everything
-/// needed to overlay onto the screener's EOD-only market_data bars.</summary>
+/// previousClose, changePercentage, day/year ranges, MAs, volume —
+/// everything needed to render screener / detail / heatmap surfaces
+/// directly from FMP without computing from market_data bars.</summary>
 public record LiveQuoteDto(
     string Ticker,
     decimal? Price,
@@ -117,6 +118,12 @@ public record LiveQuoteDto(
     decimal? ChangePct,
     decimal? DayHigh,
     decimal? DayLow,
+    decimal? Open,
+    decimal? YearHigh,
+    decimal? YearLow,
+    decimal? PriceAvg50,
+    decimal? PriceAvg200,
+    decimal? MarketCap,
     long? Volume,
     DateTime? AsOf
 );
