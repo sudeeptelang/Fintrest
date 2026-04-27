@@ -682,7 +682,7 @@ public class MarketController(AppDbContext db, INewsProvider newsProvider, IFund
                 Sector: stock.Sector,
                 Price: price,
                 ChangePct: changePct,
-                Volume: lq?.Volume ?? latest?.Volume,
+                Volume: lqFresh ? (lq?.Volume ?? latest?.Volume) : latest?.Volume,
                 RelVolume: relVol,
                 MarketCap: stock.MarketCap,
                 PeRatio: fund?.PeRatio,
